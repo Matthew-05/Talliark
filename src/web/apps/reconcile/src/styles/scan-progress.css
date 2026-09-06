@@ -1,0 +1,36 @@
+.scan-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.scan-progress__name {
+  font-weight: 600;
+}
+
+.scan-progress__stage {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.scan-progress__track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.scan-progress__fill {
+  height: 100%;
+  width: 0;
+  background: var(--color-accent);
+  transition: width 120ms linear;
+}
+
+.scan-progress .button {
+  align-self: flex-start;
+}

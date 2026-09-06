@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:talliark:schemas:reconcile:1",
+  "title": "Talliark Reconcile v1",
+  "description": "The result of one Reconcile scan of one document: the sum tree the document's own totals assert, and what the arithmetic made of it. Produced on demand -- the user selects a document and runs a scan -- and never in the cache build, which is what separates this artifact from table-structure-v1, document-values-v1 and financial-structure-v1. The whole tree is published, not only the exceptions: a home screen that can say '14 totals verified, 0 exceptions' is what makes a clean scan trustworthy instead of indistinguishable from a scan that never ran. Everything here is derived from the PDF alone; no XBRL, no taxonomy, no external fact set. Coordinates use normalized displayed-page, top-left-origin 0-1 space. Cell membership is derived per scan over the grid the scan itself re-detected, and is deliberately not published back into document-values-v1.",
+  "type": "object",
+  "required": ["version", "coordinateSpace", "detectorVersion", "source", "summary", "tables", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "coordinateSpace": { "const": "normalized" },
+    "detectorVersion": { "type": "string", "minLength": 1, "description": "Identifier of the Reconcile engine that produced this model. Bumped whenever analysis behaviour changes, so a stored result from an older engine can be told apart." },
+    "source": { "$ref": "#/definitions/ScanSource" },
+    "summary": { "$ref": "#/definitions/Summary" },
+    "tables": {
+      "type": "array",
+      "description": "One entry per detected table the scan examined, in page then reading order. A table with nothing nominated is still published: it is the record that the table was looked at and yielded nothing, which is what lets the window say it found nothing to check rather than implying the document passed.",
+      "items": { "$ref": "#/definitions/Table" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "What the scan is prepared to say out loud. Every finding restates as one sentence a reviewer can verify by hand in ten seconds, and carries the arithmetic and the spans behind it. Empty is a result, not silence -- summary.confirmed says how much was checked to reach it.",
+      "items": { "$ref": "#/definitions/Finding" }
+    }
+  },
+  "definitions": {
+
+    "Bounds": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+
+    "SpanId": {
+      "type": "string",
+      "pattern": "^(val|ref|str|noi)-[0-9a-f]{16}$",
+      "description": "The id of a span in the companion document-values-v1 model, which owns that span's printed text and geometry. Content-addressed, so it survives a detector upgrade -- and not a re-OCR that moves geometry, which is what source.geometryFingerprint exists to detect."
+    },
+
+    "ScanSource": {
+      "type": "object",
+      "description": "What this result was produced from. A stored result is shown as STALE rather than silently recomputed when any of this no longer matches what the workbook holds; only an explicit re-scan replaces it. A reviewer who has read a finding must never find it quietly changed underneath them.",
+      "required": ["documentId", "pageCount", "geometryFingerprint", "tableDetectorVersion", "valueDetectorVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1, "description": "GUID of the PdfDocument in the workbook this scan ran on." },
+        "pageCount": { "type": "integer", "minimum": 0 },
+        "geometryFingerprint": { "type": "string", "pattern": "^[0-9a-f]{16}$", "description": "Hash over the text geometry the scan read. Span ids are stable across detector versions but not across a re-OCR that moves geometry, so this is the fact that tells a result anchored to the old geometry from one anchored to the new." },
+        "tableDetectorVersion": { "type": "string", "minLength": 1, "description": "Version of the table detector the scan re-ran, unbudgeted and privately. Not necessarily the version whose output the viewer is reading." },
+        "valueDetectorVersion": { "type": "string", "minLength": 1 },
+        "financialStructureDetectorVersion": { "type": "string", "minLength": 1, "description": "Absent when the financial tier did not publish a model for this document." },
+        "scannedAt": { "type": "string", "format": "date-time", "description": "When the scan completed, in UTC. Presentation only; staleness is decided by the versions and the fingerprint, never by age." }
+      }
+    },
+
+    "Summary": {
+      "type": "object",
+      "description": "The counts the home screen reads. Every nominated total lands in exactly one of confirmed, breaks and unresolved, so those three sum to totalsNominated.",
+      "required": ["tablesExamined", "totalsNominated", "confirmed", "breaks", "unresolved"],
+      "additionalProperties": false,
+      "properties": {
+        "tablesExamined": { "type": "integer", "minimum": 0 },
+        "totalsNominated": { "type": "integer", "minimum": 0 },
+        "confirmed": { "type": "integer", "minimum": 0 },
+        "breaks": { "type": "integer", "minimum": 0 },
+        "unresolved": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "Table": {
+      "type": "object",
+      "description": "One detected table, with the cell layer Reconcile derived over it and every total nominated inside it.",
+      "required": ["id", "pageIndex", "bounds", "columnCount", "rowCount", "cells", "totals"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "pageIndex": { "type": "integer", "minimum": 0 },
+        "bounds": { "$ref": "#/definitions/Bounds" },
+        "columnCount": { "type": "integer", "minimum": 0 },
+        "rowCount": { "type": "integer", "minimum": 0, "description": "Body rows only. Header bands are not rows of the table for this purpose; table-structure-v1 remains the authority on which leading bands are header." },
+        "headerLabels": {
+          "type": "array",
+          "description": "Per column, what Reconcile made of that column's header label. Reconcile owns what a label MEANS; table-structure-v1 keeps owning which bands are header and what they say as printed.",
+          "items": { "$ref": "#/definitions/HeaderLabel" }
+        },
+        "cells": {
+          "type": "array",
+          "description": "Cells carrying text, in row then column order. Empty cells are omitted -- their absence is meaningful, because a blank cell breaks a run rather than contributing a zero.",
+          "items": { "$ref": "#/definitions/Cell" }
+        },
+        "totals": {
+          "type": "array",
+          "description": "Every cell nominated as a total in this table, whatever the arithmetic then made of it.",
+          "items": { "$ref": "#/definitions/NominatedTotal" }
+        }
+      }
+    },
+
+    "HeaderLabel": {
+      "type": "object",
+      "required": ["columnIndex", "text", "isTotalColumn", "isPeriodColumn"],
+      "additionalProperties": false,
+      "properties": {
+        "columnIndex": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string", "description": "The label as printed, joined across header bands in reading order." },
+        "isTotalColumn": { "type": "boolean", "description": "The header names a total -- Total, Consolidated, Combined. A cross-foot is attempted only against a column whose own header says so." },
+        "isPeriodColumn": { "type": "boolean", "description": "The header parses as a period or a year. Two or more of these in one table disables cross-footing for the table entirely: it is a comparative statement, and adding 2025 to 2024 is nonsense no tolerance model would catch." },
+        "period": { "type": "string", "minLength": 1, "description": "The period the label names, as printed. Absent when it names none." }
+      }
+    },
+
+    "Cell": {
+      "type": "object",
+      "description": "One cell of the grid, as Reconcile joined it: grid geometry intersected with text geometry for the text, and with document-values-v1 spans for the value. This membership is derived per scan and describes the grid the analysis actually used, which the cache build's grid may no longer be.",
+      "required": ["id", "rowIndex", "columnIndex", "text", "bounds"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "rowIndex": { "type": "integer", "minimum": 0 },
+        "columnIndex": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string", "description": "Cell text as printed, tokens joined in reading order." },
+        "bounds": { "$ref": "#/definitions/Bounds" },
+        "spanId": { "$ref": "#/definitions/SpanId", "description": "The value span this cell contains. Absent when the cell carries no recognized value -- a label, a blank, or a dash." },
+        "normalizedValue": { "type": "string", "description": "Exact canonical decimal, copied from the span unchanged. Sums are computed over this as decimal arithmetic and never as a binary float, and its decimal specificity is preserved through the addition because a near-miss diagnosis reads it. Absent when the cell has no value." },
+        "decimals": { "type": "integer", "minimum": 0, "description": "Printed decimal places. Members of a run must agree in this with each other and with the total, which is what keeps a per-share figure out of a column of whole millions without knowing what 'per share' means." },
+        "dash": { "type": "boolean", "description": "True when the cell holds a dash alone. A dash in a detected table cell is an addend worth zero, uniformly and wherever in a run it appears. A cell that is merely empty is not published at all, because a blank ends a candidate rather than contributing to it." },
+        "rowLabel": { "type": "string", "description": "The normalized label of this cell's row, taken from the row's leading cell. Present on value cells so a finding can name a row without a second lookup." }
+      }
+    },
+
+    "SignalName": {
+      "type": "string",
+      "enum": ["label-total", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
+      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. No signal may be inferred from the arithmetic -- a cell that happens to tie with the run above it is not thereby a total. Note what is absent: text-geometry-v1 carries no font or weight, so bold is not a signal that exists. Only label-total is enabled in the first pass; the rest are defined and switched on as measurement says they earn it."
+    },
+
+    "Signal": {
+      "type": "object",
+      "required": ["name", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/definitions/SignalName" },
+        "evidence": { "type": "string", "description": "What the detector saw, in a phrase a reviewer can check against the page -- 'row label reads \"Total net sales\"', 'rule spans this column in the gap above'." }
+      }
+    },
+
+    "Outcome": {
+      "type": "string",
+      "enum": ["confirmed", "break", "unresolved"],
+      "description": "confirmed: a candidate run sums exactly to the nominated total. break: no run sums to it, but a plausible run misses by a small delta. unresolved: nothing plausible was found. The distinction between the last two is the module's credibility, and neither is ever phrased as a failure of the document."
+    },
+
+    "NominatedTotal": {
+      "type": "object",
+      "description": "A cell nominated as a total on structural evidence, and what the arithmetic then made of it.",
+      "required": ["id", "cellId", "rowIndex", "columnIndex", "signals", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "cellId": { "type": "string", "minLength": 1 },
+        "rowIndex": { "type": "integer", "minimum": 0 },
+        "columnIndex": { "type": "integer", "minimum": 0 },
+        "axis": { "type": "string", "enum": ["vertical", "cross"], "default": "vertical", "description": "vertical: a run of cells in this column foots to this cell. cross: a run of cells in this row foots to it, attempted only against a column whose header names a total." },
+        "signals": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Why this cell was nominated. A run of three or more addends may be confirmed on label-total alone; a run of two requires a second enabled signal, and until one is enabled two-addend runs are not published at all -- a pair that happens to sum is nearly evidence-free.",
+          "items": { "$ref": "#/definitions/Signal" }
+        },
+        "outcome": { "$ref": "#/definitions/Outcome" },
+        "resolution": { "$ref": "#/definitions/SumRun", "description": "The run the tree is built on. Where a total could be confirmed either by the subtotals between it and the previous total or by the leaf rows beneath them, the subtotals win: that is the tree the statement is asserting. Absent when the outcome is unresolved." },
+        "leafResolution": { "$ref": "#/definitions/SumRun", "description": "The same total resolved against the leaf rows instead of the subtotals. Recorded because it is the same arithmetic and costs nothing, and never the tree. Absent unless the two differ." },
+        "unresolvedReason": { "type": "string", "enum": ["no-candidate-run", "run-too-short", "no-plausible-run", "mixed-decimals"], "description": "Why nothing was resolved. Present only when the outcome is unresolved. 'no-candidate-run' is the common one and is a statement about what was above the cell, not an accusation about the document." }
+      }
+    },
+
+    "SumRun": {
+      "type": "object",
+      "description": "A contiguous sequence of body cells added together, and what they came to. Subsets are not searched and non-contiguous combinations are not searched: both would restore precisely the coincidence problem that making structure the only nominator exists to remove.",
+      "required": ["basis", "addendCellIds", "sum", "delta"],
+      "additionalProperties": false,
+      "properties": {
+        "basis": { "type": "string", "enum": ["subtotals", "leaves"], "description": "Whether the run is made of the nominated subtotals between this total and the previous one, or of the leaf rows beneath them." },
+        "addendCellIds": {
+          "type": "array",
+          "minItems": 2,
+          "description": "The cells added, in run order. A dash cell appears here and contributes zero.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sum": { "type": "string", "description": "Exact decimal sum of the addends, at the run's shared decimal specificity. A string, never a binary float." },
+        "delta": { "type": "string", "description": "The nominated total minus the sum, as an exact decimal. '0' on a confirmed run. The first pass confirms on exact ties only -- a tolerance nobody has measured is how a rounding allowance quietly blesses a real error." },
+        "diagnosis": { "$ref": "#/definitions/Diagnosis", "description": "What the delta looks like. Present only on a non-zero delta, and only where a diagnosis applies." }
+      }
+    },
+
+    "Diagnosis": {
+      "type": "object",
+      "description": "A named shape of a miss, offered so a reviewer can check one thing rather than re-add the column.",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["transposition", "single-glyph", "sign", "omitted-addend"], "description": "transposition: the delta divides by 9, the signature of two adjacent digits swapped. single-glyph: the delta is explained by one digit read differently. sign: the delta is exactly twice an addend. omitted-addend: the delta equals a nearby value the run did not include." },
+        "detail": { "type": "string", "description": "The diagnosis in a phrase, for the sentence a finding prints." },
+        "cellId": { "type": "string", "minLength": 1, "description": "The cell the diagnosis points at, when it points at one." }
+      }
+    },
+
+    "FindingSpan": {
+      "type": "object",
+      "description": "One place on the page a finding is about, carried with its geometry so the window can take a reviewer to it without loading another model.",
+      "required": ["spanId", "pageIndex", "bounds", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "spanId": { "$ref": "#/definitions/SpanId" },
+        "pageIndex": { "type": "integer", "minimum": 0 },
+        "bounds": { "$ref": "#/definitions/Bounds" },
+        "role": { "type": "string", "enum": ["total", "addend", "diagnosis"], "description": "What this span is to the finding." }
+      }
+    },
+
+    "Finding": {
+      "type": "object",
+      "description": "One thing the scan is prepared to say. The sentence is the deliverable: 'these five rows sum to 12,345, the total row reads 12,354, and the difference of 9 is a digit transposition.' A finding that cannot be restated that way does not ship. Dispositions -- open, reviewed, explained, accepted -- are deliberately absent: where they are stored and how they survive a re-scan is the same question as staleness, and both belong to the home screen work.",
+      "required": ["id", "kind", "sentence", "tableId", "totalId", "spans"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["footing-break", "footing-unresolved", "cross-foot-break", "ruling-disagreement"],
+          "description": "ruling-disagreement covers both directions: a total drawn like a total that nothing sums to, and a confirmed tie with no rule above it. Rulings and arithmetic are independent, so a disagreement between them is itself worth surfacing."
+        },
+        "sentence": { "type": "string", "minLength": 1, "description": "The finding in one sentence a reviewer can verify by hand. Prose for a human -- a consumer renders it and never parses it." },
+        "tableId": { "type": "string", "minLength": 1 },
+        "totalId": { "type": "string", "minLength": 1 },
+        "pageIndex": { "type": "integer", "minimum": 0, "description": "Duplicated from the total's span so findings can be grouped by page without joining." },
+        "spans": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/FindingSpan" }
+        }
+      }
+    }
+
+  }
+}

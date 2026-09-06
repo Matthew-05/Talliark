@@ -1,0 +1,6 @@
+@import "@talliark/shared/base.css";
+@import "./layout.css";
+@import "./buttons.css";
+@import "./splash.css";
+@import "./document-list.css";
+@import "./scan-progress.css";

@@ -1046,6 +1046,8 @@
         "table-structure",
         "financial-structure",
         "values",
+        "reconcile-tables",
+        "reconcile",
         "result-transfer",
         "finalizing"
       ]
@@ -1078,6 +1080,138 @@
         { "type": "ocr-status", "pdfId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "status": "ocr" },
         { "type": "ocr-status", "pdfId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "status": "error", "message": "Tesseract not found" }
       ]
+    },
+
+    "ReconcileReadyMessage": {
+      "description": "Sent once by the reconcile web app after JavaScript has initialised. The host responds with ReconcileDataLoadedMessage. The app opens against the workbook, not against a sheet or a selection, so nothing about Excel's current state is carried here.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": { "type": { "const": "reconcile-ready" } },
+      "examples": [ { "type": "reconcile-ready" } ]
+    },
+
+    "ReconcileStaleness": {
+      "type": "string",
+      "enum": ["current", "stale", "none"],
+      "description": "What the workbook holds for one document. 'none' means no scan has run -- the window must say so plainly rather than implying the document passed. 'stale' means a result exists but the detector versions or the geometry it was produced from no longer match what the workbook holds; it is shown labelled stale and is never silently recomputed, because a reviewer who has read a finding must not find it quietly changed underneath them. Only an explicit re-scan replaces a result.",
+      "default": "none"
+    },
+
+    "ReconcileDocumentPayload": {
+      "description": "One document in the workbook as the Reconcile home lists it: what it is, and what reconcile data the workbook holds for it. The counts travel with the list so the home can render without loading a sum tree per document -- a clean scan reads '14 totals verified, 0 exceptions', which is what makes it trustworthy instead of indistinguishable from a scan that never ran.",
+      "type": "object",
+      "required": ["id", "name", "staleness"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "GUID of the PdfDocument." },
+        "name": { "type": "string", "description": "Display name." },
+        "folderId": { "type": "string", "description": "GUID of the owning folder, absent when uncategorised." },
+        "pageCount": { "type": "integer", "minimum": 0 },
+        "staleness": { "$ref": "#/definitions/ReconcileStaleness" },
+        "scannedAt": { "type": "string", "format": "date-time", "description": "When the stored scan completed, UTC. Presentation only -- staleness is decided by versions and geometry, never by age. Absent when staleness is none." },
+        "summary": { "$ref": "#/definitions/ReconcileSummaryPayload", "description": "Absent when staleness is none." }
+      }
+    },
+
+    "ReconcileSummaryPayload": {
+      "description": "The counts from a stored reconcile-v1 model's summary, copied verbatim. Every nominated total lands in exactly one of confirmed, breaks and unresolved.",
+      "type": "object",
+      "required": ["tablesExamined", "totalsNominated", "confirmed", "breaks", "unresolved"],
+      "additionalProperties": false,
+      "properties": {
+        "tablesExamined": { "type": "integer", "minimum": 0 },
+        "totalsNominated": { "type": "integer", "minimum": 0 },
+        "confirmed": { "type": "integer", "minimum": 0 },
+        "breaks": { "type": "integer", "minimum": 0 },
+        "unresolved": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "ReconcileDataLoadedMessage": {
+      "description": "Sent by the host in response to ReconcileReadyMessage, and again whenever the workbook's documents or their stored results change. An empty documents array is what puts the app on its 'add or select a document' splash; a non-empty one puts it on the home.",
+      "type": "object",
+      "required": ["type", "documents"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "reconcile-data-loaded" },
+        "documents": { "type": "array", "items": { "$ref": "#/definitions/ReconcileDocumentPayload" } },
+        "folders": { "type": "array", "items": { "$ref": "#/definitions/FolderPayload" } },
+        "scanning": { "type": "string", "description": "GUID of the document a scan is already running for, so an app that mounts mid-scan shows progress rather than an idle home. Absent when no scan is running." }
+      },
+      "examples": [
+        { "type": "reconcile-data-loaded", "documents": [] },
+        { "type": "reconcile-data-loaded", "documents": [ { "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "name": "apple 10k.pdf", "pageCount": 84, "staleness": "current", "scannedAt": "2026-09-06T18:04:11Z", "summary": { "tablesExamined": 61, "totalsNominated": 14, "confirmed": 14, "breaks": 0, "unresolved": 0 } } ] }
+      ]
+    },
+
+    "RunReconcileScanMessage": {
+      "description": "Sent by the reconcile web app to start a scan of one document. The host runs the existing ocr worker command with its analysis flag set, so the whole pipeline and the Reconcile engines are one sequential job under one cancellation. A scan is never started by the host on its own.",
+      "type": "object",
+      "required": ["type", "pdfId"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "run-reconcile-scan" },
+        "pdfId": { "type": "string", "description": "GUID of the document to scan." }
+      },
+      "examples": [ { "type": "run-reconcile-scan", "pdfId": "7c9e6679-7425-40de-944b-e07fc1f90ae7" } ]
+    },
+
+    "CancelReconcileScanMessage": {
+      "description": "Sent by the reconcile web app to cancel the running scan. Cancellation is handled exactly as OCR's is, and a cancelled scan leaves any previously stored result untouched.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": { "type": { "const": "cancel-reconcile-scan" } }
+    },
+
+    "ReconcileScanStatusMessage": {
+      "description": "Sent by the host to report scan progress for one document. The shape mirrors OcrStatusMessage deliberately: a scan is the OCR pipeline with two stages appended, and its progress is the same progress. stage is the machine-readable fact; message is prose beside it and must not be parsed.",
+      "type": "object",
+      "required": ["type", "pdfId", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "reconcile-scan-status" },
+        "pdfId": { "type": "string", "description": "GUID of the document being scanned." },
+        "status": {
+          "type": "string",
+          "enum": ["queued", "scanning", "complete", "cancelled", "error"],
+          "description": "Job lifecycle state. complete is sent after the result is stored, and is followed by a ReconcileDataLoadedMessage carrying the new counts."
+        },
+        "message": { "type": "string", "description": "Human-readable detail. Presentation only." },
+        "stage": { "$ref": "#/definitions/ProgressStage" },
+        "current": { "type": "integer", "minimum": 0, "description": "Completed units within the active stage. Counts within the stage only. Present only with total." },
+        "total": { "type": "integer", "minimum": 1, "description": "Total units within the active stage. Present only with current." },
+        "unit": { "type": "string", "enum": ["page", "chunk", "file", "table"], "description": "What current and total count. Present only with current and total." }
+      },
+      "examples": [
+        { "type": "reconcile-scan-status", "pdfId": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "status": "scanning", "message": "Finding tables page 23 of 84\u2026", "stage": "reconcile-tables", "current": 23, "total": 84, "unit": "page" },
+        { "type": "reconcile-scan-status", "pdfId": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "status": "complete" }
+      ]
+    },
+
+    "RequestReconcileResultMessage": {
+      "description": "Sent by the reconcile web app to load one document's stored sum tree. The list the home renders carries only counts, so the tree is fetched when a document is opened rather than with every list.",
+      "type": "object",
+      "required": ["type", "pdfId"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "request-reconcile-result" },
+        "pdfId": { "type": "string" }
+      }
+    },
+
+    "ReconcileResultLoadedMessage": {
+      "description": "Sent by the host in response to RequestReconcileResultMessage, carrying one document's whole reconcile-v1 model. Gzip-compressed and base64-encoded, as table structure and document values are on the same channel.",
+      "type": "object",
+      "required": ["type", "pdfId"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "reconcile-result-loaded" },
+        "pdfId": { "type": "string" },
+        "reconcileBase64": { "type": "string", "description": "Gzip-compressed reconcile-v1 JSON, base64-encoded. Absent when the workbook holds no result for this document." },
+        "staleness": { "$ref": "#/definitions/ReconcileStaleness" }
+      }
     },
 
     "LinkerAppReadyMessage": {
@@ -1312,6 +1446,14 @@
     { "$ref": "#/definitions/OcrStatusMessage" },
     { "$ref": "#/definitions/RotatePageMessage" },
     { "$ref": "#/definitions/PageRotationsUpdatedMessage" },
+
+    { "$ref": "#/definitions/ReconcileReadyMessage" },
+    { "$ref": "#/definitions/ReconcileDataLoadedMessage" },
+    { "$ref": "#/definitions/RunReconcileScanMessage" },
+    { "$ref": "#/definitions/CancelReconcileScanMessage" },
+    { "$ref": "#/definitions/ReconcileScanStatusMessage" },
+    { "$ref": "#/definitions/RequestReconcileResultMessage" },
+    { "$ref": "#/definitions/ReconcileResultLoadedMessage" },
 
     { "$ref": "#/definitions/LinkerAppReadyMessage" },
     { "$ref": "#/definitions/LinkerReadyMessage" },

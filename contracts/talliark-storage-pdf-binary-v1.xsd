@@ -17,6 +17,8 @@
     DocumentValuesBase64: optional — gzip-compressed document-values-v1 JSON, base64-encoded.
     FinancialStructureBase64: optional — gzip-compressed financial-structure-v1 JSON, base64-encoded.
       Financial documents only; absent means the tier did not run.
+    ReconcileBase64: optional — gzip-compressed reconcile-v1 JSON, base64-encoded.
+      Replaced only by an explicit successful scan; cache rebuilds retain it as stale.
   -->
   <xs:element name="PdfData">
     <xs:complexType>
@@ -26,6 +28,7 @@
         <xs:element name="TableStructureBase64" type="xs:string" minOccurs="0" />
         <xs:element name="DocumentValuesBase64" type="xs:string" minOccurs="0" />
         <xs:element name="FinancialStructureBase64"   type="xs:string" minOccurs="0" />
+        <xs:element name="ReconcileBase64"   type="xs:string" minOccurs="0" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>

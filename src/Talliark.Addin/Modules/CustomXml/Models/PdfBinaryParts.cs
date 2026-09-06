@@ -16,5 +16,7 @@ namespace Talliark.Addin.Modules.CustomXml.Models
         public string DocumentValuesBase64 { get; set; }
 
         public string FinancialStructureBase64 { get; set; }
+
+        public string ReconcileBase64 { get; set; }
     }
 }

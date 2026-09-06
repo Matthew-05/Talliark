@@ -63,6 +63,8 @@ namespace Talliark.Addin.Modules.CustomXml
 
         public const string FinancialStructureBase64ElementName = "FinancialStructureBase64";
 
+        public const string ReconcileBase64ElementName = "ReconcileBase64";
+
         // Page rotation storage
         public const string PageRotationsElementName = "PageRotations";
 

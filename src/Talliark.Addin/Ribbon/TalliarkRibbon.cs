@@ -68,6 +68,11 @@ namespace Talliark.Addin.Ribbon
             Globals.ThisAddIn.ShowManageFilesWindow();
         }
 
+        public void OnOpenReconcile(IRibbonControl control)
+        {
+            Globals.ThisAddIn.ShowReconcileWindow();
+        }
+
         public void OnLinkDocuments(IRibbonControl control)
         {
             Globals.ThisAddIn.ShowDocumentLinkerWindow();
@@ -466,6 +471,11 @@ namespace Talliark.Addin.Ribbon
         }
 
         public System.Drawing.Bitmap GetManageFilesImage(IRibbonControl control)
+        {
+            return LoadEmbeddedSvgAsIcon("icon-manage-files.svg");
+        }
+
+        public System.Drawing.Bitmap GetReconcileImage(IRibbonControl control)
         {
             return LoadEmbeddedSvgAsIcon("icon-manage-files.svg");
         }

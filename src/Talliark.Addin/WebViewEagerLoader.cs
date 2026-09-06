@@ -66,7 +66,7 @@ namespace Talliark.Addin
         }
 
         /// <summary>
-        /// Builds one workbook's four surfaces invisibly so each WebView2 starts initializing
+        /// Builds one workbook's surfaces invisibly so each WebView2 starts initializing
         /// now, then reclaims the warm surfaces of workbooks that have fallen out of use.
         /// Idempotent, so the workbook lifecycle events can all call it unconditionally.
         /// </summary>
@@ -89,6 +89,7 @@ namespace Talliark.Addin
                 // Ordered by how likely the user is to reach for each one.
                 addIn.WarmUpTaskPaneFor(workbook);
                 addIn.WarmUpFileManagerFor(workbook);
+                addIn.WarmUpReconcileFor(workbook);
                 addIn.WarmUpViewerWindowFor(workbook);
                 addIn.WarmUpLinkerWindowFor(workbook);
             }

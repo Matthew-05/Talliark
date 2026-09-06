@@ -108,6 +108,7 @@ namespace Talliark.Addin.Modules.CustomXml
                 TableStructureBase64 = parts.TableStructureBase64,
                 DocumentValuesBase64 = parts.DocumentValuesBase64,
                 FinancialStructureBase64 = parts.FinancialStructureBase64,
+                ReconcileBase64 = parts.ReconcileBase64,
                 PageRotations  = metadata.PageRotations,
             };
             return true;
@@ -128,6 +129,7 @@ namespace Talliark.Addin.Modules.CustomXml
                     TableStructureBase64 = parts.TableStructureBase64,
                     DocumentValuesBase64 = parts.DocumentValuesBase64,
                 FinancialStructureBase64 = parts.FinancialStructureBase64,
+                    ReconcileBase64 = parts.ReconcileBase64,
                     PageRotations  = m.PageRotations,
                 });
             }
@@ -151,6 +153,7 @@ namespace Talliark.Addin.Modules.CustomXml
                 TableStructureBase64 = pdf.TableStructureBase64,
                 DocumentValuesBase64 = pdf.DocumentValuesBase64,
                 FinancialStructureBase64 = pdf.FinancialStructureBase64,
+                ReconcileBase64 = pdf.ReconcileBase64,
             });
         }
 

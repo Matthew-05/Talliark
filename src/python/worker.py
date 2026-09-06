@@ -37,6 +37,7 @@ from engines.ocr_engine import (
 from engines.pdf_security import sanitize_pdf_bytes
 from engines.financial.detector import detect_financial_structure, structure_to_base64 as financial_structure_to_base64
 from engines.values.detector import detect_values, values_to_base64
+from engines.reconcile.detector import detect_reconcile, reconcile_to_base64
 from engines.values.lines import prepare as prepare_lines
 from engines.table.detector import detect_tables, structure_to_base64
 from engines.table_cell_engine import recover_table_geometry
@@ -526,6 +527,7 @@ def _handle_job(job: OcrJob) -> None:
         diagnostics["lines_ms"] = elapsed_ms(prepare_started)
 
         financial_structure_base64 = ""
+        financial_model: dict | None = None
         claims: tuple = ()
         structure_started = time.perf_counter()
         if prepared is not None:
@@ -537,6 +539,7 @@ def _handle_job(job: OcrJob) -> None:
                 structure = detect_financial_structure(prepared, tables=table_structure)
                 claims = structure.spans
                 model = structure.model
+                financial_model = model
                 diagnostics["financial_structure_detector_version"] = model["detectorVersion"]
                 diagnostics["financial_document_class"] = model["documentClass"]
                 diagnostics["financial_notes_found"] = model["apparatus"]["notes"]["found"]
@@ -557,11 +560,13 @@ def _handle_job(job: OcrJob) -> None:
         diagnostics["financial_structure_ms"] = elapsed_ms(structure_started)
 
         document_values_base64 = ""
+        values_model: dict | None = None
         values_started = time.perf_counter()
         if prepared is not None:
             try:
                 on_progress("Detecting values…", Stage.VALUES)
                 values = detect_values(prepared, claims=claims, diagnostics=diagnostics)
+                values_model = values
                 document_values_base64 = values_to_base64(values)
                 counts = {"number": 0, "percent": 0, "date": 0}
                 for page in values["pages"]:
@@ -579,6 +584,27 @@ def _handle_job(job: OcrJob) -> None:
                 diagnostics["values_error"] = str(exc)
                 on_progress("Value detection unavailable; keeping OCR geometry…", Stage.VALUES)
         diagnostics["values_ms"] = elapsed_ms(values_started)
+
+        # Reconcile runs last and only when the job asked for it. It is a scan
+        # the user chose to run, not a stage of the cache build, and it reads
+        # the values model this job just produced. Like every optional stage it
+        # must not cost the caller its OCR result if it fails.
+        reconcile_base64 = ""
+        if job.analysis:
+            try:
+                reconcile = detect_reconcile(
+                    pdf_bytes,
+                    geometry,
+                    document_id=job.document_id,
+                    values=values_model,
+                    financial=financial_model,
+                    progress_callback=on_progress,
+                    diagnostics=diagnostics,
+                )
+                reconcile_base64 = reconcile_to_base64(reconcile)
+            except Exception as exc:  # noqa: BLE001 — optional stage must preserve OCR
+                diagnostics["reconcile_error"] = str(exc)
+                on_progress("Reconcile scan unavailable; keeping OCR result…", Stage.RECONCILE)
 
         geometry_encode_started = time.perf_counter()
         geometry_base64 = geometry_to_base64(geometry)
@@ -609,6 +635,7 @@ def _handle_job(job: OcrJob) -> None:
                 table_structure_base64=table_structure_base64,
                 document_values_base64=document_values_base64,
                 financial_structure_base64=financial_structure_base64,
+                reconcile_base64=reconcile_base64,
                 diagnostics=diagnostics,
             ).to_dict()
         )

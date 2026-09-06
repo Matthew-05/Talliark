@@ -12,6 +12,12 @@ class OcrJob:
     command: str
     pdf_base64: str
     mode: str = "full"
+    # Reconcile is a scan, never a background pass: this is set only because a
+    # user chose to run one. It appends the scan to this job rather than adding
+    # a command, so the whole pipeline stays one job id, one progress stream and
+    # one cancellation.
+    analysis: bool = False
+    document_id: str = ""
 
     @staticmethod
     def from_dict(d: dict) -> "OcrJob":
@@ -23,6 +29,8 @@ class OcrJob:
             command=d["command"],
             pdf_base64=d["pdf_base64"],
             mode=mode,
+            analysis=bool(d.get("analysis", False)),
+            document_id=str(d.get("document_id", "")),
         )
 
 
@@ -36,6 +44,9 @@ class OcrResult:
     table_structure_base64: str = ""
     document_values_base64: str = ""
     financial_structure_base64: str = ""
+    # Present only when the job asked for analysis. Absent on an ordinary cache
+    # build, because Reconcile does not run in one.
+    reconcile_base64: str = ""
     error: str = ""      # populated on error
     # OcrDiagnostics per contracts/python-worker-v1.json. Host debug logging
     # only — the host must tolerate this being absent and must not branch on it.
@@ -54,6 +65,8 @@ class OcrResult:
                 d["document_values_base64"] = self.document_values_base64
             if self.financial_structure_base64:
                 d["financial_structure_base64"] = self.financial_structure_base64
+            if self.reconcile_base64:
+                d["reconcile_base64"] = self.reconcile_base64
             if self.diagnostics:
                 d["diagnostics"] = self.diagnostics
         else:
@@ -140,6 +153,10 @@ class Stage:
     TABLE_STRUCTURE = "table-structure"
     FINANCIAL_STRUCTURE = "financial-structure"
     VALUES = "values"
+    # The scan's two stages. They run only when a job asks for analysis, which
+    # is exactly the gap the enum's contract tells consumers to tolerate.
+    RECONCILE_TABLES = "reconcile-tables"
+    RECONCILE = "reconcile"
     RESULT_TRANSFER = "result-transfer"
     FINALIZING = "finalizing"
 
@@ -160,6 +177,8 @@ STAGE_ORDER: tuple[str, ...] = (
     Stage.TABLE_STRUCTURE,
     Stage.FINANCIAL_STRUCTURE,
     Stage.VALUES,
+    Stage.RECONCILE_TABLES,
+    Stage.RECONCILE,
     Stage.RESULT_TRANSFER,
     Stage.FINALIZING,
 )

@@ -5,7 +5,7 @@ import type { OcrProgress } from "../../host-bridge.js";
 // the barrel re-exports the pdf.js geometry module, whose top-level worker
 // setup is a side effect that keeps all of pdf.js in whatever bundles it.
 import { isTextEntryTarget } from "@talliark/shared/text-entry-target.js";
-import { fileProgressFraction, stageLabel } from "../../progress-stages.js";
+import { fileProgressFraction, stageLabel } from "@talliark/shared";
 
 export interface FileTableOptions {
   onSelectionChange(selectedIds: string[]): void;

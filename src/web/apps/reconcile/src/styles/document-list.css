@@ -1,0 +1,54 @@
+.document-list__title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.document-list__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.document-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name    actions"
+    "status  actions";
+  align-items: center;
+  gap: 2px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.document-row__name {
+  grid-area: name;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-row__status {
+  grid-area: status;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* A stale result is labelled, never hidden and never silently rebuilt. */
+.document-row--stale .document-row__status {
+  color: var(--color-text);
+}
+
+.document-row--stale {
+  border-left: 3px solid var(--color-accent);
+}
+
+.document-row__actions {
+  grid-area: actions;
+  display: flex;
+  gap: 6px;
+}

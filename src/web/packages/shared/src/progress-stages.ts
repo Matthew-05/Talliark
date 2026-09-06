@@ -6,6 +6,11 @@
  * `test/progress-stages.test.ts` fails if the two drift apart. The host states
  * which step a message belongs to, so nothing here reads the message text.
  *
+ * This lives in the shared package because two apps render the same pipeline:
+ * the file manager watches a cache build, and Reconcile watches a scan, which
+ * is that same pipeline with two stages appended. A second copy of the table
+ * would drift from the contract independently of the first.
+ *
  * Weights are this file's own, and they are presentation: they say how much of
  * a file's wait each step tends to be, which is what makes one bar advance
  * evenly instead of restarting per step. They are rough by nature; only their
@@ -40,6 +45,11 @@ export const STAGES: ReadonlyMap<string, StageDefinition> = new Map([
   ["table-structure", { label: "Finding tables",    weight: 6 }],
   ["financial-structure",    { label: "Reading structure", weight: 3 }],
   ["values",          { label: "Finding values",    weight: 3 }],
+  // The scan's own stages. They run only when a job asked for analysis, so an
+  // ordinary cache build jumps straight over them — which is the gap the
+  // contract already tells every consumer to tolerate.
+  ["reconcile-tables", { label: "Finding tables",    weight: 10 }],
+  ["reconcile",       { label: "Reconciling",       weight: 12 }],
   ["result-transfer", { label: "Saving",            weight: 3 }],
   ["finalizing",      { label: "Finalizing",        weight: 2 }],
 ]);

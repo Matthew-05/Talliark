@@ -68,13 +68,28 @@ namespace Talliark.Addin.Modules.Services
             Excel.Workbook workbook,
             Action<string, string, OcrStatusDetail> onStatusUpdate)
         {
-            return RunJobsAsync(pdfIds, workbook, onStatusUpdate);
+            return RunJobsAsync(pdfIds, workbook, onStatusUpdate, analysis: false);
+        }
+
+        /// <summary>
+        /// Runs the complete OCR pipeline for one document and appends the on-demand
+        /// Reconcile analysis under the same job id, progress stream and cancellation.
+        /// </summary>
+        public Task RunReconcileScanAsync(
+            string pdfId,
+            Excel.Workbook workbook,
+            Action<string, string, OcrStatusDetail> onStatusUpdate)
+        {
+            if (string.IsNullOrWhiteSpace(pdfId))
+                throw new ArgumentException("PDF id must be non-empty.", nameof(pdfId));
+            return RunJobsAsync(new[] { pdfId }, workbook, onStatusUpdate, analysis: true);
         }
 
         private async Task RunJobsAsync(
             IList<string> pdfIds,
             Excel.Workbook workbook,
-            Action<string, string, OcrStatusDetail> onStatusUpdate)
+            Action<string, string, OcrStatusDetail> onStatusUpdate,
+            bool analysis)
         {
             if (pdfIds == null || pdfIds.Count == 0) return;
             if (workbook == null) throw new ArgumentNullException(nameof(workbook));
@@ -105,7 +120,7 @@ namespace Talliark.Addin.Modules.Services
             }
 
             var loadClock = Stopwatch.StartNew();
-            var jobs = LoadJobData(pdfIds, workbook);
+            var jobs = LoadJobData(pdfIds, workbook, analysis);
             loadClock.Stop();
             if (jobs.Count == 0)
             {
@@ -224,7 +239,10 @@ namespace Talliark.Addin.Modules.Services
                         {
                             bool cancelled = token.IsCancellationRequested;
                             var callbackClock = Stopwatch.StartNew();
-                            Invoke(() => onStatusUpdate(job.PdfId, job.OriginalStatus, null));
+                            Invoke(() => onStatusUpdate(
+                                job.PdfId,
+                                job.Analysis && cancelled ? "cancelled" : job.OriginalStatus,
+                                null));
                             callbackClock.Stop();
                             if (cancelled) metrics.Cancelled++;
                             else metrics.Skipped++;
@@ -305,7 +323,7 @@ namespace Talliark.Addin.Modules.Services
                             var callbackClock = Stopwatch.StartNew();
                             Invoke(() => onStatusUpdate(
                                 job.PdfId,
-                                cancelled ? job.OriginalStatus : "error",
+                                cancelled ? (job.Analysis ? "cancelled" : job.OriginalStatus) : "error",
                                 cancelled ? null : "Worker closed unexpectedly."));
                             callbackClock.Stop();
                             if (cancelled) metrics.Cancelled++;
@@ -328,6 +346,16 @@ namespace Talliark.Addin.Modules.Services
                         var parseClock = Stopwatch.StartNew();
                         var parsed = ParseResultLine(resultLine);
                         parseClock.Stop();
+
+                        if (job.Analysis
+                            && string.Equals(parsed.Status, "success", StringComparison.Ordinal)
+                            && string.IsNullOrEmpty(parsed.ReconcileBase64))
+                        {
+                            parsed.Status = "error";
+                            parsed.Error = GetDiagnosticString(parsed.Diagnostics, "reconcile_error");
+                            if (string.IsNullOrEmpty(parsed.Error))
+                                parsed.Error = "The Reconcile scan did not return a result.";
+                        }
 
                         long storageMs = 0;
                         long callbackMs = processingCallbackClock.ElapsedMilliseconds;
@@ -360,7 +388,8 @@ namespace Talliark.Addin.Modules.Services
                                             parsed.GeometryBase64 ?? string.Empty,
                                             parsed.TableStructureBase64 ?? string.Empty,
                                             parsed.DocumentValuesBase64 ?? string.Empty,
-                                            parsed.FinancialStructureBase64 ?? string.Empty);
+                                            parsed.FinancialStructureBase64 ?? string.Empty,
+                                            job.Analysis ? parsed.ReconcileBase64 : null);
                                     }
                                     else
                                     {
@@ -371,13 +400,17 @@ namespace Talliark.Addin.Modules.Services
                                             parsed.GeometryBase64 ?? string.Empty,
                                             parsed.TableStructureBase64 ?? string.Empty,
                                             parsed.DocumentValuesBase64 ?? string.Empty,
-                                            parsed.FinancialStructureBase64 ?? string.Empty);
+                                            parsed.FinancialStructureBase64 ?? string.Empty,
+                                            job.Analysis ? parsed.ReconcileBase64 : null);
                                     }
                                     storageClock.Stop();
                                     storageMs = storageClock.ElapsedMilliseconds;
 
                                     var callbackClock = Stopwatch.StartNew();
-                                    onStatusUpdate(job.PdfId, PdfStatus.Ocr, null);
+                                    onStatusUpdate(
+                                        job.PdfId,
+                                        job.Analysis ? "complete" : PdfStatus.Ocr,
+                                        null);
                                     callbackClock.Stop();
                                     callbackMs += callbackClock.ElapsedMilliseconds;
                                 }
@@ -533,6 +566,7 @@ namespace Talliark.Addin.Modules.Services
                         TableStructureBase64 = PythonWorkerSession.GetString(obj, "table_structure_base64"),
                         DocumentValuesBase64 = PythonWorkerSession.GetString(obj, "document_values_base64"),
                         FinancialStructureBase64 = PythonWorkerSession.GetString(obj, "financial_structure_base64"),
+                        ReconcileBase64 = PythonWorkerSession.GetString(obj, "reconcile_base64"),
                         Diagnostics = PythonWorkerSession.GetDictionary(obj, "diagnostics"),
                     };
                 }
@@ -555,6 +589,14 @@ namespace Talliark.Addin.Modules.Services
             }
         }
 
+        private static string GetDiagnosticString(
+            Dictionary<string, object> diagnostics, string key)
+        {
+            return diagnostics != null && diagnostics.TryGetValue(key, out object value)
+                ? value?.ToString() ?? string.Empty
+                : string.Empty;
+        }
+
         private static string BuildJobJson(OcrJobEntry job)
         {
             var sb = new StringBuilder();
@@ -564,6 +606,11 @@ namespace Talliark.Addin.Modules.Services
             PythonWorkerSession.AppendJsonString(sb, job.Base64);
             sb.Append(",\"mode\":");
             PythonWorkerSession.AppendJsonString(sb, job.Mode ?? "full");
+            if (job.Analysis)
+            {
+                sb.Append(",\"analysis\":true,\"document_id\":");
+                PythonWorkerSession.AppendJsonString(sb, job.PdfId);
+            }
             sb.Append('}');
             return sb.ToString();
         }
@@ -572,7 +619,8 @@ namespace Talliark.Addin.Modules.Services
         /// Reads the base64 bytes for the requested PDFs from the workbook and assigns
         /// full OCR mode. Must be called on the UI thread.
         /// </summary>
-        private static IList<OcrJobEntry> LoadJobData(IList<string> pdfIds, Excel.Workbook workbook)
+        private static IList<OcrJobEntry> LoadJobData(
+            IList<string> pdfIds, Excel.Workbook workbook, bool analysis)
         {
             var store = new CustomXml.TalliarkCustomXmlPartStore(workbook);
             TalliarkContent content = store.LoadContent(); // metadata only — fast
@@ -597,6 +645,7 @@ namespace Talliark.Addin.Modules.Services
                     LoadMs = loadClock.ElapsedMilliseconds,
                     Mode = "full",
                     OriginalStatus = status,
+                    Analysis = analysis,
                 });
             }
             return result;
@@ -619,6 +668,7 @@ namespace Talliark.Addin.Modules.Services
             public long LoadMs { get; set; }
             public string Mode { get; set; }
             public string OriginalStatus { get; set; }
+            public bool Analysis { get; set; }
         }
 
         private sealed class OcrBatchMetrics
@@ -650,6 +700,7 @@ namespace Talliark.Addin.Modules.Services
             public string DocumentValuesBase64 { get; set; }
 
             public string FinancialStructureBase64 { get; set; }
+            public string ReconcileBase64 { get; set; }
             public string Error { get; set; }
 
             /// <summary>

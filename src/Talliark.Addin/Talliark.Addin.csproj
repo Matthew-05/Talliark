@@ -252,6 +252,7 @@
     <Compile Include="Modules\Services\NumberTextParser.cs" />
     <Compile Include="Modules\Services\OcrService.cs" />
     <Compile Include="Modules\Services\OcrStatusDetail.cs" />
+    <Compile Include="Modules\Services\ReconcileResultService.cs" />
     <Compile Include="Modules\Services\PdfImportService.cs" />
     <Compile Include="Modules\Services\PdfStatus.cs" />
     <Compile Include="Modules\Services\PdfTextLayerDetector.cs" />
@@ -292,6 +293,11 @@
     <Compile Include="Modules\WebView\FileManagerHost.cs" />
     <Compile Include="Modules\WebView\FileManagerMessageParser.cs" />
     <Compile Include="Modules\WebView\FileManagerMessageSerializer.cs" />
+    <Compile Include="Modules\WebView\ReconcileHost.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Modules\WebView\ReconcileMessageParser.cs" />
+    <Compile Include="Modules\WebView\ReconcileMessageSerializer.cs" />
     <Compile Include="Modules\WebView\HostMessageParser.cs" />
     <Compile Include="Modules\WebView\HostMessageSerializer.cs" />
     <Compile Include="Modules\WebView\IDocumentViewerHost.cs" />
@@ -375,6 +381,7 @@
     <ViewerDistDir>$(WebRootDir)\apps\document-viewer\dist</ViewerDistDir>
     <FileManagerDistDir>$(WebRootDir)\apps\file-manager\dist</FileManagerDistDir>
     <DocumentLinkerDistDir>$(WebRootDir)\apps\document-linker\dist</DocumentLinkerDistDir>
+    <ReconcileDistDir>$(WebRootDir)\apps\reconcile\dist</ReconcileDistDir>
   </PropertyGroup>
   <!-- Enumerate web source files so MSBuild can skip npm build when nothing changed -->
   <ItemGroup>
@@ -391,9 +398,12 @@
     <WebSourceFiles Include="$(WebRootDir)\apps\document-linker\src\**\*.*" />
     <WebSourceFiles Include="$(WebRootDir)\apps\document-linker\build.ts" />
     <WebSourceFiles Include="$(WebRootDir)\apps\document-linker\package.json" />
+    <WebSourceFiles Include="$(WebRootDir)\apps\reconcile\src\**\*.*" />
+    <WebSourceFiles Include="$(WebRootDir)\apps\reconcile\build.ts" />
+    <WebSourceFiles Include="$(WebRootDir)\apps\reconcile\package.json" />
     <WebSourceFiles Include="$(WebRootDir)\packages\**\src\**\*.*" />
   </ItemGroup>
-  <Target Name="BuildWebAssets" BeforeTargets="Build" Inputs="@(WebSourceFiles)" Outputs="$(ViewerDistDir)\index.js;$(ViewerDistDir)\index.css;$(FileManagerDistDir)\index.js;$(FileManagerDistDir)\index.css;$(DocumentLinkerDistDir)\index.js;$(DocumentLinkerDistDir)\index.css">
+  <Target Name="BuildWebAssets" BeforeTargets="Build" Inputs="@(WebSourceFiles)" Outputs="$(ViewerDistDir)\index.js;$(ViewerDistDir)\index.css;$(FileManagerDistDir)\index.js;$(FileManagerDistDir)\index.css;$(DocumentLinkerDistDir)\index.js;$(DocumentLinkerDistDir)\index.css;$(ReconcileDistDir)\index.js;$(ReconcileDistDir)\index.css">
     <!-- An empty node_modules is not an install. npm creates the directory before it
          fetches anything, so an interrupted, cleaned or never-completed install
          leaves the folder behind; the old Exists(node_modules) guard then skipped
@@ -416,10 +426,12 @@
       <FileManagerUiFiles Include="$(FileManagerDistDir)\**\*.*" />
       <!-- document-linker dist → webui/document-linker/ -->
       <DocumentLinkerUiFiles Include="$(DocumentLinkerDistDir)\**\*.*" />
+      <ReconcileUiFiles Include="$(ReconcileDistDir)\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(ViewerUiFiles)" DestinationFiles="@(ViewerUiFiles->'$(OutputPath)webui\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(FileManagerUiFiles)" DestinationFiles="@(FileManagerUiFiles->'$(OutputPath)webui\file-manager\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(DocumentLinkerUiFiles)" DestinationFiles="@(DocumentLinkerUiFiles->'$(OutputPath)webui\document-linker\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(ReconcileUiFiles)" DestinationFiles="@(ReconcileUiFiles->'$(OutputPath)webui\reconcile\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
   <!-- ── Python OCR worker copy ── -->
   <PropertyGroup>

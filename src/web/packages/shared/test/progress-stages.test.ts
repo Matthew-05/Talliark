@@ -61,6 +61,19 @@ const CONVERTED_RUN: Message[] = [
   ["result-transfer"], ["finalizing"],
 ];
 
+/**
+ * A Reconcile scan: the same pipeline, with the scan's two stages appended.
+ * Only a job the user started for analysis emits these, which is why the other
+ * two runs jump over them.
+ */
+const SCAN_RUN: Message[] = [
+  ["queue"], ["prepare", 1, 3], ["transfer", 1, 9],
+  ["security", 1, 84], ["source-check", 84, 84], ["source"],
+  ["table-structure", 84, 84], ["financial-structure"], ["values"],
+  ["reconcile-tables", 1, 84], ["reconcile-tables", 84, 84], ["reconcile"],
+  ["result-transfer"], ["finalizing"],
+];
+
 function replay(run: Message[]): number {
   let floor = 0;
   for (const [stage, current, total] of run) {
@@ -73,7 +86,11 @@ function replay(run: Message[]): number {
 }
 
 test("progress never goes backwards, on either path through the pipeline", () => {
-  for (const [name, run] of [["scanned", SCANNED_RUN], ["converted", CONVERTED_RUN]] as const) {
+  for (const [name, run] of [
+    ["scanned", SCANNED_RUN],
+    ["converted", CONVERTED_RUN],
+    ["scan", SCAN_RUN],
+  ] as const) {
     let floor = 0;
     for (const [stage, current, total] of run) {
       const fraction = fileProgressFraction(stage, current, total)!;
@@ -93,8 +110,11 @@ test("progress never goes backwards, on either path through the pipeline", () =>
 test("every stage in the table is reachable by some run", () => {
   // A stage nothing can emit holds weight the bar can never fill, which is what
   // left a finished run stalled below the end. Two runs cover the alternatives:
-  // recognition versus a trusted text layer, PDF input versus converted.
-  const reached = new Set([...SCANNED_RUN, ...CONVERTED_RUN].map(([stage]) => stage));
+  // recognition versus a trusted text layer, PDF input versus converted, and a
+  // cache build versus a scan the user ran.
+  const reached = new Set(
+    [...SCANNED_RUN, ...CONVERTED_RUN, ...SCAN_RUN].map(([stage]) => stage),
+  );
   const unreachable = STAGE_ORDER.filter((stage) => !reached.has(stage));
   assert.deepEqual(unreachable, [], `stages no run reaches: ${unreachable.join(", ")}`);
 });

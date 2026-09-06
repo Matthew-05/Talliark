@@ -49,6 +49,9 @@ namespace Talliark.Addin
         private readonly List<WorkbookFileManagerEntry> _workbookFileManagers =
             new List<WorkbookFileManagerEntry>();
 
+        private readonly List<WorkbookReconcileEntry> _workbookReconcileWindows =
+            new List<WorkbookReconcileEntry>();
+
         // Linkers are workbook-scoped for the same reason: the wizard reads one
         // workbook's cells and matches them against that workbook's PDFs, so a window may
         // never be re-pointed at another.
@@ -702,6 +705,19 @@ namespace Talliark.Addin
 
         }
 
+        internal void ShowReconcileWindow()
+        {
+            ReconcileClosedWorkbooks();
+            Excel.Workbook workbook = Application?.ActiveWorkbook;
+            if (workbook == null) return;
+
+            WorkbookReconcileEntry entry = EnsureReconcileFor(workbook);
+            entry.WasShown = true;
+            entry.Window.Show();
+            entry.Window.BringToFront();
+            entry.Window.RefreshDataIfReady();
+        }
+
 
 
         internal void ShowDocumentLinkerWindow()
@@ -863,6 +879,17 @@ namespace Talliark.Addin
             var window = new FileManagerHost(workbook);
             entry = new WorkbookFileManagerEntry(workbook, window);
             _workbookFileManagers.Add(entry);
+            return entry;
+        }
+
+        private WorkbookReconcileEntry EnsureReconcileFor(Excel.Workbook workbook)
+        {
+            WorkbookReconcileEntry entry = FindReconcileEntryFor(workbook);
+            if (entry != null && !entry.Window.IsDisposed) return entry;
+            if (entry != null) _workbookReconcileWindows.Remove(entry);
+
+            entry = new WorkbookReconcileEntry(workbook, new ReconcileHost(workbook));
+            _workbookReconcileWindows.Add(entry);
             return entry;
         }
 
@@ -1240,6 +1267,14 @@ namespace Talliark.Addin
             return null;
         }
 
+        private WorkbookReconcileEntry FindReconcileEntryFor(Excel.Workbook wb)
+        {
+            if (wb == null) return null;
+            foreach (WorkbookReconcileEntry entry in _workbookReconcileWindows)
+                if (IsSameWorkbook(wb, entry.Workbook)) return entry;
+            return null;
+        }
+
         // ── Event handlers ────────────────────────────────────────────────────
 
 
@@ -1361,6 +1396,10 @@ namespace Talliark.Addin
                 }
                 _workbookFileManagers.Clear();
 
+                foreach (WorkbookReconcileEntry entry in _workbookReconcileWindows.ToArray())
+                    DisposeWindow(entry.Window, "reconcile");
+                _workbookReconcileWindows.Clear();
+
                 foreach (WorkbookViewerEntry entry in _workbookViewers.ToArray())
                 {
                     try
@@ -1413,6 +1452,7 @@ namespace Talliark.Addin
                 $"ENTER workbook={GetWorkbookDebugName(wb)} cancel={cancel} " +
                 $"panes={_workbookPanes.Count} viewers={_workbookViewers.Count} " +
                 $"fileManagers={_workbookFileManagers.Count} " +
+                $"reconcileWindows={_workbookReconcileWindows.Count} " +
                 $"linkers={_workbookLinkers.Count} " +
                 $"sessions={_storageSessions.Count}");
 
@@ -1448,6 +1488,7 @@ namespace Talliark.Addin
             if (_workbookPanes.Count == 0
                 && _workbookViewers.Count == 0
                 && _workbookFileManagers.Count == 0
+                && _workbookReconcileWindows.Count == 0
                 && _workbookLinkers.Count == 0
                 && _recentlyActivated.Count == 0
                 && _storageSessions.Count == 0)
@@ -1530,6 +1571,24 @@ namespace Talliark.Addin
                 {
                     Modules.TalliarkLog.Trace(
                         $"reconcile: file manager dispose failed: {ex.GetType().FullName}: {ex.Message}");
+                }
+            }
+
+            foreach (WorkbookReconcileEntry entry in _workbookReconcileWindows.ToArray())
+            {
+                if (!entry.Window.IsDisposed
+                    && IsWorkbookStillOpen(entry.Workbook, liveWorkbooks))
+                    continue;
+
+                _workbookReconcileWindows.Remove(entry);
+                try
+                {
+                    if (!entry.Window.IsDisposed) entry.Window.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Modules.TalliarkLog.Trace(
+                        $"reconcile: Reconcile window dispose failed: {ex.Message}");
                 }
             }
 
@@ -1793,6 +1852,13 @@ namespace Talliark.Addin
                 DisposeWindow(entry.Window, "file manager");
             }
 
+            foreach (WorkbookReconcileEntry entry in _workbookReconcileWindows.ToArray())
+            {
+                if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
+                _workbookReconcileWindows.Remove(entry);
+                DisposeWindow(entry.Window, "reconcile");
+            }
+
             foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
             {
                 if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
@@ -1930,6 +1996,21 @@ namespace Talliark.Addin
             {
                 Modules.TalliarkLog.Trace(
                     $"WarmUpFileManagerFor failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        internal void WarmUpReconcileFor(Excel.Workbook wb)
+        {
+            if (wb == null) return;
+            try
+            {
+                WorkbookReconcileEntry entry = EnsureReconcileFor(wb);
+                _ = entry.Window.Handle;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"WarmUpReconcileFor failed: {ex.GetType().FullName}: {ex.Message}");
             }
         }
 
@@ -2564,6 +2645,20 @@ namespace Talliark.Addin
         internal bool WasShown { get; set; }
 
         internal WorkbookFileManagerEntry(Excel.Workbook workbook, FileManagerHost window)
+        {
+            Workbook = workbook;
+            Window = window;
+        }
+    }
+
+    /// <summary>Associates a workbook's COM identity with its Reconcile window.</summary>
+    internal sealed class WorkbookReconcileEntry
+    {
+        internal Excel.Workbook Workbook { get; }
+        internal ReconcileHost Window { get; }
+        internal bool WasShown { get; set; }
+
+        internal WorkbookReconcileEntry(Excel.Workbook workbook, ReconcileHost window)
         {
             Workbook = workbook;
             Window = window;

@@ -30,6 +30,13 @@ namespace Talliark.Addin.Modules.Infrastructure
         public const string TableStructure = "table-structure";
         public const string FinancialStructure = "financial-structure";
         public const string Values = "values";
+
+        // The Reconcile scan's two stages. They are emitted only by a job whose
+        // analysis flag is set, so an ordinary cache build jumps over them --
+        // which is exactly the gap the contract tells every consumer to tolerate.
+        public const string ReconcileTables = "reconcile-tables";
+        public const string Reconcile = "reconcile";
+
         public const string ResultTransfer = "result-transfer";
         public const string Finalizing = "finalizing";
 
@@ -50,6 +57,8 @@ namespace Talliark.Addin.Modules.Infrastructure
             TableStructure,
             FinancialStructure,
             Values,
+            ReconcileTables,
+            Reconcile,
             ResultTransfer,
             Finalizing,
         };

@@ -69,6 +69,15 @@
                   getImage="GetLinkDocumentsImage"
                   onAction="OnLinkDocuments" />
         </group>
+        <group id="Talliark.Group.Reconcile" label="Reconcile">
+          <button id="Talliark.BtnReconcile"
+                  label="Reconcile"
+                  size="large"
+                  screentip="Reconcile document totals"
+                  supertip="Scan a workbook document and verify the totals it presents."
+                  getImage="GetReconcileImage"
+                  onAction="OnOpenReconcile" />
+        </group>
         <group id="Talliark.Group.Help" label=" ">
           <button id="Talliark.BtnSettings"
                   label="Settings"

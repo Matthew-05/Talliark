@@ -1,0 +1,23 @@
+.splash {
+  margin: auto;
+  max-width: 380px;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.splash__title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.splash__lead {
+  margin: 0 0 16px;
+  color: var(--color-text-muted);
+}
+
+.splash__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
