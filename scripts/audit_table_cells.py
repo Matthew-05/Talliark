@@ -10,7 +10,7 @@ marks, and the column boundary has to fall on the far side of it; when it does
 not, the cell text a detector reports internally can still look right while every
 consumer of the contract reads the symbol into the wrong column.
 
-    py scripts/audit_table_cells.py "test-imports.local/apple 10k.pdf"
+    py scripts/audit_table_cells.py "test-imports.local/financial-statements/apple 10k.pdf"
     py scripts/audit_table_cells.py <pdf> --periods --json output/cells.json
 
 Exits non-zero when a marker lands in the wrong cell, so it can gate a change.

@@ -25,7 +25,7 @@ These reference PDFs in `test-imports.local/`, which are not committed. Generate
 candidates with:
 
 ```powershell
-py scripts/score_tables.py "test-imports.local/apple 10k.pdf" `
+py scripts/score_tables.py "test-imports.local/financial-statements/apple 10k.pdf" `
   --write-candidates output/table-candidates
 ```
 

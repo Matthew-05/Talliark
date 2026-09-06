@@ -6,7 +6,7 @@ real geometry and reports what was published, what was suppressed and why, so
 two runs can be compared across a change.
 
     py scripts/score_values.py
-    py scripts/score_values.py "test-imports.local/apple 10k.pdf" --write-report output/fs.json
+    py scripts/score_values.py "test-imports.local/financial-statements/apple 10k.pdf" --write-report output/fs.json
 """
 from __future__ import annotations
 

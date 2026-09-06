@@ -133,7 +133,7 @@ The confidence ladder as it stands: `0.99` with a percent sign or currency,
 `0.94` with comma grouping, `0.82` with a decimal point, `0.62` for a bare
 integer; dates are `0.98` at day precision and `0.92` otherwise. This measures
 *shape*. Rebasing it on evidence — how many independent supports hold — is
-phase 3 of `financial-value-precision.local.md`, and the number changes meaning when
+phase 3 of `value-precision.local.md`, and the number changes meaning when
 that lands.
 
 ## 3. References
