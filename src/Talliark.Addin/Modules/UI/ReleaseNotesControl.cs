@@ -99,14 +99,8 @@ namespace Talliark.Addin.Modules.UI
         {
             try
             {
-                var userDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Talliark",
-                    "WebView2");
-
-                var environment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: userDataFolder);
+                // The process-wide environment, same as every other host uses.
+                var environment = await WebViewEagerLoader.GetEnvironmentAsync();
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
 

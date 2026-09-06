@@ -48,6 +48,7 @@ namespace Talliark.Addin.Modules.WebView
     {
         private readonly Excel.Workbook _workbook;
         private readonly WebView2 _webView = new WebView2();
+        private WebViewStartupSurface _startup;
         private readonly NativeDropZonePanel _nativeDropZone = new NativeDropZonePanel();
         private readonly ManageFilesService _service = new ManageFilesService();
         private OcrService _ocrService;
@@ -90,8 +91,10 @@ namespace Talliark.Addin.Modules.WebView
             Text = string.IsNullOrWhiteSpace(workbookName)
                 ? "Talliark – Manage Files"
                 : $"Talliark – Manage Files – {workbookName}";
-            // OcrService needs a Control reference for UI-thread marshalling;
-            // created here after the Form's handle is available.
+            // OcrService needs a Control reference for UI-thread marshalling. The handle is
+            // not created yet at this point; warm-up realises it moments later, and nothing
+            // marshals through it before then — an OCR run is only reachable from the shown
+            // window.
             _ocrService = new OcrService(this);
             Width = 1100;
             Height = 620;
@@ -113,6 +116,10 @@ namespace Talliark.Addin.Modules.WebView
             _nativeDropZone.DragDrop += NativeFileDrop_DragDrop;
             Controls.Add(_nativeDropZone);
 
+            // Last in, so it covers both the web view and the drop zone until the manager's
+            // own UI is up. Nothing behind it is interactive while it is showing.
+            _startup = new WebViewStartupSurface(this, _webView);
+
             DragEnter += NativeFileDrop_DragEnter;
             DragOver += NativeFileDrop_DragEnter;
             DragLeave += NativeFileDrop_DragLeave;
@@ -128,13 +135,10 @@ namespace Talliark.Addin.Modules.WebView
             {
                 if (_disposed) return;
 
-                string userDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Talliark", "WebView2");
-
-                var environment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: userDataFolder);
+                // One environment per process, shared by every host: they all point at the
+                // same user data folder, and the runtime refuses a second environment over
+                // one folder. Already warm by the time any window opens.
+                var environment = await WebViewEagerLoader.GetEnvironmentAsync();
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -175,11 +179,10 @@ namespace Talliark.Addin.Modules.WebView
                 }
 
                 TalliarkLog.Trace($"EXCEPTION file manager init {ex.GetType().FullName}: {ex.Message}");
-                MessageBox.Show(
-                    $"Talliark file manager failed to load:\n\n{ex.Message}",
-                    "Talliark",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+
+                // In the window rather than a message box: this host is warmed invisibly on
+                // workbook open, so a modal here can fire with no window on screen to own it.
+                _startup?.ShowFailure(ex.Message);
             }
         }
 
@@ -528,6 +531,7 @@ namespace Talliark.Addin.Modules.WebView
                 switch (type)
                 {
                     case "manager-ready":
+                        _startup?.Reveal();
                         _webViewReady = true;
                         SendFilesToWebView();
                         break;
@@ -1070,6 +1074,9 @@ namespace Talliark.Addin.Modules.WebView
                     DragOver -= NativeFileDrop_DragEnter;
                     DragLeave -= NativeFileDrop_DragLeave;
                     DragDrop -= NativeFileDrop_DragDrop;
+
+                    _startup?.Dispose();
+                    _startup = null;
                 }
             }
             base.Dispose(disposing);

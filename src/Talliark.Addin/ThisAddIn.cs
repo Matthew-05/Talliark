@@ -49,7 +49,19 @@ namespace Talliark.Addin
         private readonly List<WorkbookFileManagerEntry> _workbookFileManagers =
             new List<WorkbookFileManagerEntry>();
 
-        private DocumentLinkerHost _linkerWindow;
+        // Linkers are workbook-scoped for the same reason: the wizard reads one
+        // workbook's cells and matches them against that workbook's PDFs, so a window may
+        // never be re-pointed at another.
+        private readonly List<WorkbookLinkerEntry> _workbookLinkers =
+            new List<WorkbookLinkerEntry>();
+
+        /// <summary>
+        /// Workbooks in most-recently-activated order. Exists only so warm surfaces stop
+        /// accumulating: everything outside the newest few loses whatever the user never
+        /// opened. Entries are dropped by <see cref="ReconcileClosedWorkbooks"/> along with
+        /// everything else belonging to a closed workbook.
+        /// </summary>
+        private readonly List<Excel.Workbook> _recentlyActivated = new List<Excel.Workbook>();
 
         private readonly Dictionary<string, WorkbookStorageSession> _storageSessions =
             new Dictionary<string, WorkbookStorageSession>(StringComparer.OrdinalIgnoreCase);
@@ -521,6 +533,8 @@ namespace Talliark.Addin
 
             if (entry == null) return;
 
+            entry.WasShown = true;
+
             entry.Pane.Visible = true;
 
             entry.Host.NotifyViewerShown();
@@ -541,6 +555,7 @@ namespace Talliark.Addin
             if (wb == null) return;
 
             WorkbookViewerEntry entry = EnsureViewerWindowFor(wb);
+            entry.WasShown = true;
             entry.Window.InvalidateData();
 
             HideTaskPaneFor(wb);
@@ -654,6 +669,20 @@ namespace Talliark.Addin
 
 
 
+        /// <summary>
+        /// Rebuilds a workbook's viewer overlays after its links change. Takes the workbook
+        /// explicitly because the linker can finish a run after focus has moved elsewhere,
+        /// and the new rectangles belong to the workbook that was linked, not the active one.
+        /// </summary>
+        internal void NotifyViewerLinksChanged(Excel.Workbook workbook)
+        {
+            IDocumentViewerHost host = GetViewerHostFor(workbook);
+            if (host == null) return;
+
+            host.InvalidateData();
+            host.RefreshDataIfReady();
+        }
+
         internal void ShowManageFilesWindow()
 
         {
@@ -666,6 +695,7 @@ namespace Talliark.Addin
             if (workbook == null) return;
 
             WorkbookFileManagerEntry entry = EnsureFileManagerFor(workbook);
+            entry.WasShown = true;
             entry.Window.Show();
             entry.Window.BringToFront();
             entry.Window.RefreshDataIfReady();
@@ -675,21 +705,24 @@ namespace Talliark.Addin
 
 
         internal void ShowDocumentLinkerWindow()
-
         {
+            ShowDocumentLinkerWindow(Application?.ActiveWorkbook);
+        }
 
-            if (_linkerWindow == null || _linkerWindow.IsDisposed)
+        internal void ShowDocumentLinkerWindow(Excel.Workbook workbook)
+        {
+            ReconcileClosedWorkbooks();
+            if (workbook == null) return;
 
-                _linkerWindow = new DocumentLinkerHost();
+            WorkbookLinkerEntry entry = EnsureLinkerFor(workbook);
+            entry.WasShown = true;
 
-            else
-
-                _linkerWindow.Reset();
-
-            _linkerWindow.Show();
-
-            _linkerWindow.BringToFront();
-
+            // Reset re-arms an already-initialised web view. A window built just now has
+            // not loaded its UI yet and posts linker-app-ready itself once it does, so the
+            // call is a no-op in that case rather than a second, competing hand-off.
+            entry.Window.Reset();
+            entry.Window.Show();
+            entry.Window.BringToFront();
         }
 
 
@@ -703,7 +736,6 @@ namespace Talliark.Addin
 
 
 
-        internal TaskPaneHost TaskPaneHost => FindEntryForActiveWorkbook()?.Host;
 
 
 
@@ -725,56 +757,6 @@ namespace Talliark.Addin
 
         }
 
-
-
-        /// <summary>
-
-        /// Ensures a task pane exists for the active workbook (eager-load / pre-warm).
-
-        /// </summary>
-
-        internal void EnsureTaskPaneCreated()
-
-        {
-
-            EnsureTaskPaneForActiveWorkbook();
-
-        }
-
-
-
-        internal void PreloadFileManagerWindow()
-
-        {
-            WarmUpFileManagerFor(Application?.ActiveWorkbook);
-
-        }
-
-
-
-        internal void PreloadViewerWindow()
-
-        {
-            Excel.Workbook wb = Application?.ActiveWorkbook;
-            if (wb == null) return;
-
-            WorkbookViewerEntry entry = EnsureViewerWindowFor(wb);
-            _ = entry.Window.Handle;
-
-        }
-
-
-
-        internal void PreloadLinkerWindow()
-
-        {
-
-            _linkerWindow = new DocumentLinkerHost();
-
-            _ = _linkerWindow.Handle;
-
-        }
-
         internal void CloseAllApplicationWindows()
         {
             foreach (WorkbookFileManagerEntry entry in _workbookFileManagers.ToArray())
@@ -787,68 +769,69 @@ namespace Talliark.Addin
                 if (!entry.Window.IsDisposed)
                     entry.Window.Close();
             }
-            if (_linkerWindow != null && !_linkerWindow.IsDisposed)
-                _linkerWindow.Close();
+            foreach (WorkbookLinkerEntry entry in _workbookLinkers.ToArray())
+            {
+                if (!entry.Window.IsDisposed)
+                    entry.Window.Close();
+            }
         }
 
 
 
         // ── Per-workbook task pane management ────────────────────────────────
-
-
-
         private WorkbookPaneEntry EnsureTaskPaneForActiveWorkbook()
-
         {
-
             // Clear out anything left by a workbook that has since closed, so a stale entry
             // cannot cause a second pane to be built for the active workbook.
             ReconcileClosedWorkbooks();
 
             Excel.Workbook wb = Application?.ActiveWorkbook;
-
             if (wb == null) return null;
 
-
-
             var entry = FindEntryFor(wb);
-
             if (entry != null) return entry;
 
-
+            // Passing the active window scopes the pane to this workbook's window, so Excel
+            // shows and hides it automatically when the user switches workbooks.
+            //
+            // ActiveWindow rather than the workbook's Windows[1], deliberately: a workbook
+            // can have several windows (View > New Window), and the pane belongs in the one
+            // the user is looking at. That only holds because panes are built for the active
+            // workbook and nothing else — the moment anything pre-creates a pane for a
+            // background workbook, this line attaches it to the wrong window.
+            Excel.Window window = Application?.ActiveWindow;
+            if (window == null)
+            {
+                Modules.TalliarkLog.Trace("EnsureTaskPaneForActiveWorkbook: no active window");
+                return null;
+            }
 
             var host = new TaskPaneHost(wb);
-
-            // Passing the active window scopes the pane to this workbook's window,
-
-            // so Excel shows/hides it automatically when the user switches workbooks.
-
-            var pane = CustomTaskPanes.Add(host, "Talliark", Application.ActiveWindow);
-
+            var pane = CustomTaskPanes.Add(host, "Talliark", window);
             pane.DockPosition = Office.MsoCTPDockPosition.msoCTPDockPositionRight;
-
             pane.Width = 640;
-
-
-
-            pane.VisibleChanged += (_, __) =>
-
-            {
-
-                if (IsViewerPoppedOutFor(wb) && pane.Visible)
-
-                    pane.Visible = false;
-
-            };
-
-
 
             entry = new WorkbookPaneEntry(wb, pane, host);
 
+            pane.VisibleChanged += (_, __) =>
+            {
+                if (!pane.Visible) return;
+
+                if (IsViewerPoppedOutFor(wb))
+                {
+                    pane.Visible = false;
+                    return;
+                }
+
+                // Excel shows the pane on its own when the user toggles it from the ribbon's
+                // task-pane list, which never goes through ShowTaskPane. Recording it here as
+                // well is what stops eviction treating a pane the user is looking at as
+                // unopened.
+                entry.WasShown = true;
+            };
+
             _workbookPanes.Add(entry);
-
             return entry;
-
         }
 
 
@@ -880,6 +863,21 @@ namespace Talliark.Addin
             var window = new FileManagerHost(workbook);
             entry = new WorkbookFileManagerEntry(workbook, window);
             _workbookFileManagers.Add(entry);
+            return entry;
+        }
+
+        private WorkbookLinkerEntry EnsureLinkerFor(Excel.Workbook workbook)
+        {
+            WorkbookLinkerEntry entry = FindLinkerEntryFor(workbook);
+            if (entry != null && !entry.Window.IsDisposed)
+                return entry;
+
+            if (entry != null)
+                _workbookLinkers.Remove(entry);
+
+            var window = new DocumentLinkerHost(workbook);
+            entry = new WorkbookLinkerEntry(workbook, window);
+            _workbookLinkers.Add(entry);
             return entry;
         }
 
@@ -1170,6 +1168,42 @@ namespace Talliark.Addin
             return null;
         }
 
+        /// <summary>Finds the document linker owned by a workbook using COM identity.</summary>
+        private WorkbookLinkerEntry FindLinkerEntryFor(Excel.Workbook wb)
+        {
+            if (wb == null) return null;
+
+            IntPtr target = IntPtr.Zero;
+            try
+            {
+                target = Marshal.GetIUnknownForObject(wb);
+                foreach (WorkbookLinkerEntry entry in _workbookLinkers)
+                {
+                    IntPtr candidate = IntPtr.Zero;
+                    try
+                    {
+                        candidate = Marshal.GetIUnknownForObject(entry.Workbook);
+                        if (candidate == target) return entry;
+                    }
+                    catch (Exception ex)
+                    {
+                        Modules.TalliarkLog.Trace(
+                            $"FindLinkerEntryFor skipping unusable entry: {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (candidate != IntPtr.Zero) Marshal.Release(candidate);
+                    }
+                }
+            }
+            finally
+            {
+                if (target != IntPtr.Zero) Marshal.Release(target);
+            }
+
+            return null;
+        }
+
         /// <summary>Finds the file manager owned by a workbook using COM identity.</summary>
         private WorkbookFileManagerEntry FindFileManagerEntryFor(Excel.Workbook wb)
         {
@@ -1302,30 +1336,12 @@ namespace Talliark.Addin
                 Modules.TalliarkLog.Trace($"ENTER panes={_workbookPanes.Count} sessions={_storageSessions.Count}");
 
                 foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
-
                 {
-
-                    try
-
-                    {
-
-                        Modules.TalliarkLog.Trace("disposing task pane host");
-
-                        entry.Host?.Dispose();
-
-                    }
-
-                    catch (Exception ex)
-
-                    {
-
-                        Modules.TalliarkLog.Trace($"task pane host dispose failed: {ex.GetType().FullName}: {ex.Message}");
-
-                    }
-
+                    DisposePaneEntry(entry, "shutdown");
                 }
 
                 _workbookPanes.Clear();
+                _recentlyActivated.Clear();
 
                 foreach (WorkbookFileManagerEntry entry in _workbookFileManagers.ToArray())
                 {
@@ -1363,31 +1379,23 @@ namespace Talliark.Addin
                 }
                 _workbookViewers.Clear();
 
-                try
-
+                foreach (WorkbookLinkerEntry entry in _workbookLinkers.ToArray())
                 {
-
-                    if (_linkerWindow != null && !_linkerWindow.IsDisposed)
-
+                    try
                     {
-
-                        Modules.TalliarkLog.Trace("disposing document linker window");
-
-                        _linkerWindow.Dispose();
-
+                        if (!entry.Window.IsDisposed)
+                        {
+                            Modules.TalliarkLog.Trace("disposing workbook document linker window");
+                            entry.Window.Dispose();
+                        }
                     }
-
+                    catch (Exception ex)
+                    {
+                        Modules.TalliarkLog.Trace(
+                            $"document linker dispose failed: {ex.GetType().FullName}: {ex.Message}");
+                    }
                 }
-
-                catch (Exception ex)
-
-                {
-
-                    Modules.TalliarkLog.Trace($"document linker window dispose failed: {ex.GetType().FullName}: {ex.Message}");
-
-                }
-
-                _linkerWindow = null;
+                _workbookLinkers.Clear();
 
                 _storageSessions.Clear();
 
@@ -1405,6 +1413,7 @@ namespace Talliark.Addin
                 $"ENTER workbook={GetWorkbookDebugName(wb)} cancel={cancel} " +
                 $"panes={_workbookPanes.Count} viewers={_workbookViewers.Count} " +
                 $"fileManagers={_workbookFileManagers.Count} " +
+                $"linkers={_workbookLinkers.Count} " +
                 $"sessions={_storageSessions.Count}");
 
             // Safe to drop even if the close is cancelled: the session is only a cache over
@@ -1439,6 +1448,8 @@ namespace Talliark.Addin
             if (_workbookPanes.Count == 0
                 && _workbookViewers.Count == 0
                 && _workbookFileManagers.Count == 0
+                && _workbookLinkers.Count == 0
+                && _recentlyActivated.Count == 0
                 && _storageSessions.Count == 0)
                 return;
 
@@ -1477,16 +1488,7 @@ namespace Talliark.Addin
 
                 Modules.TalliarkLog.Trace("reconcile: removing pane entry for closed workbook");
                 _workbookPanes.Remove(entry);
-
-                try
-                {
-                    entry.Host?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    Modules.TalliarkLog.Trace(
-                        $"reconcile: host dispose failed: {ex.GetType().FullName}: {ex.Message}");
-                }
+                DisposePaneEntry(entry, "reconcile");
             }
 
             foreach (WorkbookViewerEntry entry in _workbookViewers.ToArray())
@@ -1529,6 +1531,35 @@ namespace Talliark.Addin
                     Modules.TalliarkLog.Trace(
                         $"reconcile: file manager dispose failed: {ex.GetType().FullName}: {ex.Message}");
                 }
+            }
+
+            foreach (WorkbookLinkerEntry entry in _workbookLinkers.ToArray())
+            {
+                if (!entry.Window.IsDisposed
+                    && IsWorkbookStillOpen(entry.Workbook, liveWorkbooks))
+                    continue;
+
+                Modules.TalliarkLog.Trace("reconcile: removing document linker for closed workbook");
+                _workbookLinkers.Remove(entry);
+
+                try
+                {
+                    if (!entry.Window.IsDisposed)
+                        entry.Window.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Modules.TalliarkLog.Trace(
+                        $"reconcile: document linker dispose failed: {ex.GetType().FullName}: {ex.Message}");
+                }
+            }
+
+            // A closed workbook must not keep a slot in the warm set, or it would hold one
+            // open on behalf of a workbook that no longer exists.
+            for (int i = _recentlyActivated.Count - 1; i >= 0; i--)
+            {
+                if (!IsWorkbookStillOpen(_recentlyActivated[i], liveWorkbooks))
+                    _recentlyActivated.RemoveAt(i);
             }
 
             // Backstop for sessions WorkbookBeforeClose did not catch — a workbook closed
@@ -1576,10 +1607,7 @@ namespace Talliark.Addin
 
             ReconcileClosedWorkbooks();
 
-            // The startup eager-loader can run before Excel exposes ActiveWorkbook.
-            // Warm the manager for the workbook that actually became active so its
-            // workbook-bound WebView is ready before the user opens it.
-            WarmUpFileManagerFor(wb);
+            WebViewEagerLoader.WarmUp(this, wb);
 
             EnsureLinkTracking(wb);
 
@@ -1640,11 +1668,9 @@ namespace Talliark.Addin
 
             ReconcileClosedWorkbooks();
 
-            WarmUpFileManagerFor(wb);
+            WebViewEagerLoader.WarmUp(this, wb);
 
             EnsureLinkTracking(wb);
-
-            WarmUpTaskPaneFor(wb);
 
             await CheckForUpdateOnOpenAsync();
 
@@ -1692,61 +1718,206 @@ namespace Talliark.Addin
 
         {
 
-            WarmUpFileManagerFor(wb);
+            WebViewEagerLoader.WarmUp(this, wb);
 
             EnsureLinkTracking(wb);
 
-            WarmUpTaskPaneFor(wb);
-
         }
 
 
+        // ── Warm-up and eviction ──────────────────────────────────────────────
+        //
+        // Each warm-up creates a workbook's surface invisibly and forces HWND creation, which
+        // is what starts its WebView2 initialising, so the window is loaded before the user
+        // asks for it. All four are idempotent: the repeated calls that come from workbook
+        // activation cost a registry lookup and nothing more.
+        //
+        // Warming all four is only affordable because EvictUnopenedSurfaces takes them back.
+        // WebViewEagerLoader decides which run and how many workbooks stay warm; nothing else
+        // should call any of this directly.
 
         /// <summary>
-
-        /// Pre-creates the task pane for a workbook invisibly and forces HWND creation
-
-        /// so that WebView2 initialisation starts in the background. By the time the user
-
-        /// clicks "Show Task Pane" the WebView2 environment is already warm.
-
+        /// Records <paramref name="wb"/> as the most recently activated workbook.
         /// </summary>
-
-        private void WarmUpTaskPaneFor(Excel.Workbook wb)
-
+        internal void NoteWorkbookActivated(Excel.Workbook wb)
         {
-
             if (wb == null) return;
 
-            try
-
+            for (int i = _recentlyActivated.Count - 1; i >= 0; i--)
             {
-
-                var entry = EnsureTaskPaneForActiveWorkbook();
-
-                if (entry != null)
-
-                    _ = entry.Host.Handle;
-
+                if (IsSameWorkbook(_recentlyActivated[i], wb))
+                    _recentlyActivated.RemoveAt(i);
             }
 
-            catch (Exception ex)
-
-            {
-
-                System.Diagnostics.Debug.WriteLine(
-
-                    $"[Talliark] WarmUpTaskPaneFor failed: {ex.Message}");
-
-            }
-
+            _recentlyActivated.Insert(0, wb);
         }
 
         /// <summary>
-        /// Pre-creates the workbook-bound file manager invisibly and forces HWND creation
-        /// so its WebView2 shell loads before the user asks to show the window.
+        /// Disposes warm surfaces belonging to workbooks outside the
+        /// <paramref name="keepMostRecent"/> most recently activated, keeping anything the
+        /// user actually opened.
         /// </summary>
-        private void WarmUpFileManagerFor(Excel.Workbook wb)
+        /// <remarks>
+        /// This is what makes warming all four surfaces affordable. Without it, a session that
+        /// visits twenty workbooks ends up holding four WebView2 renderers for each of them,
+        /// most for workbooks the user glanced at once. The keep count has to be more than one
+        /// or alternating between two workbooks would rebuild every surface on each switch.
+        /// </remarks>
+        internal void EvictUnopenedSurfaces(int keepMostRecent)
+        {
+            if (keepMostRecent < 1) return;
+            if (_recentlyActivated.Count <= keepMostRecent) return;
+
+            var keep = new List<Excel.Workbook>();
+            for (int i = 0; i < keepMostRecent && i < _recentlyActivated.Count; i++)
+                keep.Add(_recentlyActivated[i]);
+
+            foreach (WorkbookLinkerEntry entry in _workbookLinkers.ToArray())
+            {
+                if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
+                _workbookLinkers.Remove(entry);
+                DisposeWindow(entry.Window, "linker");
+            }
+
+            foreach (WorkbookViewerEntry entry in _workbookViewers.ToArray())
+            {
+                if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
+                _workbookViewers.Remove(entry);
+                DisposeWindow(entry.Window, "viewer");
+            }
+
+            foreach (WorkbookFileManagerEntry entry in _workbookFileManagers.ToArray())
+            {
+                if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
+                _workbookFileManagers.Remove(entry);
+                DisposeWindow(entry.Window, "file manager");
+            }
+
+            foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
+            {
+                if (entry.WasShown || IsAnyOf(entry.Workbook, keep)) continue;
+                _workbookPanes.Remove(entry);
+                DisposePaneEntry(entry, "evict");
+            }
+        }
+
+        /// <summary>
+        /// Tears down a task pane, removing the CustomTaskPane from Excel's collection as well
+        /// as disposing the host.
+        /// </summary>
+        /// <remarks>
+        /// Disposing the host alone leaves the pane registered with Excel: an empty strip in
+        /// the task-pane list that cannot be reopened. That was survivable while panes only
+        /// died with their workbook; now that they can be reclaimed while Excel is running, it
+        /// would be visible.
+        /// </remarks>
+        private void DisposePaneEntry(WorkbookPaneEntry entry, string reason)
+        {
+            if (entry == null) return;
+
+            Modules.TalliarkLog.Trace($"{reason}: disposing task pane");
+
+            try
+            {
+                CustomTaskPanes.Remove(entry.Pane);
+            }
+            catch (Exception ex)
+            {
+                // Excel drops the pane itself when its window goes, so removing one whose
+                // workbook has already closed can fail. The host still has to be disposed.
+                Modules.TalliarkLog.Trace(
+                    $"{reason}: task pane remove failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+
+            try
+            {
+                entry.Host?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"{reason}: task pane host dispose failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        private static void DisposeWindow(Form window, string label)
+        {
+            if (window == null || window.IsDisposed) return;
+
+            Modules.TalliarkLog.Trace($"evict: disposing unopened {label}");
+
+            try
+            {
+                window.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"evict: {label} dispose failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        /// <summary>COM-identity comparison, the same test the registry lookups use.</summary>
+        private static bool IsSameWorkbook(Excel.Workbook left, Excel.Workbook right)
+        {
+            if (left == null || right == null) return false;
+
+            IntPtr a = IntPtr.Zero;
+            IntPtr b = IntPtr.Zero;
+            try
+            {
+                a = Marshal.GetIUnknownForObject(left);
+                b = Marshal.GetIUnknownForObject(right);
+                return a == b;
+            }
+            catch (Exception ex)
+            {
+                // One of them belongs to a workbook that has closed. Not a match, which makes
+                // callers treat it as evictable — and it is.
+                Modules.TalliarkLog.Trace($"IsSameWorkbook unusable: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (a != IntPtr.Zero) Marshal.Release(a);
+                if (b != IntPtr.Zero) Marshal.Release(b);
+            }
+        }
+
+        private static bool IsAnyOf(Excel.Workbook workbook, IList<Excel.Workbook> candidates)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (IsSameWorkbook(candidates[i], workbook)) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Only the active workbook, because the pane is bound to Application.ActiveWindow —
+        /// see EnsureTaskPaneForActiveWorkbook. Warm-up runs from workbook activation, open
+        /// and creation, where the workbook in hand is the active one; the guard is here so
+        /// that stays true if it is ever called from somewhere else.
+        /// </summary>
+        internal void WarmUpTaskPaneFor(Excel.Workbook wb)
+        {
+            if (wb == null || !IsSameWorkbook(wb, Application?.ActiveWorkbook)) return;
+
+            try
+            {
+                WorkbookPaneEntry entry = EnsureTaskPaneForActiveWorkbook();
+                if (entry != null)
+                    _ = entry.Host.Handle;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"WarmUpTaskPaneFor failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        internal void WarmUpFileManagerFor(Excel.Workbook wb)
         {
             if (wb == null) return;
 
@@ -1757,8 +1928,64 @@ namespace Talliark.Addin
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[Talliark] WarmUpFileManagerFor failed: {ex.Message}");
+                Modules.TalliarkLog.Trace(
+                    $"WarmUpFileManagerFor failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        internal void WarmUpViewerWindowFor(Excel.Workbook wb)
+        {
+            if (wb == null) return;
+
+            try
+            {
+                WorkbookViewerEntry entry = EnsureViewerWindowFor(wb);
+                _ = entry.Window.Handle;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"WarmUpViewerWindowFor failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        internal void WarmUpLinkerWindowFor(Excel.Workbook wb)
+        {
+            if (wb == null) return;
+
+            try
+            {
+                WorkbookLinkerEntry entry = EnsureLinkerFor(wb);
+                _ = entry.Window.Handle;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"WarmUpLinkerWindowFor failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// True when the user can bring this workbook to the front. Add-in and macro workbooks
+        /// (PERSONAL.XLSB and friends) are open but windowless or hidden, and a surface warmed
+        /// for one could never be shown.
+        /// </summary>
+        internal bool HasVisibleWindow(Excel.Workbook wb)
+        {
+            if (wb == null) return false;
+
+            try
+            {
+                Excel.Windows windows = wb.Windows;
+                if (windows == null || windows.Count == 0) return false;
+
+                return ((Excel.Window)windows[1]).Visible;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"HasVisibleWindow unavailable: {ex.GetType().FullName}: {ex.Message}");
+                return false;
             }
         }
 
@@ -1908,9 +2135,17 @@ namespace Talliark.Addin
 
             {
 
+                // Resolved once and reused. Each of these walks the pane and viewer
+                // registries comparing COM identity entry by entry, and the handler used to
+                // call them six separate times — so a single arrow key cost roughly a dozen
+                // scans, each proportional to the number of workbooks with surfaces open.
+                bool poppedOut = IsViewerPoppedOut;
+                bool paneViewerVisible = !poppedOut && IsTaskPaneViewerVisible();
+                IDocumentViewerHost viewer = GetActiveViewerHost();
+
                 string searchQuery = GetActiveCellDisplayText(target);
-                IDocumentViewerHost visibleViewer = GetVisibleViewerHost();
-                visibleViewer?.SendSearchQuery(searchQuery);
+                if (poppedOut || paneViewerVisible)
+                    viewer?.SendSearchQuery(searchQuery);
 
                 Excel.Workbook wb = Application?.ActiveWorkbook;
 
@@ -1926,7 +2161,7 @@ namespace Talliark.Addin
 
                 // Always publish the selection so the viewer can show or hide its panel.
 
-                GetActiveViewerHost()?.SendLinkSelectionChanged(selectedLinks);
+                viewer?.SendLinkSelectionChanged(selectedLinks);
 
 
 
@@ -1934,7 +2169,7 @@ namespace Talliark.Addin
 
                 {
 
-                    GetActiveViewerHost()?.SendClearRectangleHighlight();
+                    viewer?.SendClearRectangleHighlight();
 
                     return;
 
@@ -1942,21 +2177,19 @@ namespace Talliark.Addin
 
 
 
-                if (AutoOpenViewerOnCellClick
-
-                    && !IsViewerPoppedOut
-
-                    && !IsTaskPaneViewerVisible())
+                if (AutoOpenViewerOnCellClick && !poppedOut && !paneViewerVisible)
 
                 {
 
                     ShowTaskPane();
 
+                    // The only point where the handle read above can be stale: ShowTaskPane
+                    // may have just created the pane that becomes the viewer host.
+                    viewer = GetActiveViewerHost();
+
                 }
 
 
-
-                var viewer = GetActiveViewerHost();
 
                 if (viewer == null) return;
 
@@ -2280,6 +2513,9 @@ namespace Talliark.Addin
 
         internal TaskPaneHost Host { get; }
 
+        /// <summary>True once the user has opened this surface. See EvictUnopenedSurfaces.</summary>
+        internal bool WasShown { get; set; }
+
 
 
         internal WorkbookPaneEntry(
@@ -2308,6 +2544,9 @@ namespace Talliark.Addin
         internal Excel.Workbook Workbook { get; }
         internal ViewerWindowHost Window { get; }
 
+        /// <summary>True once the user has opened this surface. See EvictUnopenedSurfaces.</summary>
+        internal bool WasShown { get; set; }
+
         internal WorkbookViewerEntry(Excel.Workbook workbook, ViewerWindowHost window)
         {
             Workbook = workbook;
@@ -2321,7 +2560,26 @@ namespace Talliark.Addin
         internal Excel.Workbook Workbook { get; }
         internal FileManagerHost Window { get; }
 
+        /// <summary>True once the user has opened this surface. See EvictUnopenedSurfaces.</summary>
+        internal bool WasShown { get; set; }
+
         internal WorkbookFileManagerEntry(Excel.Workbook workbook, FileManagerHost window)
+        {
+            Workbook = workbook;
+            Window = window;
+        }
+    }
+
+    /// <summary>Associates a workbook's COM identity with its document-linker window.</summary>
+    internal sealed class WorkbookLinkerEntry
+    {
+        internal Excel.Workbook Workbook { get; }
+        internal DocumentLinkerHost Window { get; }
+
+        /// <summary>True once the user has opened this surface. See EvictUnopenedSurfaces.</summary>
+        internal bool WasShown { get; set; }
+
+        internal WorkbookLinkerEntry(Excel.Workbook workbook, DocumentLinkerHost window)
         {
             Workbook = workbook;
             Window = window;

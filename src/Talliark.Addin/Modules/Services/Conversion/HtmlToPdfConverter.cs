@@ -92,13 +92,8 @@ namespace Talliark.Addin.Modules.Services.Conversion
                 host.Controls.Add(webView);
                 host.Show();          // Realises the handle; the form stays off-screen.
 
-                string userDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Talliark", "WebView2");
-
-                CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: userDataFolder);
+                // The process-wide environment, same as every other host uses.
+                CoreWebView2Environment environment = await WebViewEagerLoader.GetEnvironmentAsync();
 
                 await webView.EnsureCoreWebView2Async(environment);
 

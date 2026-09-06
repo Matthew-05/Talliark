@@ -23,8 +23,8 @@ namespace Talliark.Addin.Modules.WebView
         private readonly string _loadFailureSurfaceName;
         private readonly Excel.Workbook _workbook;
         private readonly Panel _surface = new Panel();
-        private readonly Label _startupPlaceholder = new Label();
         private readonly WebView2 _webView = new WebView2();
+        private WebViewStartupSurface _startup;
         private readonly ExcelGridFocusRestoreService _focusRestoreService;
         private ThreadedProgressController _cacheProgress;
         private Task _initTask;
@@ -48,26 +48,17 @@ namespace Talliark.Addin.Modules.WebView
             _loadFailureSurfaceName = loadFailureSurfaceName ?? "viewer";
             _workbook = workbook ?? throw new ArgumentNullException(nameof(workbook));
 
-            Color background = Color.FromArgb(244, 244, 249);
-
             _surface.Dock = DockStyle.Fill;
-            _surface.BackColor = background;
 
             _webView.Dock = DockStyle.Fill;
-            _webView.DefaultBackgroundColor = background;
             _webView.Leave += OnWebViewLeave;
             _focusRestoreService = new ExcelGridFocusRestoreService(_surface);
 
-            _startupPlaceholder.Dock = DockStyle.Fill;
-            _startupPlaceholder.BackColor = background;
-            _startupPlaceholder.ForeColor = Color.FromArgb(92, 92, 112);
-            _startupPlaceholder.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-            _startupPlaceholder.Text = "Talliark Initializing...";
-            _startupPlaceholder.TextAlign = ContentAlignment.MiddleCenter;
-
             _surface.Controls.Add(_webView);
-            _surface.Controls.Add(_startupPlaceholder);
-            _startupPlaceholder.BringToFront();
+
+            // Same placeholder the file manager and linker use. The viewer needs it most:
+            // its bundle is the largest, and the pane is the surface opened most often.
+            _startup = new WebViewStartupSurface(_surface, _webView);
         }
 
         internal Control Surface => _surface;
@@ -89,13 +80,10 @@ namespace Talliark.Addin.Modules.WebView
             {
                 if (_disposed) return;
 
-                string userDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Talliark", "WebView2");
-
-                var environment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: userDataFolder);
+                // One environment per process, shared by every host: they all point at the
+                // same user data folder, and the runtime refuses a second environment over
+                // one folder. Already warm by the time any window opens.
+                var environment = await WebViewEagerLoader.GetEnvironmentAsync();
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -139,34 +127,9 @@ namespace Talliark.Addin.Modules.WebView
             }
         }
 
-        private void RevealWebView()
-        {
-            if (_disposed) return;
+        private void RevealWebView() => _startup?.Reveal();
 
-            if (_surface.InvokeRequired)
-            {
-                _surface.BeginInvoke(new Action(RevealWebView));
-                return;
-            }
-
-            _startupPlaceholder.Visible = false;
-            _webView.BringToFront();
-        }
-
-        private void ShowStartupFailure(string message)
-        {
-            if (_disposed) return;
-
-            if (_surface.InvokeRequired)
-            {
-                _surface.BeginInvoke(new Action(() => ShowStartupFailure(message)));
-                return;
-            }
-
-            _startupPlaceholder.Text = $"Talliark failed to load.\n\n{message}";
-            _startupPlaceholder.Visible = true;
-            _startupPlaceholder.BringToFront();
-        }
+        private void ShowStartupFailure(string message) => _startup?.ShowFailure(message);
 
         private void OnWebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
@@ -1153,7 +1116,8 @@ namespace Talliark.Addin.Modules.WebView
 
             try
             {
-                _startupPlaceholder.Dispose();
+                _startup?.Dispose();
+                _startup = null;
                 _surface.Dispose();
             }
             catch (Exception ex)

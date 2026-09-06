@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Talliark.Addin.Modules.CustomXml;
@@ -13,12 +14,16 @@ using Excel = Microsoft.Office.Interop.Excel;
 
 namespace Talliark.Addin.Modules.WebView
 {
-    /// <summary>Hosts the document-linker wizard web UI in a standalone non-modal window.</summary>
+    /// <summary>
+    /// Hosts the document-linker wizard web UI in a standalone non-modal window bound to
+    /// one workbook.
+    /// </summary>
     public sealed class DocumentLinkerHost : Form
     {
         private const string AllFoldersId = "__all__";
 
         private readonly WebView2 _webView = new WebView2();
+        private WebViewStartupSurface _startup;
         private bool _webViewReady;
         private bool _disposed;
         private bool _selectionChangeSubscribed;
@@ -46,9 +51,30 @@ namespace Talliark.Addin.Modules.WebView
         /// <summary>Column currently shown by hover preview, or 0 when none.</summary>
         private int _previewColNumber;
 
-        public DocumentLinkerHost()
+        /// <summary>
+        /// The workbook this window belongs to, fixed for the window's whole life. Linkers
+        /// follow the same ownership model as standalone viewers and file managers: one
+        /// window per workbook, never re-pointed at whichever workbook is active.
+        /// </summary>
+        private readonly Excel.Workbook _workbook;
+
+        public DocumentLinkerHost(Excel.Workbook workbook)
         {
-            Text = "Talliark – Link Documents";
+            _workbook = workbook ?? throw new ArgumentNullException(nameof(workbook));
+
+            string workbookName;
+            try
+            {
+                workbookName = workbook.Name;
+            }
+            catch
+            {
+                workbookName = null;
+            }
+
+            Text = string.IsNullOrWhiteSpace(workbookName)
+                ? "Talliark \u2013 Link Documents"
+                : $"Talliark \u2013 Link Documents \u2013 {workbookName}";
             Width = 900;
             Height = 640;
             MinimumSize = new System.Drawing.Size(700, 480);
@@ -56,6 +82,13 @@ namespace Talliark.Addin.Modules.WebView
 
             _webView.Dock = DockStyle.Fill;
             Controls.Add(_webView);
+
+            // Added after the web view so the placeholder sits on top of it. The window is
+            // normally warm by the time it is shown, but it must still hold up on the cold
+            // path — a workbook whose warm surfaces were evicted, or an eviction that landed
+            // between activation and the click. Cold, this bundle takes 2.06–2.31s to reach
+            // linker-app-ready, and every one of those seconds would be a blank rectangle.
+            _startup = new WebViewStartupSurface(this, _webView);
 
             _ = InitAsync();
         }
@@ -67,13 +100,10 @@ namespace Talliark.Addin.Modules.WebView
             {
                 if (_disposed) return;
 
-                string userDataFolder = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Talliark", "WebView2");
-
-                var environment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: userDataFolder);
+                // One environment per process, shared by every host: they all point at the
+                // same user data folder, and the runtime refuses a second environment over
+                // one folder. Already warm by the time any window opens.
+                var environment = await WebViewEagerLoader.GetEnvironmentAsync();
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -97,11 +127,11 @@ namespace Talliark.Addin.Modules.WebView
             catch (Exception ex)
             {
                 TalliarkLog.Trace($"EXCEPTION document linker init {ex.GetType().FullName}: {ex.Message}");
-                MessageBox.Show(
-                    $"Talliark document linker failed to load:\n\n{ex.Message}",
-                    "Talliark",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+
+                // In the window rather than a message box: this host is warmed invisibly, so
+                // a modal here could fire with no window on screen to own it. The placeholder
+                // carries the message instead, ready for whenever the window is opened.
+                _startup?.ShowFailure(ex.Message);
             }
         }
 
@@ -115,6 +145,10 @@ namespace Talliark.Addin.Modules.WebView
             switch (messageType)
             {
                 case "linker-app-ready":
+                    // The app's own signal, not NavigationCompleted: the wizard still has to
+                    // build step 1 after the page loads, and revealing before that trades a
+                    // blank window for a half-drawn one.
+                    _startup?.Reveal();
                     HandleAppReady();
                     break;
 
@@ -171,11 +205,23 @@ namespace Talliark.Addin.Modules.WebView
                 var app = Globals.ThisAddIn.Application;
                 if (app == null) return;
 
-                // The captured range is what pins the wizard to a workbook for the rest of
-                // its life; every later handler derives the workbook from it via
-                // GetSelectedWorkbook rather than re-reading ActiveWorkbook.
-                _selectedRange = app.Selection as Excel.Range;
-                if (_selectedRange == null) return;
+                // Armed before the selection is read, so a wizard opened while another
+                // workbook is in front fills step 1 the moment the user clicks back into
+                // the one that owns it. Hidden windows stay off the event entirely.
+                if (Visible)
+                    SubscribeSelectionChanged();
+
+                // Only the owning workbook's selection may pin the wizard. Reading the live
+                // selection unconditionally is how a window belonging to one workbook ended
+                // up matching against another's cells.
+                var selection = app.Selection as Excel.Range;
+                if (selection == null || !OwnsRange(selection))
+                {
+                    TalliarkLog.Trace("linker-app-ready: selection is outside the owning workbook");
+                    return;
+                }
+
+                _selectedRange = selection;
 
                 var workbook = GetSelectedWorkbook();
                 if (workbook == null) return;
@@ -193,7 +239,6 @@ namespace Talliark.Addin.Modules.WebView
                 string json = DocumentLinkerMessageSerializer.BuildLinkerReady(
                     rowCount, keyColumns, outputColumns, folders);
                 Post(json);
-                SubscribeSelectionChanged();
             }
             catch (Exception ex)
             {
@@ -207,6 +252,11 @@ namespace Talliark.Addin.Modules.WebView
 
             try
             {
+                // The event is application-wide, so it also fires for workbooks this window
+                // does not own. Adopting one of those ranges would re-target the wizard at a
+                // workbook whose PDFs and links are not the ones it is showing.
+                if (!OwnsRange(target)) return;
+
                 if (TryAnalyzeSelection(target, out int rowCount, out var keyColumns, out var outputColumns))
                 {
                     _selectedRange = target;
@@ -421,8 +471,8 @@ namespace Talliark.Addin.Modules.WebView
         }
 
         /// <summary>
-        /// The workbook the wizard is operating on: the one owning the range captured when it
-        /// opened, never whatever happens to be active now.
+        /// The workbook the wizard is operating on: the one this window was created for,
+        /// resolved through the captured range so a stale range cannot outlive it.
         /// </summary>
         /// <remarks>
         /// A matching run lasts long enough for the user to click into another workbook, so
@@ -439,13 +489,70 @@ namespace Talliark.Addin.Modules.WebView
             {
                 var firstArea = (Excel.Range)_selectedRange.Areas[1];
                 var worksheet = (Excel.Worksheet)firstArea.Worksheet;
-                return worksheet.Parent as Excel.Workbook;
+                var workbook = worksheet.Parent as Excel.Workbook;
+
+                // The captured range should never leave the owning workbook now that both
+                // entry points screen for it. A mismatch means one slipped through, so abort
+                // rather than write this window's links into a workbook it does not own.
+                return IsOwningWorkbook(workbook) ? workbook : null;
             }
             catch (Exception ex)
             {
                 // Typically the captured range's workbook has been closed mid-run.
                 TalliarkLog.Trace($"GetSelectedWorkbook unavailable: {ex.GetType().FullName}: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>True when <paramref name="range"/> lives in the owning workbook.</summary>
+        private bool OwnsRange(Excel.Range range)
+        {
+            if (range == null) return false;
+
+            try
+            {
+                return IsOwningWorkbook(range.Worksheet?.Parent as Excel.Workbook);
+            }
+            catch (Exception ex)
+            {
+                // A range whose workbook has closed throws on the first touch. Not ours.
+                TalliarkLog.Trace($"OwnsRange unavailable: {ex.GetType().FullName}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// COM-identity comparison against the workbook this window belongs to.
+        /// </summary>
+        /// <remarks>
+        /// Identity rather than <c>Name</c>: Excel hands out several RCW wrappers for the
+        /// same workbook, so reference equality gives false negatives, and two workbooks
+        /// opened from different folders can share a name, which gives false positives.
+        /// Matches how <c>ThisAddIn</c> resolves pane, viewer and file-manager entries.
+        /// </remarks>
+        private bool IsOwningWorkbook(Excel.Workbook workbook)
+        {
+            if (workbook == null || _workbook == null) return false;
+
+            IntPtr candidate = IntPtr.Zero;
+            IntPtr owner = IntPtr.Zero;
+            try
+            {
+                candidate = Marshal.GetIUnknownForObject(workbook);
+                owner = Marshal.GetIUnknownForObject(_workbook);
+                return candidate == owner;
+            }
+            catch (Exception ex)
+            {
+                // A closed workbook leaves an RCW that throws when touched; treating that as
+                // "not ours" makes callers abort, which is the safe outcome here.
+                TalliarkLog.Trace($"IsOwningWorkbook unavailable: {ex.GetType().FullName}: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (candidate != IntPtr.Zero) Marshal.Release(candidate);
+                if (owner != IntPtr.Zero) Marshal.Release(owner);
             }
         }
 
@@ -564,6 +671,27 @@ namespace Talliark.Addin.Modules.WebView
             int clampedLast = Math.Min(last, boundLast);
             clampedCount = clampedLast - clampedStart + 1;
             if (clampedCount < 0) clampedCount = 0;
+        }
+
+        /// <summary>
+        /// Tracks the Excel selection only while this window is on screen.
+        /// </summary>
+        /// <remarks>
+        /// SheetSelectionChange is application-wide and one of Excel's hottest events, and
+        /// there is now one linker per open workbook. Leaving every hidden window subscribed
+        /// — including the warm-loaded one the user may never open — would put a handler on
+        /// that event for each of them, all but one of which would immediately bail out of
+        /// <see cref="OwnsRange"/>.
+        /// </remarks>
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (_disposed) return;
+
+            if (!Visible)
+                UnsubscribeSelectionChanged();
+            else if (!_selectionLocked)
+                SubscribeSelectionChanged();
         }
 
         private void SubscribeSelectionChanged()
@@ -748,13 +876,11 @@ namespace Talliark.Addin.Modules.WebView
                     });
                 }
 
-                // Notify the active viewer that links have changed so overlays refresh
-                var viewerHost = Globals.ThisAddIn.GetActiveViewerHost();
-                if (viewerHost != null)
-                {
-                    viewerHost.InvalidateData();
-                    viewerHost.RefreshDataIfReady();
-                }
+                // Refresh the owning workbook's viewer, not the active one: creating links
+                // can take long enough for the user to have moved to another workbook, and
+                // the new overlays belong to this one.
+                Globals.ThisAddIn.NotifyViewerLinksChanged(workbook);
+                Globals.ThisAddIn.NotifyFileManagerLinksChanged(workbook);
             }
             catch (Exception ex)
             {
@@ -811,6 +937,8 @@ namespace Talliark.Addin.Modules.WebView
                 ClearOutputRangePreview();
                 _disposed = true;
                 UnsubscribeSelectionChanged();
+                _startup?.Dispose();
+                _startup = null;
                 _webView.Dispose();
             }
             base.Dispose(disposing);
