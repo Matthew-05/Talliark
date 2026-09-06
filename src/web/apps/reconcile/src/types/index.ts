@@ -61,3 +61,82 @@ export interface ScanProgress {
   readonly total?: number | undefined;
   readonly unit?: string | undefined;
 }
+
+export interface Bounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export type ReconcileOutcome = "confirmed" | "break" | "unresolved";
+
+export interface ReconcileCell {
+  readonly id: string;
+  readonly rowIndex: number;
+  readonly columnIndex: number;
+  readonly text: string;
+  readonly bounds: Bounds;
+  readonly normalizedValue?: string | undefined;
+  readonly rowLabel?: string | undefined;
+}
+
+export interface ReconcileSumRun {
+  readonly basis: "subtotals" | "leaves";
+  readonly addendCellIds: string[];
+  readonly sum: string;
+  readonly delta: string;
+  readonly diagnosis?: {
+    readonly kind: "transposition" | "single-glyph" | "sign" | "omitted-addend";
+    readonly detail?: string | undefined;
+    readonly cellId?: string | undefined;
+  } | undefined;
+}
+
+export interface ReconcileTotal {
+  readonly id: string;
+  readonly cellId: string;
+  readonly rowIndex: number;
+  readonly columnIndex: number;
+  readonly axis?: "vertical" | "cross" | undefined;
+  readonly outcome: ReconcileOutcome;
+  readonly resolution?: ReconcileSumRun | undefined;
+  readonly unresolvedReason?: string | undefined;
+}
+
+export interface ReconcileTable {
+  readonly id: string;
+  readonly pageIndex: number;
+  readonly bounds: Bounds;
+  readonly columnCount: number;
+  readonly rowCount: number;
+  readonly cells: ReconcileCell[];
+  readonly totals: ReconcileTotal[];
+}
+
+export interface ReconcileFinding {
+  readonly id: string;
+  readonly kind:
+    | "footing-break"
+    | "footing-unresolved"
+    | "cross-foot-break"
+    | "ruling-disagreement";
+  readonly sentence: string;
+  readonly tableId: string;
+  readonly totalId: string;
+  readonly pageIndex?: number | undefined;
+}
+
+export interface ReconcileModel {
+  readonly version: 1;
+  readonly coordinateSpace: "normalized";
+  readonly detectorVersion: string;
+  readonly source: {
+    readonly documentId: string;
+    readonly pageCount: number;
+    readonly scannedAt?: string | undefined;
+  };
+  readonly summary: ReconcileSummary;
+  readonly tables: ReconcileTable[];
+  readonly findings: ReconcileFinding[];
+}
