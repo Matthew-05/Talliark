@@ -27,6 +27,8 @@ function coverageOf(rect: NormalizedRect, table: DetectedTable, area: number): n
 
 export class TableStructureCache {
   private readonly _cache = new Map<string, Map<number, DetectedTable[]>>();
+  private readonly _generations = new Map<string, number>();
+  private _epoch = 0;
   private readonly _decoder: ((base64: string) => Promise<TableStructure>) | undefined;
 
   constructor(decoder?: (base64: string) => Promise<TableStructure>) {
@@ -35,19 +37,23 @@ export class TableStructureCache {
 
   async build(pdfId: string, tableStructureBase64?: string): Promise<void> {
     this.clearPdf(pdfId);
+    const epoch = this._epoch;
+    const generation = this._generations.get(pdfId) ?? 0;
     if (!tableStructureBase64) return;
     try {
       const decode = this._decoder
         ?? (await import("@talliark/shared")).decodeTableStructure;
       const structure = await decode(tableStructureBase64);
-      this._cache.set(
-        pdfId,
-        new Map(structure.pages.map((page) => [page.pageIndex, page.tables])),
-      );
+      if (this._isCurrent(pdfId, epoch, generation)) {
+        this._cache.set(
+          pdfId,
+          new Map(structure.pages.map((page) => [page.pageIndex, page.tables])),
+        );
+      }
     } catch {
       // The model is optional. A corrupt or future-version payload must not prevent
       // the PDF and its ordinary text geometry from loading.
-      this.clearPdf(pdfId);
+      if (this._isCurrent(pdfId, epoch, generation)) this._cache.delete(pdfId);
     }
   }
 
@@ -127,9 +133,16 @@ export class TableStructureCache {
 
   clearPdf(pdfId: string): void {
     this._cache.delete(pdfId);
+    this._generations.set(pdfId, (this._generations.get(pdfId) ?? 0) + 1);
   }
 
   clear(): void {
     this._cache.clear();
+    this._generations.clear();
+    this._epoch++;
+  }
+
+  private _isCurrent(pdfId: string, epoch: number, generation: number): boolean {
+    return this._epoch === epoch && (this._generations.get(pdfId) ?? 0) === generation;
   }
 }

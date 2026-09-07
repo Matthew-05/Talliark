@@ -820,7 +820,11 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
         }
       }
     },
-    () => { refreshTableMetadata(); valuesOverlay.refresh(); },
+    () => {
+      charBboxDebug.refresh();
+      refreshTableMetadata();
+      valuesOverlay.refresh();
+    },
     {
       onLinkedRectangles: (rects) => {
         contextMenu.hide();

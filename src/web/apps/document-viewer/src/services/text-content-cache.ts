@@ -26,6 +26,8 @@ export class TextContentCache {
   private readonly _cache = new Map<string, Map<number, CharacterEntry[]>>();
   private readonly _searchIndexCache = new Map<string, Map<number, SearchPageIndex>>();
   private readonly _geometryByPdfId = new Map<string, string>();
+  private readonly _generations = new Map<string, number>();
+  private _epoch = 0;
 
   /**
    * Builds the full character cache for every page by loading the PDF from
@@ -46,15 +48,20 @@ export class TextContentCache {
     }
 
     if (this.has(pdfId)) return;
+    const epoch = this._epoch;
+    const generation = this._generations.get(pdfId) ?? 0;
 
     const storedGeometry = this._geometryByPdfId.get(pdfId);
     if (storedGeometry) {
-      await this._buildFromGeometry(pdfId, storedGeometry);
+      const entries = buildCharEntriesFromGeometry(await decodeTextGeometry(storedGeometry));
+      if (this._isCurrent(pdfId, epoch, generation)) this._cache.set(pdfId, entries);
       return;
     }
 
     const geometry = await extractTextGeometryFromPdfUrl(url);
-    this._cache.set(pdfId, buildCharEntriesFromGeometry(geometry));
+    if (this._isCurrent(pdfId, epoch, generation)) {
+      this._cache.set(pdfId, buildCharEntriesFromGeometry(geometry));
+    }
   }
 
   /**
@@ -63,15 +70,20 @@ export class TextContentCache {
    */
   async buildFromDoc(pdfId: string, doc: pdfjsLib.PDFDocumentProxy): Promise<void> {
     if (this.has(pdfId)) return;
+    const epoch = this._epoch;
+    const generation = this._generations.get(pdfId) ?? 0;
 
     const storedGeometry = this._geometryByPdfId.get(pdfId);
     if (storedGeometry) {
-      await this._buildFromGeometry(pdfId, storedGeometry);
+      const entries = buildCharEntriesFromGeometry(await decodeTextGeometry(storedGeometry));
+      if (this._isCurrent(pdfId, epoch, generation)) this._cache.set(pdfId, entries);
       return;
     }
 
     const geometry = await extractTextGeometryFromPdfDocument(doc);
-    this._cache.set(pdfId, buildCharEntriesFromGeometry(geometry));
+    if (this._isCurrent(pdfId, epoch, generation)) {
+      this._cache.set(pdfId, buildCharEntriesFromGeometry(geometry));
+    }
   }
 
   /** Returns true when every page of the PDF has been indexed. */
@@ -119,16 +131,18 @@ export class TextContentCache {
   clearPdf(pdfId: string): void {
     this._cache.delete(pdfId);
     this._searchIndexCache.delete(pdfId);
+    this._generations.set(pdfId, (this._generations.get(pdfId) ?? 0) + 1);
   }
 
   clear(): void {
     this._cache.clear();
     this._searchIndexCache.clear();
     this._geometryByPdfId.clear();
+    this._generations.clear();
+    this._epoch++;
   }
 
-  private async _buildFromGeometry(pdfId: string, geometryBase64: string): Promise<void> {
-    const geometry = await decodeTextGeometry(geometryBase64);
-    this._cache.set(pdfId, buildCharEntriesFromGeometry(geometry));
+  private _isCurrent(pdfId: string, epoch: number, generation: number): boolean {
+    return this._epoch === epoch && (this._generations.get(pdfId) ?? 0) === generation;
   }
 }

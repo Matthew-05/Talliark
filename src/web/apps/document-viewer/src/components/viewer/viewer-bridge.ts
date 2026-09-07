@@ -26,9 +26,9 @@ async function indexAllPdfs(
   cache.clear();
   tableCache.clear();
   valuesCache.clear();
-  await Promise.all(
+  await Promise.allSettled(
     entries.map(async (entry) => {
-      await Promise.all([
+      await Promise.allSettled([
         cache.buildForUrl(entry.id, entry.url, entry.geometryBase64),
         tableCache.build(entry.id, entry.tableStructureBase64),
         valuesCache.build(entry.id, entry.documentValuesBase64, entry.financialStructureBase64),
@@ -105,8 +105,12 @@ export function connectViewerToHostBridge(
 
           startIndexing();
           void indexAllPdfs(cache, tableCache, valuesCache, entries)
-            .then(onTableStructureChanged)
-            .finally(endIndexing);
+            // Geometry for one damaged PDF must not suppress table/value refreshes
+            // that finished successfully for it or any other document.
+            .finally(() => {
+              onTableStructureChanged();
+              endIndexing();
+            });
 
           const target = pickEntryToLoad(entries, viewer.getActivePdfId());
           if (target) {
@@ -129,13 +133,15 @@ export function connectViewerToHostBridge(
         cache.clearPdf(entry.id);
         tableCache.clearPdf(entry.id);
         valuesCache.clearPdf(entry.id);
-        await Promise.all([
+        await Promise.allSettled([
           cache.buildForUrl(entry.id, entry.url, entry.geometryBase64),
           tableCache.build(entry.id, entry.tableStructureBase64),
           valuesCache.build(entry.id, entry.documentValuesBase64, entry.financialStructureBase64),
         ]);
+      })().finally(() => {
         onTableStructureChanged();
-      })().finally(endIndexing);
+        endIndexing();
+      });
 
       if (isFirstEntry || viewer.getActivePdfId() === entry.id) {
         void reloadEntry(entry);

@@ -39,6 +39,8 @@ export class ValuesCache {
   private readonly _pageContexts = new Map<string, Map<number, ValueContext>>();
   private readonly _documentContexts = new Map<string, ValueContext>();
   private readonly _financialStructure = new Map<string, FinancialStructure | null>();
+  private readonly _generations = new Map<string, number>();
+  private _epoch = 0;
   private readonly _valuesDecoder: ((base64: string) => Promise<DocumentValues>) | undefined;
   private readonly _structureDecoder: ((base64: string) => Promise<FinancialStructure>) | undefined;
 
@@ -53,21 +55,29 @@ export class ValuesCache {
   async build(pdfId: string, documentValuesBase64?: string, financialStructureBase64?: string): Promise<void> {
     this.clearPdf(pdfId);
     this._reset(pdfId);
+    const epoch = this._epoch;
+    const generation = this._generations.get(pdfId) ?? 0;
     if (documentValuesBase64) {
       try {
         const decode = this._valuesDecoder ?? (await import("@talliark/shared")).decodeDocumentValues;
-        this._ingestValues(pdfId, await decode(documentValuesBase64));
+        const values = await decode(documentValuesBase64);
+        if (this._isCurrent(pdfId, epoch, generation)) this._ingestValues(pdfId, values);
       } catch {
         // A malformed optional artifact must not prevent the PDF itself loading.
-        this._reset(pdfId);
+        if (this._isCurrent(pdfId, epoch, generation)) this._reset(pdfId);
       }
     }
     if (financialStructureBase64) {
       try {
         const decode = this._structureDecoder ?? (await import("@talliark/shared")).decodeFinancialStructure;
-        this._financialStructure.set(pdfId, await decode(financialStructureBase64));
+        const structure = await decode(financialStructureBase64);
+        if (this._isCurrent(pdfId, epoch, generation)) {
+          this._financialStructure.set(pdfId, structure);
+        }
       } catch {
-        this._financialStructure.set(pdfId, null);
+        if (this._isCurrent(pdfId, epoch, generation)) {
+          this._financialStructure.set(pdfId, null);
+        }
       }
     }
   }
@@ -236,6 +246,7 @@ export class ValuesCache {
     this._pageContexts.delete(pdfId);
     this._documentContexts.delete(pdfId);
     this._financialStructure.delete(pdfId);
+    this._generations.set(pdfId, (this._generations.get(pdfId) ?? 0) + 1);
   }
 
   clear(): void {
@@ -247,5 +258,11 @@ export class ValuesCache {
     this._pageContexts.clear();
     this._documentContexts.clear();
     this._financialStructure.clear();
+    this._generations.clear();
+    this._epoch++;
+  }
+
+  private _isCurrent(pdfId: string, epoch: number, generation: number): boolean {
+    return this._epoch === epoch && (this._generations.get(pdfId) ?? 0) === generation;
   }
 }

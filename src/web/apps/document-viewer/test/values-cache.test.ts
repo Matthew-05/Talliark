@@ -163,3 +163,36 @@ test("a document outside the financial tier carries no structure, and says so", 
   // needs before it can report not applicable.
   assert.equal(cache.apparatus("invoice").notes.searched, false);
 });
+
+test("a stale values decode cannot replace a newer OCR model", async () => {
+  let releaseOld!: (value: never) => void;
+  const oldModel = new Promise<never>((resolve) => { releaseOld = resolve; });
+  const model = (text: string) => ({
+    version: 1,
+    coordinateSpace: "normalized",
+    detectorVersion: "test",
+    documentContext: {},
+    pages: [{
+      pageIndex: 0,
+      context: {},
+      values: [{
+        id: `value-${text}`,
+        kind: "number",
+        text,
+        bounds: { x: 0.1, y: 0.1, width: 0.1, height: 0.02 },
+        clickable: true,
+        confidence: 1,
+      }],
+    }],
+  });
+  const cache = new ValuesCache((encoded) => (
+    encoded === "old" ? oldModel : Promise.resolve(model("fresh") as never)
+  ));
+
+  const oldBuild = cache.build("pdf", "old");
+  await cache.build("pdf", "fresh");
+  releaseOld(model("stale") as never);
+  await oldBuild;
+
+  assert.deepEqual(cache.valuesOnPage("pdf", 0).map((entry) => entry.text), ["fresh"]);
+});

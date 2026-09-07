@@ -199,3 +199,27 @@ test("a payload that cannot be decoded counts as never detected", async () => {
 
   assert.equal(cache.hasStructure("pdf-1"), false);
 });
+
+test("a stale table decode cannot replace a newer OCR model", async () => {
+  let releaseOld!: (value: never) => void;
+  const oldModel = new Promise<never>((resolve) => { releaseOld = resolve; });
+  const fresh = {
+    version: 1,
+    coordinateSpace: "normalized",
+    pages: [{ pageIndex: 0, tables: [table("fresh")] }],
+  };
+  const cache = new TableStructureCache((encoded) => (
+    encoded === "old" ? oldModel : Promise.resolve(fresh as never)
+  ));
+
+  const oldBuild = cache.build("pdf-1", "old");
+  await cache.build("pdf-1", "fresh");
+  releaseOld({
+    version: 1,
+    coordinateSpace: "normalized",
+    pages: [{ pageIndex: 0, tables: [table("stale")] }],
+  } as never);
+  await oldBuild;
+
+  assert.deepEqual(cache.tablesOnPage("pdf-1", 0).map((entry) => entry.id), ["fresh"]);
+});
