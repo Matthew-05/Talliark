@@ -54,8 +54,9 @@ SIGNALS: tuple[SignalDefinition, ...] = (
     ),
     SignalDefinition(
         "ruling-above",
-        enabled=False,
-        sees="a horizontal rule crossing this cell's column in the gap above it",
+        enabled=True,
+        sees="a rule is drawn in the gap above this cell's row -- the other half "
+        "of the convention a double rule completes",
     ),
     SignalDefinition(
         "outdent",
@@ -202,6 +203,27 @@ def double_rule_below(cell: dict, table_cells) -> dict | None:
     }
 
 
+def ruling_above(cell: dict, table_cells) -> dict | None:
+    """A single rule above a total, which is the other half of the convention.
+
+    It reaches the rows no lexicon can and no label announces: *Cash generated
+    by operating activities*, *Increase/(Decrease) in cash, cash equivalents and
+    restricted cash*, and the second net line of Apple's commercial paper note,
+    whose label opens with "Proceeds". Extending the total lexicon to cover them
+    would swallow the ordinary rows in between; the page has already marked them.
+
+    Weaker than a double rule, because a rule above a row is also just the rule
+    below the row before it, and the published positions carry no extent. So a
+    total holding this and nothing else may confirm and may never accuse -- and
+    `mark_rules_above` withholds the mark entirely from a table where most rows
+    are ruled, since a ruled grid draws the line for every row and means nothing
+    by it.
+    """
+    if int(cell["rowIndex"]) not in getattr(table_cells, "ruled_above", frozenset()):
+        return None
+    return {"name": "ruling-above", "evidence": "a rule is drawn above this row"}
+
+
 def nominate(table_cells) -> list[Nomination]:
     """Every cell in this table that structure proposes as a total.
 
@@ -225,6 +247,7 @@ def nominate(table_cells) -> list[Nomination]:
             for signal in (
                 label_total(cell),
                 double_rule_below(cell, table_cells),
+                ruling_above(cell, table_cells),
             )
             if signal is not None
         )

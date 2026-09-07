@@ -286,16 +286,36 @@ class Decisions(unittest.TestCase):
         for label in ("Cost of sales", "the total of these amounts", "Percentage of total"):
             self.assertFalse(labels.is_total_label(label), label)
 
-    def test_the_enabled_signals_are_the_four_that_have_been_measured(self) -> None:
+    def test_the_enabled_signals_are_the_five_that_have_been_measured(self) -> None:
         self.assertEqual(
             nominate.ENABLED_SIGNALS,
             (
                 "label-total",
                 "column-corroboration",
                 "total-column",
+                "ruling-above",
                 "double-rule-below",
             ),
         )
+
+    def test_a_ruled_grid_lends_no_row_the_convention(self) -> None:
+        # Every row bordered is a grid, not a statement marking its totals, and
+        # a rule that is drawn everywhere says nothing about anywhere.
+        built = cells.TableCells(
+            table_id="t", page_index=0, column_count=2, row_count=4
+        )
+        for row in range(4):
+            cell = {
+                "id": f"t-r{row}-c1", "rowIndex": row, "columnIndex": 1, "text": "1",
+                "bounds": {"x": 0.5, "y": 0.10 + row * 0.02, "width": 0.05, "height": 0.011},
+            }
+            built.published.append(cell)
+            built.by_position[(row, 1)] = cell
+            built.by_id[cell["id"]] = cell
+        cells.mark_rules_above(built, [0.1125, 0.1325, 0.1525])
+        self.assertEqual(built.ruled_above, frozenset())
+        cells.mark_rules_above(built, [0.1525])
+        self.assertEqual(built.ruled_above, frozenset({3}))
 
     def test_a_double_rule_is_two_rules_and_a_single_rule_is_not(self) -> None:
         built = cells.TableCells(
@@ -605,16 +625,54 @@ class SumTree(unittest.TestCase):
     def test_a_total_may_reverse_one_printed_sign(self) -> None:
         built = _table([
             ("Revenue", "100"),
-            ("Cost of sales", "40"),
             ("Other", "5"),
+            ("Cost of sales", "40"),
             ("Gross margin", "65"),
         ])
         run = _resolve(built)[0]["resolution"]
         self.assertEqual(run["sum"], "65")
         self.assertEqual(run["delta"], "0")
-        self.assertEqual(run["negatedAddendCellIds"], ["t-r1-c1"])
+        self.assertEqual(run["negatedAddendCellIds"], ["t-r2-c1"])
+
+    def test_the_first_member_of_a_run_keeps_its_printed_sign(self) -> None:
+        # The same four figures with the subtraction in the middle:
+        # 100 - 40 + 5 = 65 is arithmetic the search can reach and a shape no
+        # statement lays out. Reversing an arbitrary subset is 2^n readings and
+        # finds an exact tie in almost any column; a statement writes *A less B
+        # less C*, and on the corpus every one of the 55 real signed
+        # confirmations reverses a contiguous suffix.
+        built = _table([
+            ("Revenue", "100"),
+            ("Cost of sales", "40"),
+            ("Other", "5"),
+            ("Gross margin", "65"),
+        ])
+        resolved = _resolve(built)
+        self.assertEqual(resolved[0]["outcome"], "unresolved")
+
+    def test_a_reversal_is_a_suffix_and_never_a_scattered_subset(self) -> None:
+        from decimal import Decimal as _D
+        def cell(index, value):
+            return {
+                "id": f"c{index}", "rowIndex": index, "columnIndex": 1,
+                "text": value, "normalizedValue": value, "decimals": 0,
+            }
+        run = sums.Run(
+            "leaves",
+            tuple(cell(i, v) for i, v in enumerate(("10", "3", "4", "5"))),
+            _D("8"),
+            0,
+        )
+        # 10 - 3 + 4 - 5 = 6 and 10 + 3 - 4 - 5 = 4; only the suffix reading
+        # 10 + 3 + 4 - 5 = 12 and 10 + 3 - 4 - 5 are candidates at all, and the
+        # one that ties is a suffix.
+        for variant in sums.tied_variants(run):
+            negated = set(variant.negated_indices)
+            self.assertNotIn(0, negated)
+            self.assertEqual(negated, set(range(min(negated), len(run.cells))))
 
     def test_a_total_may_reverse_multiple_printed_signs(self) -> None:
+        # Returns, discounts and allowances are a contiguous suffix.
         built = _table([
             ("Revenue", "100"),
             ("Returns", "10"),

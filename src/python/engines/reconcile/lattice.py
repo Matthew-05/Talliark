@@ -14,7 +14,14 @@ from statistics import median
 from engines.table.layout import PageLayout
 
 from . import labels
-from .cells import DASHES, TableCells, decimals_of, horizontal_rules, mark_double_rules
+from .cells import (
+    DASHES,
+    TableCells,
+    decimals_of,
+    horizontal_rules,
+    mark_double_rules,
+    mark_rules_above,
+)
 
 
 RIGHT_EDGE_TOLERANCE = 0.005
@@ -250,5 +257,6 @@ def build_page_lattice(
         # A lattice block with no table under it has no ruling evidence at all,
         # which is why the signal is absent there rather than false.
         mark_double_rules(built, horizontal_rules(table))
+        mark_rules_above(built, horizontal_rules(table))
         result.append(built)
     return result

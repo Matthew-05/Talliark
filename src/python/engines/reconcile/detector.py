@@ -249,55 +249,37 @@ def _reconcile_block(
 
     # Resolved per column first, published afterwards, because whether a
     # two-addend run may be published is a fact about the other columns.
+    #
+    # And resolved more than once, because a total that foots on a subtotal
+    # cannot be settled before that subtotal is. Corroboration can confirm a
+    # short run only after every column has been walked, by which time the
+    # totals standing above it have already been resolved without it -- Apple's
+    # commercial paper note is two deep exactly this way, its second net line
+    # confirmed by the parallel columns and its Total resting on that line. So
+    # the pass repeats while it is still learning something, and stops as soon
+    # as it is not.
     column_results: dict[int, list[tuple[object, dict]]] = {}
     column_state: dict[int, tuple[set, dict]] = {}
-    for column_index, column_nominations in sorted(by_column.items()):
-        column_nominations.sort(key=lambda nomination: nomination.row_index)
-        established = corroborated_blocks.get(column_index, {})
-        nominated_rows = {nomination.row_index for nomination in column_nominations}
-        nominated_rows |= set(established)
-        jump: dict[int, int | None] = dict(established)
-        results: list[tuple[object, dict]] = []
-        for nomination in column_nominations:
-            resolved = sums.resolve(
-                built,
-                nomination.cell,
-                len(nomination.signals),
-                nominated_rows,
-                jump,
-            )
-            named = {signal["name"] for signal in nomination.signals}
-            if resolved["outcome"] == "break" and (
-                built.provenance.startswith("lattice") or "label-total" not in named
-            ):
-                # A label can nominate on its own, but the looser lattice may
-                # have exposed only a fragment of the real block. Confirmation
-                # is safe; accusation requires leave-one-out column evidence.
-                #
-                # A drawn rule is thinner still: the published rule positions
-                # carry no extent, so `double-rule-below` says a double rule is
-                # under the row and not that it is under this column. A total
-                # holding it and no label confirms and stays quiet otherwise.
-                resolved = {
-                    "outcome": "unresolved",
-                    "unresolvedReason": "no-plausible-run",
-                }
-            resolution = resolved.get("resolution")
-            if resolution:
-                addends = [
-                    built.by_id[cell_id]
-                    for cell_id in resolution["addendCellIds"]
-                    if cell_id in built.by_id
-                ]
-                # The block this total consumed reaches above its own addends
-                # wherever one of them is itself a subtotal, so the resume point
-                # is the top of the deepest block beneath it.
-                jump[nomination.row_index] = sums.block_top(addends, jump, nominated_rows)
-            results.append((nomination, resolved))
-        column_results[column_index] = results
-        column_state[column_index] = (nominated_rows, jump)
-
-    _corroborate_short_runs(built, column_results, column_state)
+    seed = {
+        column: dict(blocks) for column, blocks in corroborated_blocks.items()
+    }
+    for _ in range(MAX_RESOLUTION_PASSES):
+        column_results, column_state = _resolve_columns(built, by_column, seed)
+        _corroborate_short_runs(built, column_results, column_state)
+        learned = {
+            column: dict(blocks) for column, blocks in seed.items()
+        }
+        for column_index, results in column_results.items():
+            for nomination, resolved in results:
+                if resolved["outcome"] != "confirmed":
+                    continue
+                _, jump = column_state[column_index]
+                learned.setdefault(column_index, {})[nomination.row_index] = jump.get(
+                    nomination.row_index
+                )
+        if learned == seed:
+            break
+        seed = learned
 
     for column_index, results in sorted(column_results.items()):
         column_label = labelled.get(column_index, "")
@@ -415,6 +397,98 @@ def _reconcile_block(
     return model, structure_diagnostics
 
 
+MAX_RESOLUTION_PASSES = 4
+
+# The signals strong enough for a nominated row to stop another total's walk.
+# A label is the document's own word and a double rule is the grand-total
+# convention drawn unambiguously; a rule above a row is neither, being equally
+# the rule below the row before it.
+BOUNDARY_SIGNALS = frozenset({"label-total", "double-rule-below"})
+
+
+def _resolve_columns(built, by_column, seed):
+    """Walk and resolve every label-route nomination, one column at a time.
+
+    `seed` names the rows already known to be subtotals and, for each, the top
+    of the block it consumed -- from the structure search, and from whatever an
+    earlier pass confirmed. A row present with `None` is a subtotal whose own
+    top is unknown, which §7.2 requires the walk to stop at rather than guess.
+    """
+    column_results: dict[int, list[tuple[object, dict]]] = {}
+    column_state: dict[int, tuple[set, dict]] = {}
+    for column_index, column_nominations in sorted(by_column.items()):
+        column_nominations.sort(key=lambda nomination: nomination.row_index)
+        established = seed.get(column_index, {})
+        # Which rows the walk must stop at. A nominated total is a barrier
+        # because stepping over one whose own block is unknown would count that
+        # block's addends twice -- but only a row actually established as a
+        # subtotal has a block to protect.
+        #
+        # `ruling-above` cannot tell a total from the row beneath one: the rule
+        # under a subtotal is also the rule over the row that follows it, and
+        # both readings look identical. That is fine for proposing -- the
+        # arithmetic decides -- and ruinous for blocking, because a speculative
+        # nomination that resolves to nothing would stop every real total above
+        # it. Disney's segment expense note is the case: a rule sits under each
+        # of the three segment subtotals, so the first row of the next segment
+        # is nominated too, and treating it as a barrier hides *Total costs and
+        # expenses* entirely.
+        #
+        # So a row proposed by a rule above and nothing else is resolved like any
+        # other and blocks nothing until it resolves, at which point the next
+        # pass admits it through the seed.
+        nominated_rows = {
+            nomination.row_index
+            for nomination in column_nominations
+            if not BOUNDARY_SIGNALS.isdisjoint(
+                signal["name"] for signal in nomination.signals
+            )
+        }
+        nominated_rows |= set(established)
+        jump: dict[int, int | None] = dict(established)
+        results: list[tuple[object, dict]] = []
+        for nomination in column_nominations:
+            resolved = sums.resolve(
+                built,
+                nomination.cell,
+                len(nomination.signals),
+                nominated_rows,
+                jump,
+            )
+            named = {signal["name"] for signal in nomination.signals}
+            if resolved["outcome"] == "break" and (
+                built.provenance.startswith("lattice") or "label-total" not in named
+            ):
+                # A label can nominate on its own, but the looser lattice may
+                # have exposed only a fragment of the real block. Confirmation
+                # is safe; accusation requires leave-one-out column evidence.
+                #
+                # A drawn rule is thinner still: the published rule positions
+                # carry no extent, so `double-rule-below` and `ruling-above` say
+                # a rule is at the row and not that it crosses this column. A
+                # total holding one of those and no label confirms and stays
+                # quiet otherwise.
+                resolved = {
+                    "outcome": "unresolved",
+                    "unresolvedReason": "no-plausible-run",
+                }
+            resolution = resolved.get("resolution")
+            if resolution:
+                addends = [
+                    built.by_id[cell_id]
+                    for cell_id in resolution["addendCellIds"]
+                    if cell_id in built.by_id
+                ]
+                # The block this total consumed reaches above its own addends
+                # wherever one of them is itself a subtotal, so the resume point
+                # is the top of the deepest block beneath it.
+                jump[nomination.row_index] = sums.block_top(addends, jump, nominated_rows)
+            results.append((nomination, resolved))
+        column_results[column_index] = results
+        column_state[column_index] = (nominated_rows, jump)
+    return column_results, column_state
+
+
 def _corroborate_short_runs(built, column_results, column_state) -> None:
     """Publish a two-addend run only where the parallel columns say the same.
 
@@ -501,6 +575,18 @@ def _corroborate_short_runs(built, column_results, column_state) -> None:
             if not others:
                 continue
             nomination, _ = column_results[column_index][position]
+            nominated_rows, jump = column_state[column_index]
+            # The upgraded run is a resolved block like any other, and the total
+            # standing above it has to be able to step over it on the next pass.
+            jump[nomination.row_index] = sums.block_top(
+                [
+                    built.by_id[cell_id]
+                    for cell_id in upgraded["resolution"]["addendCellIds"]
+                    if cell_id in built.by_id
+                ],
+                jump,
+                nominated_rows,
+            )
             published = dict(upgraded)
             published["signals"] = [dict(signal) for signal in nomination.signals] + [
                 {

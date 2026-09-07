@@ -16,8 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from itertools import combinations
-from math import comb
 
 from . import nominate
 
@@ -76,28 +74,33 @@ STEP_OVER_SECTION_CAPTIONS = True
 
 # A statement occasionally asserts a difference while printing every component
 # as a positive figure: gross margin is net sales less cost of sales, for
-# example. Search the smallest exact set of sign reversals, bounded so a long
-# column cannot turn into an unbounded subset-sum search. The row run remains
-# contiguous and no cell is omitted.
-MAX_NEGATED_ADDENDS = 4
-MAX_SIGN_COMBINATIONS = 4096
-
-# How many sign interpretations the search may have had to choose from before
-# the one it lands on stops being evidence.
+# example. The run stays contiguous and no cell is omitted; what the search
+# chooses is where the subtraction starts.
 #
-# A discovered reversal is worth exactly as much as the search space it was found
-# in. Reversing one of two members is the relationship a statement asserts when
-# it prints gross margin under sales and cost: two ways to read it, one of which
-# ties. Reversing four of seventeen is a subset-sum with 2,380 ways to hit any
-# number at all, and on the corpus it hit three: Apple's cash-flow statement
-# (210 ways), Amazon's RSU rollforward (495) and Disney's segment expense note
-# (2,380), all three exact, all three arithmetic nonsense. Disney's is the one
-# worth naming, because it cancelled a segment subtotal against the very leaves
-# that make it and still tied to the printed grand total.
+# **Only a suffix may be reversed, and the first member always keeps its printed
+# sign.** A statement writes *A less B less C*: the figure being subtracted from
+# comes first, and what is taken off it follows. Reversing the first member
+# instead asserts *-A + B + C*, which is not a shape a statement lays out -- had
+# the page meant that, it would have printed A negative or put it elsewhere.
 #
-# The measured split is absolute: every one of the 59 real signed confirmations
-# on the corpus was found among 7 candidates or fewer, and every false one among
-# 210 or more. The constant sits in the gap and is a measurement, not a taste.
+# This is a constraint on the search space before it is a constraint on the
+# answer, and that is the point. Reversing an arbitrary subset of n members is
+# 2^n readings to choose from, and a search that large finds an exact tie in
+# almost any column. Measured on the corpus with every value permuted at random
+# inside its own column -- labels, rules, captions and grid left exactly as
+# printed, so every reason to propose a total survives and every real
+# relationship is destroyed -- the subset search confirmed 595 totals that were
+# not there, against 52 for the unsigned search. Suffixes number n-1.
+#
+# Reading the real corpus back the same way: all 55 true signed confirmations
+# reverse a contiguous suffix and keep the first member's printed sign -- gross
+# margin, operating income, net income, net deferred tax assets, non-current
+# borrowings, property and equipment net -- and every one of the five that
+# reversed the first member was arithmetic nonsense that happened to tie.
+#
+# How many starting points may be tried at all. The longest real signed run in
+# the corpus is seven members; past twenty even one reading per start is more
+# readings than a run that long has earned.
 MAX_SIGN_CANDIDATES = 20
 
 
@@ -158,33 +161,32 @@ def tied_variants(run: Run) -> tuple[Run, ...]:
     if run.delta == TOLERANCE:
         return (run,)
 
+    if len(run.cells) - 1 > MAX_SIGN_CANDIDATES:
+        return ()
+
     target = (run.sum - run.total) / Decimal(2)
-    eligible = [
-        index
-        for index, cell in enumerate(run.cells)
-        if (value_of(cell) or Decimal(0)) != 0
-    ]
-    tested = 0
-    limit = min(MAX_NEGATED_ADDENDS, len(eligible))
-    for count in range(1, limit + 1):
-        if comb(len(eligible), count) > MAX_SIGN_CANDIDATES:
-            # Past here the search is a subset-sum rather than a reading of the
-            # statement, and a tie found among hundreds of candidates says
-            # nothing about the page. Longer reversals are not tried either:
-            # they are drawn from a larger space still.
-            return ()
-        found: list[Run] = []
-        for indices in combinations(eligible, count):
-            tested += 1
-            if tested > MAX_SIGN_COMBINATIONS:
-                return tuple(found)
-            if sum((value_of(run.cells[index]) or Decimal(0) for index in indices), Decimal(0)) == target:
-                candidate = run.with_negated(indices)
-                if not double_counts(candidate):
-                    found.append(candidate)
-        if found:
-            return tuple(found)
-    return ()
+    found: list[Run] = []
+    # Later starts first, so the fewest reversals -- the least complex reading
+    # of the statement -- is the variant returned.
+    for start in range(len(run.cells) - 1, 0, -1):
+        indices = tuple(
+            index
+            for index in range(start, len(run.cells))
+            if (value_of(run.cells[index]) or Decimal(0)) != 0
+        )
+        if not indices:
+            # A suffix of dashes reverses nothing, so it is not a reading of its
+            # own; the next start up is.
+            continue
+        if sum(
+            (value_of(run.cells[index]) or Decimal(0) for index in indices),
+            Decimal(0),
+        ) != target:
+            continue
+        candidate = run.with_negated(indices)
+        if not double_counts(candidate):
+            found.append(candidate)
+    return tuple(found)
 
 
 def preferred_tied_variant(run: Run) -> Run | None:
@@ -402,6 +404,7 @@ def _walk(
     cells: list[dict] = []
     stopped = "top-of-table"
     consumed_a_subtotal = False
+    highest_subtotal: int | None = None
     crossed_a_caption = False
     # The top row of the block the walk has just stepped over, which is the one
     # row whose caption is that block's own heading rather than a boundary.
@@ -447,11 +450,16 @@ def _walk(
                 # thing this run takes.
                 stopped = "unresolved-subtotal"
                 break
+            # Only a subtotal the walk actually stepped over marks a boundary.
+            # The row that *stopped* the walk is the one whose status is in
+            # question, so counting it here would make the shorter reading
+            # identical to the full run and offer nothing.
+            highest_subtotal = row
             block_below = above
             row = above - 1
             continue
         row -= 1
-    return cells, stopped, consumed_a_subtotal, crossed_a_caption
+    return cells, stopped, consumed_a_subtotal, crossed_a_caption, highest_subtotal
 
 
 def resolve(
@@ -482,55 +490,82 @@ def resolve(
         return {"outcome": "unresolved", "unresolvedReason": "no-candidate-run"}
 
     floor = min_addends(signal_count) if floor is None else floor
-    leaves, leaf_stop, _, leaf_crossed = leaf_run(
+    leaves, leaf_stop, _, leaf_crossed, _ = leaf_run(
         table_cells, column, row, decimals, nominated_rows
     )
-    nested, nested_stop, consumed, nested_crossed = subtotal_run(
+    nested, nested_stop, consumed, nested_crossed, highest = subtotal_run(
         table_cells, column, row, decimals, nominated_rows, jump
     )
 
-    runs: list[Run] = []
-    stops: dict[str, str] = {}
+    # Each candidate carries its own stop reason and its own right to accuse,
+    # because two candidates can share a basis: the walk that ends on a
+    # nominated total whose block was never resolved yields two readings of the
+    # same run, and they are not the same evidence.
+    candidates: list[tuple[Run, str, bool]] = []
     # A run that crossed a caption may confirm and may never break, whether the
     # caption ended it (§7.3) or it stepped over the heading of a block it took
     # whole. Both hold a run whose extent was decided by something other than
     # the arithmetic, and a miss there is about the scan and not about the page.
-    silent: set[str] = set()
     if consumed and len(nested) >= floor:
-        runs.append(Run("subtotals", tuple(nested), total, decimals))
-        stops["subtotals"] = nested_stop
-        if nested_crossed:
-            silent.add("subtotals")
+        candidates.append(
+            (Run("subtotals", tuple(nested), total, decimals), nested_stop, nested_crossed)
+        )
+    if consumed and highest is not None:
+        # A run that took subtotals in has a boundary the page drew: the topmost
+        # subtotal it consumed. Above that lies whatever came before the block,
+        # and whether those rows belong is exactly what is unknown -- they may be
+        # the run's remaining addends, or they may be the statement's opening
+        # figure, which is the addend of nothing.
+        #
+        # Apple shows both readings on facing pages. Its statement of
+        # shareholders' equity opens with "Total shareholders' equity, beginning
+        # balances" and closes with the ending balances its three sections make,
+        # so the opening balance must be left out; its cash flow statement makes
+        # *Increase/(Decrease) in cash* out of the three activity subtotals and
+        # nothing else, while the row below it is that increase plus the opening
+        # cash balance -- the same shape, cut in two different places.
+        #
+        # So the shorter reading is offered as a second candidate and never
+        # preferred: the full run is evaluated first and this one can only win by
+        # tying exactly. Being a boundary the arithmetic chose rather than one
+        # the page marked, it may confirm and may never accuse.
+        short = [cell for cell in nested if int(cell["rowIndex"]) >= highest]
+        if len(short) < len(nested) and len(short) >= floor:
+            candidates.append(
+                (Run("subtotals", tuple(short), total, decimals), nested_stop, True)
+            )
     if len(leaves) >= floor:
-        runs.append(Run("leaves", tuple(leaves), total, decimals))
-        stops["leaves"] = leaf_stop
-        if leaf_crossed:
-            silent.add("leaves")
+        candidates.append(
+            (Run("leaves", tuple(leaves), total, decimals), leaf_stop, leaf_crossed)
+        )
 
-    if not runs:
+    if not candidates:
         return {"outcome": "unresolved", "unresolvedReason": _why(leaves, nested, leaf_stop)}
 
-    runs = [run for run in runs if not double_counts(run)]
-    if not runs:
+    candidates = [entry for entry in candidates if not double_counts(entry[0])]
+    if not candidates:
         # A run that contains its own subtotal is not a candidate at all, and
         # this is the one place arithmetic is allowed near nomination: it
         # refutes a run it may not propose.
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
 
-    evaluated = [preferred_tied_variant(run) or run for run in runs]
-    tied = [run for run in evaluated if run.delta == TOLERANCE]
+    evaluated = [
+        (preferred_tied_variant(run) or run, stop, quiet)
+        for run, stop, quiet in candidates
+    ]
+    tied = [entry for entry in evaluated if entry[0].delta == TOLERANCE]
     if tied:
         # The subtotals win where both resolve: that is the tree the statement
         # is asserting. The leaf resolution is recorded too, since it is the
         # same arithmetic and costs nothing, and never becomes the tree.
-        chosen = tied[0]
+        chosen = tied[0][0]
         published = {"outcome": "confirmed", "resolution": chosen.as_dict()}
-        others = [run for run in evaluated if run.basis != chosen.basis]
+        others = [run for run, _, _ in evaluated if run.basis != chosen.basis]
         if others and others[0].cells != chosen.cells:
             published["leafResolution"] = others[0].as_dict()
         return published
 
-    chosen = evaluated[0]
+    chosen, chosen_stop, chosen_quiet = evaluated[0]
     if len(chosen.cells) < nominate.MIN_ADDENDS_ON_ONE_SIGNAL:
         # A pair that happens to sum is nearly evidence-free, which is why the
         # floor exists; a pair that happens not to sum is exactly as thin, and
@@ -538,9 +573,9 @@ def resolve(
         # already been let past the floor by corroboration or a second signal --
         # enough to confirm on, never enough to accuse on.
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
-    if chosen.basis in silent:
+    if chosen_quiet:
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
-    if stops.get(chosen.basis) == "caption":
+    if chosen_stop == "caption":
         # The run was cut short by a caption row -- "Changes in assets and
         # liabilities:", "Cash Flows from Investing Activities:" -- which is the
         # statement separating blocks, not the top of this one. What was
@@ -552,7 +587,7 @@ def resolve(
     if not _plausible(chosen):
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
     published = {"outcome": "break", "resolution": chosen.as_dict()}
-    others = [run for run in evaluated if run.basis != chosen.basis]
+    others = [run for run, _, _ in evaluated if run.basis != chosen.basis]
     if others and others[0].cells != chosen.cells:
         published["leafResolution"] = others[0].as_dict()
     return published
@@ -601,9 +636,17 @@ def double_counts(run: Run) -> bool:
             for other in range(len(values))
         ):
             return True
-    if len(values) < 3 or values[-1] == 0:
-        return False
-    return sum(values[:-1], Decimal(0)) == values[-1]
+    # And anywhere in the run, not only at its end. A statement's own identities
+    # make a long leaf run a rich source of these: Disney's income statement
+    # prints services revenues, products revenues and then total revenues, and a
+    # fifteen-row span that takes all three ties to the small figure at the
+    # bottom for reasons that have nothing to do with the page. The test stays
+    # what it was -- a member equal to everything before it -- and only stops
+    # looking exclusively at the last row.
+    for index in range(2, len(values)):
+        if values[index] != 0 and sum(values[:index], Decimal(0)) == values[index]:
+            return True
+    return False
 
 
 def _why(leaves: list[dict], nested: list[dict], leaf_stop: str) -> str:
