@@ -246,8 +246,20 @@ def evaluate(
             for token in line.tokens
             if column_index(boundaries, token.center) > 0
         )
+        trailing_words = sum(
+            1
+            for line in row.lines
+            for token in line.tokens
+            if column_index(boundaries, token.center) > 0
+            and token.kind in ("word", "ordinal")
+        )
+        # A numbered footnote often embeds measurements in its sentence. Those
+        # numbers are not independent value cells and must not turn the ordinal
+        # gutter into a data column. Conversely, ``(6) | 10`` remains ambiguous
+        # accounting data and is not penalized on shape alone.
+        marker_leads_prose = trailing_words >= 2
         if (kinds and kinds <= {"bullet", "ordinal", "marker"}) or (
-            _LIST_MARKER.match(cell.strip()) and not carries_values
+            _LIST_MARKER.match(cell.strip()) and (not carries_values or marker_leads_prose)
         ):
             first_column_markers += 1
     features.marker_first_column = first_column_markers / counted if counted else 0.0

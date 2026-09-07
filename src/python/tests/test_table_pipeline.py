@@ -9,6 +9,7 @@ import unittest
 
 from engines.table.candidates import generate, whitespace_candidates
 from engines.table.grid import (
+    GridHypothesis,
     build_logical_rows,
     cells_for,
     coalesce_empty_body_columns,
@@ -562,6 +563,12 @@ class ColumnFittingTests(unittest.TestCase):
         )
         self.assertEqual(cells_for(layout.lines[0], [0.30, 0.55]), ["Total", "", "$ 195,201"])
 
+    def test_a_currency_marker_joins_an_accounting_dash(self) -> None:
+        layout = build_page_layout(
+            page([(0.10, [(0.08, "Total"), (0.50, "$"), (0.60, "-")])])
+        )
+        self.assertEqual(cells_for(layout.lines[0], [0.30, 0.55]), ["Total", "", "$ -"])
+
     def test_a_percent_sign_stays_with_its_number(self) -> None:
         layout = build_page_layout(
             page([(0.10, [(0.08, "Products"), (0.40, "10"), (0.47, "%"), (0.60, "31,370")])])
@@ -593,6 +600,28 @@ class ColumnFittingTests(unittest.TestCase):
         )
 
         self.assertEqual(grid.column_count, 3)
+
+    def test_dash_does_not_keep_a_floated_currency_column_alive(self) -> None:
+        rows = [
+            (0.100, [(0.05, "Plan Category"), (0.49, "Number"), (0.59, "Weighted average"), (0.84, "Remaining")]),
+            (0.140, [(0.05, "2012 Plan"), (0.49, "2,216,555"), (0.61, "$"), (0.70, "2.84"), (0.86, "-")]),
+            (0.160, [(0.05, "2024 Plan"), (0.49, "927,670"), (0.61, "$"), (0.70, "-"), (0.84, "672,200")]),
+            (0.180, [(0.05, "Total"), (0.49, "3,144,225"), (0.61, "$"), (0.70, "3.18"), (0.84, "672,200")]),
+        ]
+        layout = build_page_layout(page(rows))
+        boundaries = [0.40, 0.58, 0.66, 0.80]
+        grid = GridHypothesis(
+            columns=[
+                {"x0": left, "x1": right}
+                for left, right in zip([0.03] + boundaries, boundaries + [0.95])
+            ],
+            rows=build_logical_rows(layout.lines, boundaries, layout),
+            boundaries=boundaries,
+        )
+
+        self.assertTrue(coalesce_empty_body_columns(grid, layout, header_rows=1))
+        self.assertEqual(grid.column_count, 4)
+        self.assertEqual(grid.rows[2].cells[2], "$ -")
 
 
 class LogicalRowTests(unittest.TestCase):
@@ -714,6 +743,32 @@ class ScoringTests(unittest.TestCase):
         features, _grid = self._score(page(rows))
         self.assertFalse(features.accepted())
         self.assertEqual(features.weakest(), "marker-first-column")
+
+    def test_numbered_footnotes_with_measurements_are_rejected(self) -> None:
+        # Measurements embedded in prose do not form value cells. This is the
+        # Quest shape: aligned ordinals plus sentences containing share counts.
+        rows = [
+            (0.10, [(0.05, "(6)"), (0.12, "Includes 25,000 shares and 21,629 DSUs.")]),
+            (0.13, [(0.05, "(7)"), (0.12, "Includes 1,893 DSUs.")]),
+        ]
+        features, _grid = self._score(page(rows))
+
+        self.assertEqual(features.header, 1.0)
+        self.assertEqual(features.marker_first_column, 1.0)
+        self.assertFalse(features.accepted())
+        self.assertEqual(features.weakest(), "marker-first-column")
+
+    def test_parenthesized_amounts_against_numeric_cells_are_not_list_markers(self) -> None:
+        # Parenthesized numbers are also accounting values, so the marker guard
+        # requires prose to their right before treating them as ordinals.
+        rows = [
+            (0.10, [(0.05, "(6)"), (0.75, "10")]),
+            (0.13, [(0.05, "(7)"), (0.75, "12")]),
+            (0.16, [(0.05, "(8)"), (0.75, "14")]),
+        ]
+        features, _grid = self._score(page(rows))
+
+        self.assertEqual(features.marker_first_column, 0.0)
 
     def test_a_list_of_names_against_short_values_is_not_prose(self) -> None:
         # Two columns and no header, but the right column is one word: an exhibit

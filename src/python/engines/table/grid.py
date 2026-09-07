@@ -28,6 +28,10 @@ _ITERATIONS = 3
 # Accounting layouts float a currency or sign marker in its own whitespace island,
 # well clear of the amount it belongs to. It is a marker, never a column.
 _MARKER_ONLY = re.compile(r"^[$€£¥%()\[\]*†‡]+$")
+# A standalone accounting dash is a printed zero. Native PDF text may expose
+# the same convention as a hyphen, figure dash, en dash, em dash or horizontal
+# bar, so marker attachment must recognize the whole family.
+_ZERO_PLACEHOLDER = re.compile(r"^[-‐‒–—―]+$")
 
 
 class GridHypothesis:
@@ -87,6 +91,10 @@ def assign_tokens(line: VisualLine, boundaries: list[float]) -> list[list[TextTo
             and (
                 # The classic floated marker: "$" alone, then its amount.
                 buckets[index + 1][0].is_value
+                # A dash is the accounting zero placeholder. It occupies the
+                # amount cell even though token classification correctly keeps
+                # punctuation out of the numeric vocabulary.
+                or _ZERO_PLACEHOLDER.match(buckets[index + 1][0].text.strip())
                 # Or a marker swept into the tail of the cell before it, because
                 # the amount it belongs to sits tight against that cell. Currency
                 # precedes its amount, so a symbol at the end of a cell that

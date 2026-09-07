@@ -68,7 +68,7 @@ the acceptance threshold is not published.
    content, rulings, graphics and negative layouts. Two parallel columns that are
    predominantly running prose are rejected even when their first line was
    inferred to be a header. A coherent ruled grid can override that ambiguity.
-8. `redesign.py` publishes accepted candidates as `table-detector-3`.
+8. `redesign.py` publishes accepted candidates as `table-detector-5`.
 
 ## 5. Tuning and thresholds
 
@@ -78,6 +78,8 @@ the acceptance threshold is not published.
 | Prose words per side | `4` | Requires sentence-like content in both columns; a short jurisdiction or code column remains table evidence. |
 | Prose numeric allowance | `2` | Years and small counts occur inside prose and must not disable the prose test. |
 | Dominant prose share | `0.60` | One short paragraph tail may differ; most rows must still exhibit parallel prose before the full penalty applies. |
+| Marker-led prose | `2` trailing words | A numbered or bulleted gutter remains list structure when its sentence embeds measurements; a parenthesized amount beside a numeric cell remains eligible table data. |
+| Accounting zero placeholders | `-`, `‐`, `‒`, `–`, `—`, `―` | A floated currency marker attaches to a dash exactly as it attaches to a numeric amount, allowing the otherwise-empty marker column to collapse. |
 | Ruled override | ruling feature `>= 0.50` | At least a small coherent set of intersections establishes cells independently of text flow. |
 | Page backdrop extent | `90%` on both axes | A rectangle covering nearly the whole page is canvas rather than figure content. |
 | Visually white fill | every component `>= 0.95` | A white paint operation contributes no visible graphic area. |
@@ -125,10 +127,11 @@ Unit tests separately pin ruling extraction, page-background neutrality, header
 analysis, post-alignment column coalescing, section-row handling and scoring.
 
 The Quest 10-K corpus goldens record pages 3 and 4 as negative editorial layouts,
-page 49 as three independent tables with centred multi-line headers, and page 64
-as a striped financial statement. The Apple 10-K and scanned form/table goldens
-exercise different publishers and raster inputs. Corpus goldens are visually
-approved and are never regenerated as an oracle from detector output.
+page 49 as three independent tables with centred multi-line headers, page 50 as a
+numbered-footnote negative beside a genuine equity-compensation table, and page
+64 as a striped financial statement. The Apple 10-K and scanned form/table
+goldens exercise different publishers and raster inputs. Corpus goldens are
+visually approved and are never regenerated as an oracle from detector output.
 
 ## 8. Related documents
 
