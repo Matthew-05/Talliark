@@ -48,9 +48,10 @@ class TableOverlayTests(unittest.TestCase):
                 rendered.close()
 
     def test_rejected_candidates_are_reported_with_a_reason(self) -> None:
-        # A page of bullets produces candidates and publishes none of them, so it
-        # is the clearest check that rejections are surfaced rather than silent.
-        source = FIXTURES / "negative-bullet-list.pdf"
+        # A numbered list produces a fitted candidate and publishes none of it,
+        # so it is the clearest check that rejections are surfaced rather than
+        # silent. Bullet markers are filtered before candidate generation.
+        source = FIXTURES / "negative-numbered-list.pdf"
         with tempfile.TemporaryDirectory() as temporary_directory:
             output = Path(temporary_directory) / "overlay.pdf"
             report = Path(temporary_directory) / "overlay.json"

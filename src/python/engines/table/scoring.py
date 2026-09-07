@@ -252,9 +252,12 @@ def evaluate(
             first_column_markers += 1
     features.marker_first_column = first_column_markers / counted if counted else 0.0
 
-    if grid.column_count == 2 and not header_rows:
-        # Two columns of running text with no header is a page laid out in
-        # columns, not a table. Both sides have to be prose for that to be true:
+    if grid.column_count == 2 and features.ruling < 0.5:
+        # Two columns of running text are a page layout, not a table. An inferred
+        # header cannot waive this test: the first synchronized prose line is
+        # itself liable to be misread as an all-word header. A coherent ruled
+        # grid can waive it because the cells then exist independently of text
+        # alignment. Both sides have to be prose for the penalty to apply:
         # a list of subsidiaries against their jurisdictions has a long left cell
         # and a one-word right cell, and reading that as prose lost a real table.
         wordy = 0
@@ -268,9 +271,15 @@ def evaluate(
                         per_column[index] += 1
                     elif token.is_value and not token.is_marker:
                         values += 1
-            if values == 0 and min(per_column) >= 4:
+            # Years and small counts occur naturally inside prose. Their mere
+            # presence does not turn two editorial columns into table records.
+            if values <= 2 and min(per_column) >= 4:
                 wordy += 1
-        features.prose_pair = wordy / len(body) if body else 0.0
+        ratio = wordy / len(body) if body else 0.0
+        # Once most rows are parallel prose, treat the layout as the categorical
+        # negative it is. A proportional score left long pages just above the
+        # acceptance threshold when one short paragraph tail diluted the ratio.
+        features.prose_pair = 1.0 if ratio >= 0.60 else ratio
 
     if candidate.bounds["width"] < 0.30 and features.marker_first_column > 0.5:
         features.narrow_marker = 1.0

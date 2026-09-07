@@ -11,6 +11,7 @@ from engines.table.candidates import generate, whitespace_candidates
 from engines.table.grid import (
     build_logical_rows,
     cells_for,
+    coalesce_empty_body_columns,
     fit_grid,
     infer_boundaries,
     occupied_columns,
@@ -575,6 +576,24 @@ class ColumnFittingTests(unittest.TestCase):
         grid = fit_grid(candidate, layout)
         self.assertEqual(grid.column_count, 3)
 
+    def test_final_alignment_does_not_leave_header_only_columns(self) -> None:
+        rows = [
+            (0.100, [(0.42, "Stock"), (0.76, "Option")]),
+            (0.116, [(0.05, "Name"), (0.39, "Awards (1)"), (0.73, "Awards")]),
+            (0.140, [(0.05, "Glenn Culpepper"), (0.52, "41,629"), (0.86, "25,000")]),
+            (0.156, [(0.05, "Audrey Dunning"), (0.52, "21,893"), (0.86, "—")]),
+            (0.172, [(0.05, "Daniel Friedberg"), (0.52, "75,644"), (0.86, "513,819")]),
+        ]
+        layout = build_page_layout(page(rows))
+        candidate = whitespace_candidates(layout)[0]
+        grid = fit_grid(candidate, layout)
+        header = detect_header_cells(grid.cell_matrix(), grid.column_count)
+        coalesce_empty_body_columns(
+            grid, layout, header_rows=header["rowCount"]
+        )
+
+        self.assertEqual(grid.column_count, 3)
+
 
 class LogicalRowTests(unittest.TestCase):
     def test_a_wrapped_cell_stays_one_row(self) -> None:
@@ -600,6 +619,20 @@ class LogicalRowTests(unittest.TestCase):
         logical = build_logical_rows(layout.lines, [0.40, 0.70], layout)
         self.assertEqual(len(logical), 3)
         self.assertEqual(logical[1].kind, "section")
+
+    def test_an_unpunctuated_section_label_is_not_wrapped_into_its_neighbours(self) -> None:
+        rows = [
+            (0.100, [(0.05, "Net loss"), (0.60, "(15,382)"), (0.80, "(15,063)")]),
+            (0.114, [(0.05, "Net loss per share applicable to common shareholders")]),
+            (0.128, [(0.07, "Basic"), (0.60, "(0.73)"), (0.80, "(0.73)")]),
+            (0.142, [(0.07, "Diluted"), (0.60, "(0.73)"), (0.80, "(0.73)")]),
+        ]
+        layout = build_page_layout(page(rows))
+        logical = build_logical_rows(layout.lines, [0.50, 0.72], layout)
+
+        self.assertEqual(len(logical), 4)
+        self.assertEqual(logical[1].kind, "section")
+        self.assertEqual(logical[2].cells[0], "Basic")
 
     def test_occupancy_ignores_a_lone_currency_marker(self) -> None:
         layout = build_page_layout(
@@ -700,6 +733,24 @@ class ScoringTests(unittest.TestCase):
         features, _grid = self._score(page(rows))
         self.assertEqual(features.prose_pair, 0.0)
         self.assertTrue(features.accepted())
+
+    def test_a_heading_does_not_turn_parallel_prose_into_a_table(self) -> None:
+        rows = [
+            (0.100, [(0.05, "Operational Excellence"), (0.55, "Looking Ahead")]),
+            (0.124, [(0.05, "Our teams improved service quality today"),
+                     (0.55, "We enter the year with stronger clients")]),
+            (0.148, [(0.05, "Those changes increased consistency across operations"),
+                     (0.55, "The platform now supports continued profitable growth")]),
+            (0.172, [(0.05, "Managers gained better visibility into requirements"),
+                     (0.55, "New programs expand the services now available")]),
+            (0.196, [(0.05, "This discipline strengthened execution during the year"),
+                     (0.55, "Our partners remain central to future work")]),
+        ]
+        features, _grid = self._score(page(rows))
+
+        self.assertEqual(features.header, 1.0)
+        self.assertGreater(features.prose_pair, 0.5)
+        self.assertFalse(features.accepted())
 
     def test_two_rows_without_a_header_are_not_a_table(self) -> None:
         # A signature block: two aligned lines is not a repeated structure.

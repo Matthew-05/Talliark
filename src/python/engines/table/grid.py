@@ -381,6 +381,60 @@ def _coalesce(
     return boundaries
 
 
+def coalesce_empty_body_columns(
+    grid: GridHypothesis,
+    layout: PageLayout,
+    *,
+    header_rows: int,
+) -> bool:
+    """Remove columns that only a centred header title occupies.
+
+    This pass deliberately runs after header detection. Before then a footnote
+    marker in ``Awards (1)`` looks numeric and makes the title line eligible as
+    body evidence. Once the header boundary is known, a column that is empty in
+    every body row carries no data and can be folded into its neighbour.
+    """
+    if header_rows <= 0 or not grid.boundaries:
+        return False
+    # Refinement may already have stripped a spanning caption. Rebuild only from
+    # the lines that survived into this grid, never from the wider candidate.
+    lines = [line for row in grid.rows for line in row.lines]
+    boundaries = list(grid.boundaries)
+    changed = False
+    while boundaries:
+        rows = build_logical_rows(lines, boundaries, layout)
+        body = rows[header_rows:]
+        if not body:
+            break
+        column_count = len(boundaries) + 1
+        empty = next(
+            (
+                index
+                for index in range(column_count)
+                if not any(index < len(row.cells) and row.cells[index] for row in body)
+            ),
+            None,
+        )
+        if empty is None:
+            break
+        # A header-only band normally contains a centred title for the data
+        # column on its right. At the outer right edge there is no right-hand
+        # neighbour, so it folds left instead.
+        boundary = empty if empty < len(boundaries) else empty - 1
+        boundaries = boundaries[:boundary] + boundaries[boundary + 1 :]
+        changed = True
+    if not changed:
+        return False
+    grid.boundaries = sorted(boundaries)
+    grid.rows = build_logical_rows(lines, grid.boundaries, layout)
+    edges = [grid.columns[0]["x0"]] + grid.boundaries + [grid.columns[-1]["x1"]]
+    grid.columns = [
+        {"x0": edges[index], "x1": edges[index + 1]}
+        for index in range(len(edges) - 1)
+    ]
+    return True
+
+
 def ruled_boundaries(
     vertical: list[RulingSegment], bounds: dict
 ) -> list[float]:
@@ -444,6 +498,18 @@ def _is_continuation(
         (token.x0 for token in previous.anchor.tokens if column_index(boundaries, token.center) == column),
         default=line.x0,
     )
+    if column == 0:
+        words = [token.text for token in meaningful if token.kind in ("word", "ordinal")]
+        first_alpha = next((character for character in text if character.isalpha()), "")
+        if (
+            len(words) >= 3
+            and first_alpha.isupper()
+            and line.x0 <= previous_start + layout.character_width
+        ):
+            # A flush-left title between numeric rows ("Net loss per share ...")
+            # is a section row, not wrapped text belonging to the amount above.
+            # Real continuations normally indent or begin mid-sentence.
+            return False
     return line.x0 >= previous_start - layout.character_width
 
 
@@ -510,7 +576,18 @@ def _absorbs_wrapped_label(
     # column. A row that already carries values of its own is complete.
     if len(previous.lines) > 1 or previous.occupied != (0,):
         return False
-    if len(boundaries) not in occupied_columns(line, boundaries):
+    occupied = occupied_columns(line, boundaries)
+    if len(boundaries) not in occupied:
+        return False
+    cells = cells_for(line, boundaries)
+    first_cell = cells[0].strip() if cells else ""
+    first_words = [piece for piece in first_cell.split() if any(c.isalpha() for c in piece)]
+    first_alpha = next((character for character in first_cell if character.isalpha()), "")
+    if first_cell and len(first_words) <= 3 and first_alpha.isupper():
+        # A short label plus amounts is already a complete row. Folding it into
+        # the section title above turned "Weighted average ..." and "Basic" into
+        # one record. A genuine wrapped continuation is sentence-like (typically
+        # lower-case) and remains eligible below.
         return False
     label = previous.anchor
     if label.text.strip().endswith(":") or label.width < layout.body_width * 0.45:
@@ -631,6 +708,10 @@ def fit_grid(candidate, layout: PageLayout) -> GridHypothesis | None:
         # whitespace vote is only an estimate, and the cells it produced are the
         # better evidence of where the boundary belongs.
         aligned = align_boundaries_to_cells(boundaries, lines, layout)
+        # Alignment can move a header token out of a narrow band and leave that
+        # column empty in every body row. Coalesce once more over the final
+        # geometry so centred titles cannot create phantom spreadsheet columns.
+        aligned = _coalesce(aligned, lines, left, right)
         if aligned != boundaries:
             boundaries = aligned
             rows = build_logical_rows(lines, boundaries, layout)

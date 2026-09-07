@@ -39,6 +39,13 @@ suggestion at all. Chart pages, bullet lists and numbered lists are recorded tha
 way, and they are the cheapest goldens to write, because they need no inspection
 of boundaries — only the judgement that the page holds no table.
 
+The Quest 10-K goldens pin both sides of one general failure: pages 3 and 4 are
+two-column editorial prose and contain no tables; page 49 contains three tables,
+including centred multi-line headers; and page 64 is a zebra-striped financial
+statement. The positive goldens were transcribed from visually inspected page
+overlays and intentionally contain only the geometry and header facts the scorer
+measures, rather than copying detector metadata into the oracle.
+
 ## What the scorer measures
 
 `scripts/score_tables.py` matches predictions to goldens by area overlap rather

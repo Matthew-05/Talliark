@@ -8,6 +8,7 @@ unrelated ruled objects on one page as two proposals instead of one.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from PIL import Image, ImageOps
 import math
@@ -53,6 +54,89 @@ _MAX_RULE_THICKNESS_PT = 2.5
 _MIN_GRAPHIC_EXTENT = 0.04
 _MIN_IMAGE_WIDTH = 400
 _MIN_IMAGE_HEIGHT = 200
+
+
+def _contains_diagonal_series(image: Image.Image) -> bool:
+    """Does a raster image contain a long plotted line rather than cell ink?
+
+    Embedded-image coverage is neutral because scans and spreadsheet screenshots
+    are legitimate table sources. A long diagonal stroke is different evidence:
+    it is characteristic of a plotted series and cannot be a horizontal or
+    vertical cell boundary. The small Hough-style vote tolerates dashed lines
+    without requiring OpenCV in the shipped worker.
+    """
+    sample = image.convert("L")
+    sample.thumbnail((400, 400))
+    width, height = sample.size
+    if width < 80 or height < 60:
+        return False
+    pixels = sample.load()
+    dark = [
+        (x, y)
+        for y in range(height)
+        for x in range(width)
+        if pixels[x, y] < 100
+    ]
+    if not dark:
+        return False
+    # These slopes cover shallow financial plots and steeper general charts.
+    # Horizontal and vertical strokes are deliberately absent: they are also the
+    # defining furniture of tables.
+    for slope in (-1.0, -0.67, -0.5, -0.33, -0.2, 0.2, 0.33, 0.5, 0.67, 1.0):
+        votes: dict[int, list[int]] = defaultdict(list)
+        for x, y in dark:
+            votes[round((y - slope * x) / 3.0)].append(x)
+        for xs in votes.values():
+            span = max(xs) - min(xs)
+            if (
+                span >= width * 0.60
+                and len(xs) >= width * 0.30
+                and len(xs) / max(1, span) >= 0.30
+            ):
+                return True
+    return False
+
+
+def _raster_chart_boxes(page, image: Image.Image) -> list[tuple[float, float, float, float]]:
+    """Bounds of embedded images that carry chart-specific raster evidence."""
+    width = float(page.rect.width) or 1.0
+    height = float(page.rect.height) or 1.0
+    boxes: list[tuple[float, float, float, float]] = []
+    try:
+        infos = page.get_image_info(xrefs=True)
+    except Exception:
+        return boxes
+    for info in infos:
+        rect = info.get("bbox")
+        if rect is None:
+            continue
+        x0, y0, x1, y1 = (float(value) for value in rect)
+        box = (
+            max(0.0, (x0 - page.rect.x0) / width),
+            max(0.0, (y0 - page.rect.y0) / height),
+            min(1.0, (x1 - page.rect.x0) / width),
+            min(1.0, (y1 - page.rect.y0) / height),
+        )
+        box_width = box[2] - box[0]
+        box_height = box[3] - box[1]
+        if box_width < _MIN_GRAPHIC_EXTENT or box_height < _MIN_GRAPHIC_EXTENT:
+            continue
+        if box_width >= 0.90 and box_height >= 0.90:
+            continue
+        crop = image.crop(
+            (
+                round(box[0] * image.width),
+                round(box[1] * image.height),
+                round(box[2] * image.width),
+                round(box[3] * image.height),
+            )
+        )
+        try:
+            if _contains_diagonal_series(crop):
+                boxes.append(box)
+        finally:
+            crop.close()
+    return boxes
 
 
 def _pixel_values(image: Image.Image) -> list[int]:
@@ -200,7 +284,7 @@ def _vector_ruling_segments(page) -> PageRulings:
         display_x, display_y = _to_displayed(matrix, x, y)
         return (display_x - page.rect.x0) / width, (display_y - page.rect.y0) / height
 
-    def _record_graphic(rect) -> None:
+    def _record_graphic(rect, *, fill=None) -> None:
         """Remember a shape only if it covers area in both directions.
 
         Row shading and highlight bars are filled rectangles too, and they are a
@@ -214,7 +298,18 @@ def _vector_ruling_segments(page) -> PageRulings:
         except Exception:
             return
         box = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
-        if box[2] - box[0] < _MIN_GRAPHIC_EXTENT or box[3] - box[1] < _MIN_GRAPHIC_EXTENT:
+        box_width = box[2] - box[0]
+        box_height = box[3] - box[1]
+        if box_width < _MIN_GRAPHIC_EXTENT or box_height < _MIN_GRAPHIC_EXTENT:
+            return
+        # A PDF commonly paints the paper itself as one page-sized rectangle.
+        # That is canvas, not content. Counting it as a figure gives every table
+        # on the page 100% graphics coverage. The same is true of a white panel:
+        # it is visually empty regardless of how large its drawing command is.
+        near_page_backdrop = box_width >= 0.90 and box_height >= 0.90
+        components = tuple(float(component) for component in (fill or ()))
+        visually_white = bool(components) and min(components) >= 0.95
+        if near_page_backdrop or visually_white:
             return
         result.graphics.append(box)
 
@@ -257,7 +352,7 @@ def _vector_ruling_segments(page) -> PageRulings:
                     # Row shading or a filled plot area. Taking its edges as rules
                     # made every stripe look like a cell border, which drove row
                     # detection down the ruled path and discarded the header.
-                    _record_graphic(rect)
+                    _record_graphic(rect, fill=drawing.get("fill"))
                     continue
             for first, second in segments:
                 x0, y0 = _to_displayed(matrix, float(first[0]), float(first[1]))
@@ -444,23 +539,15 @@ def detect_ruled_grid_segments(image: Image.Image) -> list[RulingSegment]:
 def detect_page_ruling_segments(page, *, dpi: int = 150) -> PageRulings:
     """Vector and raster rules for one page, keeping extents and page graphics."""
     rulings = _vector_ruling_segments(page)
-    try:
-        for rect in page.get_image_rects():
-            width = float(page.rect.width) or 1.0
-            height = float(page.rect.height) or 1.0
-            box = (
-                (float(rect.x0) - page.rect.x0) / width,
-                (float(rect.y0) - page.rect.y0) / height,
-                (float(rect.x1) - page.rect.x0) / width,
-                (float(rect.y1) - page.rect.y0) / height,
-            )
-            if box[2] - box[0] >= _MIN_GRAPHIC_EXTENT and box[3] - box[1] >= _MIN_GRAPHIC_EXTENT:
-                rulings.graphics.append(box)
-    except Exception:  # Image geometry is a hint, never a requirement.
-        pass
+    # An embedded image is a transport, not a semantic role: a chart, a scanned
+    # invoice and an Excel screenshot can all cover the same rectangle. Raster
+    # content therefore remains neutral here. Its table evidence is measured by
+    # the alignment and ruling passes; chart-specific vector curves and diagonals
+    # are still recorded above.
     try:
         pixmap = page.get_pixmap(dpi=dpi, alpha=False)
         image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+        rulings.graphics.extend(_raster_chart_boxes(page, image))
         for segment in detect_ruled_grid_segments(image):
             if segment.axis == "vertical":
                 rulings.vertical.append(segment)

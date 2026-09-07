@@ -1,69 +1,141 @@
 # Table engine
 
-> **Skeleton.** The headed sections below are the fixed shape every engine doc in
-> this folder follows. Facts about where the code lives are filled in; the
-> substance is not written yet. Delete this note once the doc says something.
-
 | | |
 | --- | --- |
 | **Source** | `src/python/engines/table/` |
 | **Contract** | `contracts/table-structure-v1.json` |
 | **Entry point** | `engines/table/detector.py` |
-| **Consumes** | `text-geometry-v1`, page rulings |
+| **Consumes** | `text-geometry-v1`, PDF vector drawings and raster rulings |
 | **Tests** | `src/python/tests/test_table_structure.py`, `test_table_detector.py`, `test_table_pipeline.py`, `test_table_overlay.py`, `test_table_benchmark.py`; fixtures in `src/python/tests/fixtures/tables/` |
-
-**Modules**
-
-`candidates.py`, `detector.py`, `grid.py`, `headers.py`, `layout.py`, `redesign.py`, `refine.py`, `rulings.py`, `scoring.py`
-
-Related single-module engines that sit beside the package rather than inside it: `engines/table_cell_engine.py`, `engines/table_date_engine.py`.
 
 ## 1. Purpose
 
-*What this engine is for, and the one job it owns that no sibling engine does.
-Two or three sentences. If a reader only reads this section, they should know
-when to reach for this engine and when not to.*
+The table engine finds table-shaped regions on any document and publishes their
+normalized bounds, columns, logical rows, header bands, confidence and supporting
+evidence. It is document-neutral: financial statements, invoices, forms, scanned
+pages and spreadsheet screenshots all travel through the same detector.
 
 ## 2. Inputs and outputs
 
-*What comes in, what goes out, and which contract governs the boundary. Name the
-contract fields that matter and say what the engine guarantees about them —
-ordering, completeness, coordinate space, units. Anything a downstream engine is
-allowed to rely on belongs here; anything it is not allowed to rely on belongs
-here too, stated as such.*
+The detector reads character geometry from `text-geometry-v1` and inspects the PDF
+page for vector and raster ruling evidence. Coordinates are normalized to the
+displayed page after rotation. Every output page preserves its zero-based
+`pageIndex`; tables are ordered top-to-bottom and left-to-right and conform to
+`table-structure-v1`.
+
+Published row and column bands cover the full detected region. A consumer may
+reconstruct cells by intersecting text geometry with those bands. Header rows are
+also present in `rows` and are labelled with `kind: "header"`. A candidate below
+the acceptance threshold is not published.
 
 ## 3. Types
 
-*The vocabulary. Every kind of thing the engine names — the categories, the
-tags, the states — with the one-line definition that distinguishes each from its
-neighbours. This is the section a reader comes back to; keep the definitions
-sharp enough to settle an argument about which bucket a case falls in.*
+- **Visual line** - characters sharing a baseline, tokenized into whitespace
+  islands.
+- **Logical row** - one anchor line plus any wrapped continuation lines assigned
+  to the same record.
+- **Candidate** - a generous possible table region supported by whitespace,
+  rulings, or both.
+- **Grid hypothesis** - fitted column boundaries and logical rows for a candidate.
+- **Section row** - a label band inside a table that carries no values.
+- **Spanning label** - a leading band that qualifies several columns and is stored
+  as a caption rather than a table row.
+- **Graphic** - chart-like vector area, curve or diagonal evidence. Page canvas,
+  white panels, row shading and embedded raster images are not graphics merely by
+  occupying area; a raster image becomes graphic evidence only when it contains
+  a sustained diagonal plotted series.
 
 ## 4. Algorithm
 
-*How it actually works, stage by stage, in the order the code runs. Say what each
-stage decides and on what evidence. Where a stage rejects a candidate, say what
-would have had to be true for it to pass. Prefer the shape of the reasoning over
-a line-by-line narration of the source.*
+1. `layout.py` converts characters into classified tokens, visual lines and page
+   body metrics, and marks running prose.
+2. `rulings.py` extracts vector and raster rules with their real extents. It
+   ignores near-page background rectangles and white fills. Raster image coverage
+   remains neutral; a small Hough-style vote records only long diagonal series as
+   chart evidence.
+3. `candidates.py` proposes independent ruled and whitespace regions and combines
+   evidence where their bounds agree.
+4. `grid.py` votes for persistent whitespace corridors, builds logical rows and
+   iterates until columns and rows settle. It aligns boundaries to actual cells,
+   coalesces empty bands again, and after header detection removes columns that
+   only a centred title occupied.
+5. `refine.py` splits schema changes, repeated headers and prose interruptions;
+   merges adjacent fragments only when their columns agree; strips spanning
+   labels; and deduplicates overlapping proposals.
+6. `headers.py` recognizes period bands, stacked titles and complete all-word
+   headers from the fitted cell matrix.
+7. `scoring.py` measures alignment, repetition, typing, spacing, headers, numeric
+   content, rulings, graphics and negative layouts. Two parallel columns that are
+   predominantly running prose are rejected even when their first line was
+   inferred to be a header. A coherent ruled grid can override that ambiguity.
+8. `redesign.py` publishes accepted candidates as `table-detector-3`.
 
 ## 5. Tuning and thresholds
 
-*Every constant that could have been a different number, where it lives, and what
-moves if it changes. For each, the measurement or the case that set it — a
-threshold with no recorded reason is a threshold nobody can safely touch.*
+| Setting | Value | Reason and effect |
+| --- | ---: | --- |
+| Acceptance confidence | `0.50` | Separates small but repeated tables from aligned lists and prose negatives. |
+| Prose words per side | `4` | Requires sentence-like content in both columns; a short jurisdiction or code column remains table evidence. |
+| Prose numeric allowance | `2` | Years and small counts occur inside prose and must not disable the prose test. |
+| Dominant prose share | `0.60` | One short paragraph tail may differ; most rows must still exhibit parallel prose before the full penalty applies. |
+| Ruled override | ruling feature `>= 0.50` | At least a small coherent set of intersections establishes cells independently of text flow. |
+| Page backdrop extent | `90%` on both axes | A rectangle covering nearly the whole page is canvas rather than figure content. |
+| Visually white fill | every component `>= 0.95` | A white paint operation contributes no visible graphic area. |
+| Minimum graphic extent | `0.04` on both axes | Thin shading bands and furniture are not chart regions. |
+| Raster series span | `60%` of image width | Text strokes do not traverse a figure; plotted series do. |
+| Raster series votes | `30%` of image width at `30%` density | Preserves dashed plots while rejecting scattered text and scanned grid furniture. |
+| Maximum rule thickness | `2.5 pt` | Thicker rectangles are fills rather than ruling lines. |
+| Column support | `35%` of weighted anchors | Keeps minority gaps from inventing columns while allowing sparse tables. |
+| Maximum ordinary crossing | `15%` | A persistent boundary may not cut through ordinary cell text. |
+| Spanning-header crossing | `40%` | The first tolerant vote allows centred and spanning headers to cross provisional boundaries. |
+| Grid iterations | `3` | Columns and wrapped-row membership settle within three passes on the regression corpus. |
+| Refinement depth | `4` | Bounds recursive splitting while allowing stacked independent tables to separate. |
+| Default document budget | `300,000 ms` | Production remains bounded; diagnostic and reconcile callers may disable the budget explicitly. |
+
+Scoring uses positive weights for alignment (`0.20`), multi-column occupancy
+(`0.15`), type stability (`0.10`), spacing (`0.08`), header evidence (`0.12`),
+rulings (`0.08`), numeric content (`0.10`), rule/grid agreement (`0.05`) and size
+(`0.12`). Penalties cover list markers (`0.55`), parallel prose (`0.45`), narrow
+marker layouts (`0.30`), chart graphics (`0.50`), empty grids (`0.25`), irregular
+density (`0.20`), unstable schemas (`0.30`) and unrepeated two-line blocks
+(`0.35`).
 
 ## 6. Failure modes
 
-*What this engine gets wrong, and how it fails when it does. Distinguish the
-cases it is designed to decline (and how a caller can tell) from the cases where
-it produces a confident wrong answer. Record real observed failures from the
-corpus, with the document that produced them.*
+- An unruled two-column table whose body consists mainly of long prose in both
+  cells is geometrically indistinguishable from editorial columns and is declined
+  conservatively unless independent ruling evidence exists.
+- A raster-only bar chart with no diagonal series receives no penalty merely for
+  being an image. It must be rejected by its lack of repeated cell structure;
+  unusually table-like charts can therefore remain ambiguous.
+- Poor OCR can merge adjacent values, erase gutters or move glyphs enough to
+  change both candidate bounds and content-addressed row structure.
+- Centred multi-line titles can initially create header-only columns. The
+  post-header coalescing pass removes columns empty throughout the body, but a
+  genuinely sparse optional column cannot be removed safely.
+- An unpunctuated section label can resemble a wrapped row label. Flush-left
+  capitalized titles and short labelled rows are kept separate; unusual wrapping
+  conventions may still require manual correction.
 
 ## 7. Tests and corpus
 
-*What the tests cover, what the fixtures are, and the bar the engine is held to.
-Note anything the corpus exercises that the unit tests do not.*
+Synthetic fixtures cover whitespace and ruled tables, stacked schemas, wrapped
+cells, currency markers, introductory prose, charts, lists and aligned prose.
+Unit tests separately pin ruling extraction, page-background neutrality, header
+analysis, post-alignment column coalescing, section-row handling and scoring.
+
+The Quest 10-K corpus goldens record pages 3 and 4 as negative editorial layouts,
+page 49 as three independent tables with centred multi-line headers, and page 64
+as a striped financial statement. The Apple 10-K and scanned form/table goldens
+exercise different publishers and raster inputs. Corpus goldens are visually
+approved and are never regenerated as an oracle from detector output.
 
 ## 8. Related documents
 
-- [`../reconcile/README.md`](../reconcile/README.md) — the main consumer of the detected grid. Its §4.1 is the reason that consumption is now corroborating rather than load-bearing: the sum tree stands on a value-alignment lattice, and reads the grid only where it is confident. A recall gain here no longer buys arithmetic recall there.
+- [`../../../value-types.md`](../../../value-types.md) - the vocabulary used by
+  the value tier whose geometry often corroborates table columns.
+- [`../reconcile/README.md`](../reconcile/README.md) - the main analytical
+  consumer. Reconcile uses table structure as corroboration rather than as the
+  sole arithmetic substrate.
+- [`../../architecture.md`](../../architecture.md) - runtime and contract
+  boundaries shared by all engines.

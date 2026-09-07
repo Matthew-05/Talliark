@@ -12,7 +12,11 @@ The pipeline is deliberately linear and each stage owns one decision:
 from __future__ import annotations
 
 from engines.table.candidates import generate
-from engines.table.grid import GridHypothesis, ruled_row_edges
+from engines.table.grid import (
+    GridHypothesis,
+    coalesce_empty_body_columns,
+    ruled_row_edges,
+)
 from engines.table.headers import detect_header_cells, period_in
 from engines.table.layout import PageLayout, build_page_layout
 from engines.table.refine import deduplicate, merge_adjacent, refine
@@ -20,7 +24,7 @@ from engines.table.rulings import PageRulings, detect_page_ruling_segments
 from engines.table.scoring import CandidateFeatures, evaluate
 
 
-DETECTOR_VERSION = "table-detector-2"
+DETECTOR_VERSION = "table-detector-3"
 
 # Period analysis — reporting what span of time a table's data is dated to — is
 # early alpha. It is off unless a caller asks for it, so production output keeps
@@ -189,6 +193,14 @@ def detect_page(
             matrix, grid.column_count, ruled=candidate.evidence == "ruled"
         )
         header_rows = int(header["rowCount"]) if header else 0
+        if coalesce_empty_body_columns(
+            grid, layout, header_rows=header_rows
+        ):
+            matrix = grid.cell_matrix()
+            header = detect_header_cells(
+                matrix, grid.column_count, ruled=candidate.evidence == "ruled"
+            )
+            header_rows = int(header["rowCount"]) if header else 0
         features: CandidateFeatures = evaluate(
             candidate, grid, layout, header_rows=header_rows
         )
