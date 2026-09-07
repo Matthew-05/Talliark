@@ -2,6 +2,7 @@ import type { DetectedTable } from "@talliark/shared";
 import type { TableStructureCache } from "../../services/table-structure-cache.js";
 import type { PdfViewer } from "./pdf-viewer.js";
 import { ensureOverlayLayer } from "./page-renderer.js";
+import { groupDisplayedTableRows } from "../../services/table-extractor.js";
 
 const OVERLAY_CLASS = "table-suggestions";
 
@@ -90,8 +91,9 @@ export class TableSuggestionOverlay {
     for (const column of table.columns.slice(0, -1)) {
       element.appendChild(this._line("column", (column.x1 - bounds.x) / bounds.width));
     }
-    for (const row of table.rows.slice(0, -1)) {
-      element.appendChild(this._line("row", (row.y1 - bounds.y) / bounds.height));
+    for (const group of groupDisplayedTableRows(table).slice(0, -1)) {
+      const groupBottom = group[group.length - 1]!.y1;
+      element.appendChild(this._line("row", (groupBottom - bounds.y) / bounds.height));
     }
     if (table.header) {
       const headerBottom = table.rows[Math.min(table.header.rowCount, table.rows.length) - 1]?.y1;

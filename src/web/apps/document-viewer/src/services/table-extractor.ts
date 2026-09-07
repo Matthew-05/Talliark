@@ -289,6 +289,22 @@ function sourceLineBoundaries(rows: TableRow[], rect: NormalizedRect): number[] 
   return normalizeBoundaries(boundaries);
 }
 
+/**
+ * Returns the row bands the user sees and edits.
+ *
+ * The detector retains each physical header line as a row so its evidence is not
+ * lost, while the table editor presents those lines as one multiline header row.
+ * Consumers that draw the editable grid must use these groups rather than the raw
+ * detector rows or they will expose boundaries that disappear during creation.
+ */
+export function groupDisplayedTableRows(table: DetectedTable): TableRow[][] {
+  const headerRowCount = Math.min(Math.max(table.header?.rowCount ?? 0, 0), table.rows.length);
+  const displayedGroups: TableRow[][] = [];
+  if (headerRowCount > 0) displayedGroups.push(table.rows.slice(0, headerRowCount));
+  for (const row of table.rows.slice(headerRowCount)) displayedGroups.push([row]);
+  return displayedGroups;
+}
+
 /** Converts absolute page table bands into the existing rectangle-relative grid shape. */
 export function gridFromTableStructure(
   table: DetectedTable,
@@ -299,9 +315,7 @@ export function gridFromTableStructure(
     table.columns.slice(0, -1).map((column) => relativeX(column.x1, rect)),
   );
   const headerRowCount = Math.min(table.header?.rowCount ?? 0, table.rows.length);
-  const displayedGroups: TableRow[][] = [];
-  if (headerRowCount > 0) displayedGroups.push(table.rows.slice(0, headerRowCount));
-  for (const row of table.rows.slice(headerRowCount)) displayedGroups.push([row]);
+  const displayedGroups = groupDisplayedTableRows(table);
 
   const rowBoundaries = normalizeBoundaries(
     displayedGroups.slice(0, -1).map((group) => relativeY(group[group.length - 1]!.y1, rect)),

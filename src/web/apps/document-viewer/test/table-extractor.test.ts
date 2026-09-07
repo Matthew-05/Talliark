@@ -20,7 +20,7 @@ registerHooks({
   },
 });
 
-const { detectCopiedTable, detectTableGrid, gridFromTableStructure } =
+const { detectCopiedTable, detectTableGrid, gridFromTableStructure, groupDisplayedTableRows } =
   await import(tableExtractorUrl) as typeof import("../src/services/table-extractor.ts");
 
 interface TestCharacter {
@@ -189,12 +189,19 @@ test("uses detected table bands and collapses a multiline header", () => {
   };
 
   const grid = gridFromTableStructure(table, table.bounds);
+  const displayedRows = groupDisplayedTableRows(table);
 
   assert.deepEqual(grid.columnBoundaries, [0.5]);
   assert.ok(Math.abs(grid.rowBoundaries[0]! - 2 / 7) < 1e-12);
   assert.ok(Math.abs(grid.rowBoundaries[1]! - 4 / 7) < 1e-12);
   assert.equal(grid.headerRowCount, 2);
   assert.ok(grid.textLineBoundaries?.[0]?.length === 1);
+  assert.equal(displayedRows.length, 3);
+  assert.deepEqual(displayedRows.map((group) => group.map((row) => row.y1)), [
+    [0.2, 0.3],
+    [0.5],
+    [0.8],
+  ]);
 });
 
 test("a missing model retains the text heuristic fallback", () => {
