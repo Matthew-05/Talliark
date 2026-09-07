@@ -39,6 +39,8 @@ interface ReconcileScanStatusMessage {
 interface ReconcileResultLoadedMessage {
   type: "reconcile-result-loaded";
   pdfId: string;
+  pdfBase64?: string;
+  pageRotations?: Record<number, number>;
   reconcileBase64?: string;
   staleness?: Staleness;
 }
@@ -74,6 +76,8 @@ export interface HostHandlers {
   onScanStatus(pdfId: string, status: ScanStatus, progress: ScanProgress): void;
   onResultLoaded?(
     pdfId: string,
+    pdfBase64: string | null,
+    pageRotations: Record<number, number>,
     reconcileBase64: string | null,
     staleness: Staleness,
   ): void;
@@ -112,6 +116,8 @@ export function initHostBridge(handlers: HostHandlers): void {
     } else if (msg.type === "reconcile-result-loaded") {
       handlers.onResultLoaded?.(
         msg.pdfId,
+        msg.pdfBase64 ?? null,
+        msg.pageRotations ?? {},
         msg.reconcileBase64 ?? null,
         msg.staleness ?? "none",
       );

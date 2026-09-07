@@ -83,6 +83,7 @@ export type { StageDefinition } from "./progress-stages.js";
 export { STAGES, STAGE_ORDER, fileProgressFraction, stageLabel } from "./progress-stages.js";
 export type { ModalAction, ModalActionVariant, ModalOptions } from "./modal.js";
 export { Modal } from "./modal.js";
+export { PdfViewer, applyNormalizedRectToElement, ensureOverlayLayer } from "./pdf-viewer.js";
 export {
   encodeTextGeometry,
   extractTextGeometryFromPdfBase64,

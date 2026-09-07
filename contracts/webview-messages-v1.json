@@ -1202,13 +1202,15 @@
     },
 
     "ReconcileResultLoadedMessage": {
-      "description": "Sent by the host in response to RequestReconcileResultMessage, carrying one document's whole reconcile-v1 model. Gzip-compressed and base64-encoded, as table structure and document values are on the same channel.",
+      "description": "Sent by the host in response to RequestReconcileResultMessage, carrying one document's whole reconcile-v1 model and the source PDF used by the review workspace. The model is gzip-compressed and base64-encoded, as table structure and document values are on the same channel; the PDF is its original base64 payload.",
       "type": "object",
       "required": ["type", "pdfId"],
       "additionalProperties": false,
       "properties": {
         "type": { "const": "reconcile-result-loaded" },
         "pdfId": { "type": "string" },
+        "pdfBase64": { "type": "string", "description": "Original PDF bytes, base64-encoded, so the reconcile workspace can keep the evidence beside its findings. Absent only when the document no longer exists." },
+        "pageRotations": { "type": "object", "description": "Optional map of 0-based page index to the workbook's stored clockwise rotation in degrees, so the evidence view stays aligned with the scan geometry.", "additionalProperties": { "type": "integer", "enum": [0, 90, 180, 270] } },
         "reconcileBase64": { "type": "string", "description": "Gzip-compressed reconcile-v1 JSON, base64-encoded. Absent when the workbook holds no result for this document." },
         "staleness": { "$ref": "#/definitions/ReconcileStaleness" }
       }

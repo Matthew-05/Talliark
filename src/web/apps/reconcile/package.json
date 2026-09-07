@@ -7,6 +7,7 @@
     "build": "tsc -p ../../tsconfig.tools.json && node build.ts"
   },
   "dependencies": {
-    "@talliark/shared": "*"
+    "@talliark/shared": "*",
+    "pdfjs-dist": "^4.10.38"
   }
 }

@@ -45,6 +45,8 @@ namespace Talliark.Addin.Modules.Services
             return new ReconcileStoredResult
             {
                 PdfId = pdfId,
+                PdfBase64 = parts.Base64,
+                PageRotations = metadata.PageRotations,
                 ReconcileBase64 = parts.ReconcileBase64,
                 Staleness = document.Staleness,
             };
@@ -317,6 +319,8 @@ namespace Talliark.Addin.Modules.Services
     internal sealed class ReconcileStoredResult
     {
         public string PdfId { get; set; }
+        public string PdfBase64 { get; set; }
+        public Dictionary<int, int> PageRotations { get; set; }
         public string ReconcileBase64 { get; set; }
         public string Staleness { get; set; }
     }

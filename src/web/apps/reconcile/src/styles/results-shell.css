@@ -1,0 +1,94 @@
+.results-shell {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.results-shell__topbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.results-shell__identity,
+.results-shell__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.results-shell__back {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.results-shell__back:hover { color: var(--color-accent); }
+
+.results-shell__title {
+  overflow: hidden;
+  max-width: 420px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results-shell__tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.results-shell__tab {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 11px 12px 10px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.results-shell__tab:hover { color: var(--color-text); }
+.results-shell__tab--active { color: var(--color-accent); }
+.results-shell__tab--active::after {
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  background: var(--color-accent);
+  content: "";
+}
+
+.results-shell__workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.results-shell__sidebar-slot {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border);
+}
+
+.results-shell__viewer-slot { min-width: 0; min-height: 0; }
+
+@media (max-width: 760px) {
+  .results-shell__title { max-width: 190px; }
+  .results-shell__workspace { grid-template-columns: minmax(220px, 42%) minmax(0, 1fr); }
+}

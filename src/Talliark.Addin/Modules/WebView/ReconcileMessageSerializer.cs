@@ -53,6 +53,10 @@ namespace Talliark.Addin.Modules.WebView
                 ["pdfId"] = result.PdfId ?? string.Empty,
                 ["staleness"] = result.Staleness ?? "none",
             };
+            if (!string.IsNullOrEmpty(result.PdfBase64))
+                root["pdfBase64"] = result.PdfBase64;
+            if (result.PageRotations != null && result.PageRotations.Count > 0)
+                root["pageRotations"] = result.PageRotations;
             if (!string.IsNullOrEmpty(result.ReconcileBase64))
                 root["reconcileBase64"] = result.ReconcileBase64;
             return Serialize(root);

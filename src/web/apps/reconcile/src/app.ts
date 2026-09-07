@@ -2,10 +2,9 @@
  * The Reconcile window.
  *
  * Per-workbook, one document at a time. The app lists the workbook's documents,
- * starts and watches a scan, and opens the stored result into a scorecard,
- * findings queue and complete per-table sum tree. Findings are R-2's — until
- * then a scanned document reports what was examined, which is the whole of what
- * the engine currently knows.
+ * starts and watches a scan, and opens the stored result as the starting point
+ * for a document review. The review workspace keeps its findings beside the
+ * source PDF and leaves room for the later consistency views.
  */
 import {
   initHostBridge,
@@ -120,7 +119,7 @@ export function mountApp(root: HTMLElement): void {
       scanProgress.update(nameOf(pdfId), status, progress);
     },
 
-    async onResultLoaded(pdfId, reconcileBase64, staleness) {
+    async onResultLoaded(pdfId, pdfBase64, pageRotations, reconcileBase64, staleness) {
       if (selectedId !== pdfId) return;
       const existing = documents.find((entry) => entry.id === pdfId);
       if (!existing) return;
@@ -130,7 +129,12 @@ export function mountApp(root: HTMLElement): void {
         return;
       }
       try {
-        resultView.showResult(entry, await decodeReconcileResult(reconcileBase64));
+        resultView.showResult(
+          entry,
+          await decodeReconcileResult(reconcileBase64),
+          pdfBase64,
+          pageRotations,
+        );
       } catch (error) {
         console.error("[Talliark] could not decode Reconcile result:", error);
         resultView.showError(entry, "The stored scan result could not be opened.");
