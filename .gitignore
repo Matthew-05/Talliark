@@ -152,6 +152,13 @@ src/Talliark.Addin/Properties/GeneratedVersion.cs
 # Generated analysis and diagnostic artifacts
 /output/
 
+# Public documents used by local benchmarks. Fetch with
+# scripts/setup-development-corpus.ps1; do not redistribute them in Git.
+/sample-document-corpus/financial-statements/*.pdf
+/sample-document-corpus/mixed-pdf-purposes/0[1-9]-*.pdf
+/sample-document-corpus/mixed-pdf-purposes/1[0-9]-*.pdf
+/sample-document-corpus/mixed-pdf-purposes/20-*.pdf
+
 # --- Installer build artifacts ---
 # Generated at build time; not committed
 installer/obj/

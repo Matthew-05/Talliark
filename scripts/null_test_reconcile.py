@@ -64,7 +64,7 @@ if __name__ == "__main__":
         for name in docs:
             RNG.seed(seed * 7919 + hash(name) % 1000)
             D._reconcile_block = patched
-            m = scan(ROOT/"test-imports.local/financial-statements"/name)
+            m = scan(ROOT/"sample-document-corpus/financial-statements"/name)
             D._reconcile_block = _original
             s = m["summary"]
             cells = {c["id"]: c for t in m["tables"] for c in t["cells"]}

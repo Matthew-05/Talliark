@@ -20,5 +20,5 @@ This is the fourth sibling engine and the only one that does not run in the
 cache build. `engines.financial` is cache-build detection and runs on every
 document; analysis code does not go there.
 
-Plan of record: docs/reconcile.local.md.
+Engine record: docs/internal/engines/reconcile/README.md.
 """

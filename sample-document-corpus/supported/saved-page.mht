@@ -1,0 +1,17 @@
+Subject: Saved page =?utf-8?b?4oCU?= Talliark docs
+Content-Type: multipart/alternative;
+ boundary="===============4808901735266392696=="
+
+--===============4808901735266392696==
+Content-Location: https://example.invalid/docs
+
+
+--===============4808901735266392696==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><body><h1>Saved Web Page</h1><p>This MHTML fixture exercises the MIME p=
+arsing path.</p></body></html>
+
+--===============4808901735266392696==--

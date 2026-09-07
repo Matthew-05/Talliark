@@ -1,8 +1,9 @@
 # Reconcile goldens
 
 One golden per corpus document, listing every total the scan nominated and what
-it made of each. The documents themselves live in `test-imports.local/` and are
-not committed.
+it made of each. The source reports are local, gitignored development inputs;
+run `scripts/setup-development-corpus.ps1` to fetch them, and see the corpus
+README for what each one exercises.
 
 A golden is an **independent oracle or it is nothing**. `scripts/score_reconcile.py`
 can write candidates, but it writes them with `"approved": false`, and it refuses
@@ -11,11 +12,11 @@ from detector output and blessed by the same detector measures precisely nothing
 
 ```powershell
 # Write candidates for review
-py scripts/score_reconcile.py "test-imports.local/financial-statements/apple 10k.pdf" `
+py scripts/score_reconcile.py "sample-document-corpus/financial-statements/apple 10k.pdf" `
   --propose-golden src/python/tests/fixtures/reconcile/apple-10k.json
 
 # Score against the approved golden — non-zero exit on a false tie
-py scripts/score_reconcile.py "test-imports.local/financial-statements/apple 10k.pdf" `
+py scripts/score_reconcile.py "sample-document-corpus/financial-statements/apple 10k.pdf" `
   --golden src/python/tests/fixtures/reconcile/apple-10k.json
 ```
 
@@ -38,7 +39,7 @@ listed page that is absent from `totals` scores as a false tie. Without it the
 scorer can only check the entries it was given, and a total invented on a page
 nobody covered would pass unnoticed.
 
-The bar itself, from `docs/reconcile.local.md` §11: zero false ties anywhere in
+The bar itself: zero false ties anywhere in
 the document is the hard number; every labelled total in the primary statements
 nominated and confirmed is the soft one. Recall may lag — a single confidently
 wrong finding costs more than ten missed totals.

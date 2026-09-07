@@ -18,7 +18,7 @@ The scorer never blesses its own output. `--propose-golden` writes candidates
 marked unapproved, and scoring refuses a golden that a person has not marked
 approved.
 
-    py scripts/score_reconcile.py "test-imports.local/financial-statements/apple 10k.pdf"
+    py scripts/score_reconcile.py "sample-document-corpus/financial-statements/apple 10k.pdf"
     py scripts/score_reconcile.py "…/apple 10k.pdf" --propose-golden src/python/tests/fixtures/reconcile/apple-10k.json
     py scripts/score_reconcile.py "…/apple 10k.pdf" --golden src/python/tests/fixtures/reconcile/apple-10k.json
 """

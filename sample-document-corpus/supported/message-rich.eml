@@ -1,0 +1,72 @@
+From: billing@northwind.example
+To: matthew@talliark.example
+Cc: ap@talliark.example
+Subject: Invoice 4471 attached
+Date: Mon, 03 Aug 2026 16:02:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============0285644635837663908=="
+
+--===============0285644635837663908==
+Content-Type: multipart/alternative;
+ boundary="===============8614112360936518110=="
+
+--===============8614112360936518110==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Plain-text fallback body for Invoice 4471.
+
+--===============8614112360936518110==
+MIME-Version: 1.0
+Content-Type: multipart/related;
+ boundary="===============8964220761337252904=="
+
+--===============8964220761337252904==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<html><body><h2>Invoice 4471</h2><p>Please see the summary below.</p><img src=
+=3D"cid:banner001"/><p style=3D"color:#868e96">Northwind Supply Co.</p></body=
+></html>
+
+--===============8964220761337252904==
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <banner001>
+MIME-Version: 1.0
+Content-Disposition: inline
+
+iVBORw0KGgoAAAANSUhEUgAAAZAAAADICAIAAABJdyC1AAAEL0lEQVR4nO3av4scdRjA4dm9TWJy
+F5KA5AoVxCbYiI1FBCsVRBCxvNhYpLUxjQpaCIqFf4BIwCIkYGFloWJjKah1QCJYJHAJBH9ciMol
+dxYGOUwut8juhQ8+TzXsvAxv9eG7w4xWV5YGgILxvV4AYFqCBWQIFpAhWECGYAEZggVkCBaQMdnu
+xvK5td3cA2CryycO3v6jExaQIVhAhmABGdu+w9rqjn8mAWZrx1fnTlhAhmABGYIFZAgWkCFYQIZg
+ARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVk
+CBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFY
+QIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZ
+ggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgW
+kCFYQIZgARmCBWQIFpAhWECGYAEZggVkzCxYkwcf3f/MybsMHD19aZoxgO1MZvWgGxfP37h4flZj
+ALebWbCGYTh6+tKVkw/8fXH9q4/2HDs+PnDo2qfv/fntZ1OOjRcPH3zlg/Gh5WGy99rZN9d//H6G
+6wF1swzWlqfu2Vi7+vM7zy0cffjIW5//K1h3GVt6+d3rX364fuG7hfsfOnzqk6tvPDmX9YCm+QRr
+NP796zPDMNy88tP4wKHpx/Y+9vTC8iO3bt63OIwXho2bc9kQCJpPsG6ub17/9db15ub0Y6Px5Jf3
+X9pc/2MYjfceO65WwFbz+axhY+O/ja3/8M2+J14YhmHf488uvnhq5nsBabv3HdaN1Qs7NmjtzOv7
+n1o58vYXB55/9bePX9udxYCK0erK0h1vLJ9b++f68omDu7UP8P+1Y3Z86Q5kCBaQIVhAhmABGYIF
+ZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAh
+WECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmAB
+GYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQI
+FpAhWECGYAEZggVkCBaQIVhAhmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZggVkCBaQIVhA
+hmABGYIFZAgWkCFYQIZgARmCBWQIFpAhWECGYAEZk2mGls+tzXsPgB05YQEZggVkCBaQMVpdWbrX
+OwBMxQkLyBAsIEOwgAzBAjIEC8gQLCDjLw3Cjmv7FT17AAAAAElFTkSuQmCC
+
+--===============8964220761337252904==--
+
+--===============8614112360936518110==--
+
+--===============0285644635837663908==
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="invoice-4471.pdf"
+MIME-Version: 1.0
+
+JVBERi0xLjQgZmFrZQ==
+
+--===============0285644635837663908==--

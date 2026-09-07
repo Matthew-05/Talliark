@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Corpus files are byte-sensitive fixtures unless explicitly documented as text.
+sample-document-corpus/** binary
+sample-document-corpus/README.md text eol=lf diff merge

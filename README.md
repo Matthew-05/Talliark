@@ -14,6 +14,16 @@ Talliark is not yet ready for production use. Early builds are available on the 
 
 More complete installation instructions, product documentation, screenshots, and support information will be added as the project approaches a stable release.
 
+## Development corpus
+
+Public documents used by the local OCR and analysis benchmarks are not
+redistributed in this repository. Run
+`.\scripts\setup-development-corpus.ps1` after cloning to download the pinned
+source files, verify their SHA-256 hashes, and assemble the image-derived PDFs.
+See the
+[sample corpus documentation](sample-document-corpus/README.md) for provenance
+and usage.
+
 ## License
 
 Talliark is available under the [Mozilla Public License 2.0](LICENSE).

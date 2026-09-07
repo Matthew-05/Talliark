@@ -17,15 +17,14 @@ py scripts/make_table_fixtures.py
 
 which derives each golden from the layout it drew, not from detector output, so
 the fixtures stay an independent oracle. `tests/test_table_benchmark.py` runs
-them, and they need no local corpus, so they gate CI.
+them, and they need no corpus document, so they gate CI.
 
 ## Corpus goldens (`<pdf-stem>.page-<n>.json`)
 
-These reference PDFs in `test-imports.local/`, which are not committed. Generate
-candidates with:
+These reference PDFs in `sample-document-corpus/`. Generate candidates with:
 
 ```powershell
-py scripts/score_tables.py "test-imports.local/financial-statements/apple 10k.pdf" `
+py scripts/score_tables.py "sample-document-corpus/financial-statements/apple 10k.pdf" `
   --write-candidates output/table-candidates
 ```
 
