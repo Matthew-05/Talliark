@@ -598,6 +598,7 @@ def _handle_job(job: OcrJob) -> None:
                     document_id=job.document_id,
                     values=values_model,
                     financial=financial_model,
+                    tables=table_structure,
                     progress_callback=on_progress,
                     diagnostics=diagnostics,
                 )

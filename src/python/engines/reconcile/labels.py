@@ -7,14 +7,20 @@ table detection has to remain highly accurate for linking, which is what it is
 used for almost all of the time. The other half of that module, reading what a
 label *means*, belongs here.
 
-R-1 fills this in: row-label extraction and normalization, and the header-label
-semantics moved out of `engines/table/headers.py`. What already exists is the
-total lexicon, because `nominate.label_total` is the one enabled signal and
-reads it.
+One thing did not move, deliberately. `engines.table.headers.period_in` reads
+the printed period out of a label, and `table-structure-v1` still publishes that
+text in its own `period` field -- so moving the function here would have made
+table detection depend on the analysis module to fill a field it owns. What
+moved is the judgement built on top of it: whether a column *is* a period
+column, whether it names a total, and what a row label announces. Reconcile
+never reads `table-structure-v1.period` as an interpreted fact; it re-reads the
+printed label and decides for itself.
 """
 from __future__ import annotations
 
 import re
+
+from engines.table.headers import period_in
 
 
 # The words a row label uses to say it is a total. Compound forms matter as much
@@ -32,6 +38,20 @@ TOTAL_LEXICON: tuple[str, ...] = (
     "balance",
 )
 
+# The words a *column* header uses to say the column is a total of the columns
+# beside it. Narrower than the row lexicon on purpose: a cross-foot is attempted
+# only against a column whose own header names a total, and "Net" heading a
+# column means net of something rather than the sum of its neighbours.
+TOTAL_COLUMN_LEXICON: tuple[str, ...] = (
+    "total",
+    "consolidated",
+    "combined",
+)
+
+NON_ADDITIVE_COLUMN_TERMS: tuple[str, ...] = (
+    "percent", "%", "rate", "average", "per share", "per unit", "margin",
+)
+
 _COLLAPSE = re.compile(r"\s+")
 # Leading list and footnote apparatus, which sits between the margin and the
 # word the label actually starts with.
@@ -43,20 +63,73 @@ def normalize(text: str) -> str:
     return _COLLAPSE.sub(" ", (text or "").strip()).lower()
 
 
-def is_total_label(text: str) -> bool:
-    """Whether a row label announces itself as a total.
+def row_label(text: str) -> str:
+    """A row's label as a finding will quote it back.
+
+    Whitespace collapsed and case kept, because the sentence a finding prints
+    names the row: *the five rows above "Total net sales" sum to…*. Matching is
+    done through `normalize`, which lower-cases; what is published is what the
+    page says.
+    """
+    return _COLLAPSE.sub(" ", (text or "").strip())
+
+
+def _opens_with(label: str, lexicon: tuple[str, ...]) -> bool:
+    """Does the label's opening phrase come from this lexicon?
 
     Leading apparatus is stripped first so "(1) Total revenue" reads the same as
     "Total revenue". The test is on the opening phrase: a label that merely
     contains "total" somewhere in a sentence is not announcing one.
     """
-    label = _LEADING_APPARATUS.sub("", normalize(text))
+    stripped = _LEADING_APPARATUS.sub("", label)
     return any(
-        label == word or label.startswith(word + " ") for word in TOTAL_LEXICON
+        stripped == word or stripped.startswith(word + " ") for word in lexicon
     )
 
 
-# --- R-1 -------------------------------------------------------------------
-# row_label(cells)          the leading cell of a row, normalized
-# header_semantics(labels)  is_total_column / is_period_column / period,
-#                           moved out of engines/table/headers.py
+def is_total_label(text: str) -> bool:
+    """Whether a row label announces itself as a total."""
+    return _opens_with(normalize(text), TOTAL_LEXICON)
+
+
+def is_total_column(text: str) -> bool:
+    """Whether a column header names a total of the columns beside it."""
+    return _opens_with(normalize(text), TOTAL_COLUMN_LEXICON)
+
+
+def is_period_column(text: str) -> bool:
+    """Whether a column header parses as a period or a year.
+
+    Two or more of these in one table disables cross-footing for the table
+    entirely: it is a comparative statement, and adding 2025 to 2024 is nonsense
+    no tolerance model would catch.
+    """
+    return bool(period_in(text))
+
+
+def is_non_additive_column(text: str) -> bool:
+    """Whether the header names a rate, average, or per-unit measure."""
+    normalized = normalize(text)
+    return any(term in normalized for term in NON_ADDITIVE_COLUMN_TERMS)
+
+
+def header_semantics(labels: list[str]) -> list[dict]:
+    """Per column, what Reconcile makes of that column's header label.
+
+    `labels` is `table-structure-v1`'s `header.labels`, which is the printed
+    text joined across the header bands -- table detection's fact. Everything
+    returned here is Reconcile's reading of it.
+    """
+    published: list[dict] = []
+    for index, text in enumerate(labels):
+        entry = {
+            "columnIndex": index,
+            "text": text,
+            "isTotalColumn": is_total_column(text),
+            "isPeriodColumn": is_period_column(text),
+        }
+        period = period_in(text)
+        if period:
+            entry["period"] = period
+        published.append(entry)
+    return published

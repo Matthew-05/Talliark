@@ -78,7 +78,31 @@ export interface ReconcileCell {
   readonly text: string;
   readonly bounds: Bounds;
   readonly normalizedValue?: string | undefined;
+  /** Printed decimal places. What the run agreed on, and what a sum is set at. */
+  readonly decimals?: number | undefined;
+  /** A dash alone: an addend worth zero, wherever in a run it appears. */
+  readonly dash?: boolean | undefined;
   readonly rowLabel?: string | undefined;
+}
+
+/**
+ * What Reconcile made of a column's header.
+ *
+ * `table-structure-v1` owns which bands are header and what they say as
+ * printed; the reading of it is Reconcile's, and this is that reading.
+ */
+export interface ReconcileHeaderLabel {
+  readonly columnIndex: number;
+  readonly text: string;
+  readonly isTotalColumn: boolean;
+  readonly isPeriodColumn: boolean;
+  readonly period?: string | undefined;
+}
+
+/** Why a cell was nominated. Structure nominates; arithmetic confirms. */
+export interface ReconcileSignal {
+  readonly name: string;
+  readonly evidence: string;
 }
 
 export interface ReconcileSumRun {
@@ -100,7 +124,13 @@ export interface ReconcileTotal {
   readonly columnIndex: number;
   readonly axis?: "vertical" | "cross" | undefined;
   readonly outcome: ReconcileOutcome;
+  readonly signals?: ReconcileSignal[] | undefined;
   readonly resolution?: ReconcileSumRun | undefined;
+  /**
+   * The same total resolved against the leaf rows instead of the subtotals.
+   * Never the tree — the subtotals are what the statement is asserting.
+   */
+  readonly leafResolution?: ReconcileSumRun | undefined;
   readonly unresolvedReason?: string | undefined;
 }
 
@@ -108,8 +138,11 @@ export interface ReconcileTable {
   readonly id: string;
   readonly pageIndex: number;
   readonly bounds: Bounds;
+  /** Value lattice alone, or a lattice block corroborated by table detection. */
+  readonly provenance: "lattice" | "lattice+table" | "table";
   readonly columnCount: number;
   readonly rowCount: number;
+  readonly headerLabels?: ReconcileHeaderLabel[] | undefined;
   readonly cells: ReconcileCell[];
   readonly totals: ReconcileTotal[];
 }

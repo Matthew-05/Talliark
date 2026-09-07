@@ -1,0 +1,2011 @@
+{
+  "document": "apple 10k.pdf",
+  "detectorVersion": "reconcile-detector-1",
+  "approved": false,
+  "pages": [],
+  "note": "Candidate, not a golden. Check every entry against the printed page, correct the outcomes the scan got wrong, list in `pages` the page numbers you checked in full, then set `approved` to true. Any total confirmed on a listed page that is absent from `totals` scores as a false tie, which is what makes the hard bar mean anything.",
+  "totals": [
+    {
+      "page": 22,
+      "column": "Approximate Dollar Value of Shares That May Yet Be Purchased Under the Plans or Programs (1)",
+      "label": "Total",
+      "value": "99779",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 22,
+      "column": "Total Number of Shares Purchased",
+      "label": "Total",
+      "value": "89498",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 25,
+      "column": "2023",
+      "label": "Total net sales",
+      "value": "383285",
+      "outcome": "confirmed",
+      "sum": "383285",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "162560",
+        "94294",
+        "72559",
+        "24257",
+        "29615"
+      ]
+    },
+    {
+      "page": 25,
+      "column": "2024",
+      "label": "Total net sales",
+      "value": "391035",
+      "outcome": "confirmed",
+      "sum": "391035",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "167045",
+        "101328",
+        "66952",
+        "25052",
+        "30658"
+      ]
+    },
+    {
+      "page": 25,
+      "column": "2025",
+      "label": "Total net sales",
+      "value": "416161",
+      "outcome": "confirmed",
+      "sum": "416161",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "178353",
+        "111032",
+        "64377",
+        "28703",
+        "33696"
+      ]
+    },
+    {
+      "page": 26,
+      "column": "2023",
+      "label": "Total net sales",
+      "value": "383285",
+      "outcome": "confirmed",
+      "sum": "383285",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "200583",
+        "29357",
+        "28300",
+        "39845",
+        "85200"
+      ]
+    },
+    {
+      "page": 26,
+      "column": "2024",
+      "label": "Total net sales",
+      "value": "391035",
+      "outcome": "confirmed",
+      "sum": "391035",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "201183",
+        "29984",
+        "26694",
+        "37005",
+        "96169"
+      ]
+    },
+    {
+      "page": 26,
+      "column": "2025",
+      "label": "Total net sales",
+      "value": "416161",
+      "outcome": "confirmed",
+      "sum": "416161",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "209586",
+        "33708",
+        "28023",
+        "35686",
+        "109158"
+      ]
+    },
+    {
+      "page": 27,
+      "column": "2023",
+      "label": "Total gross margin",
+      "value": "169148",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 27,
+      "column": "2024",
+      "label": "Total gross margin",
+      "value": "180683",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 27,
+      "column": "2025",
+      "label": "Total gross margin",
+      "value": "195201",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 27,
+      "column": "2023",
+      "label": "Total operating expenses",
+      "value": "54847",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 27,
+      "column": "2024",
+      "label": "Total operating expenses",
+      "value": "57467",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 27,
+      "column": "2025",
+      "label": "Total operating expenses",
+      "value": "62151",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 32,
+      "column": "September 27, 2025",
+      "label": "Gross margin",
+      "value": "195201",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 28, 2024",
+      "label": "Gross margin",
+      "value": "180683",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 30, 2023",
+      "label": "Gross margin",
+      "value": "169148",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 27, 2025",
+      "label": "Net income",
+      "value": "112010",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 32,
+      "column": "September 28, 2024",
+      "label": "Net income",
+      "value": "93736",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 32,
+      "column": "September 30, 2023",
+      "label": "Net income",
+      "value": "96995",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 32,
+      "column": "September 27, 2025",
+      "label": "Total cost of sales",
+      "value": "220960",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 28, 2024",
+      "label": "Total cost of sales",
+      "value": "210352",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 30, 2023",
+      "label": "Total cost of sales",
+      "value": "214137",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 27, 2025",
+      "label": "Total net sales",
+      "value": "416161",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 28, 2024",
+      "label": "Total net sales",
+      "value": "391035",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 30, 2023",
+      "label": "Total net sales",
+      "value": "383285",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 27, 2025",
+      "label": "Total operating expenses",
+      "value": "62151",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 28, 2024",
+      "label": "Total operating expenses",
+      "value": "57467",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 32,
+      "column": "September 30, 2023",
+      "label": "Total operating expenses",
+      "value": "54847",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 27, 2025",
+      "label": "Net income",
+      "value": "112010",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 33,
+      "column": "September 28, 2024",
+      "label": "Net income",
+      "value": "93736",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 33,
+      "column": "September 30, 2023",
+      "label": "Net income",
+      "value": "96995",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 33,
+      "column": "September 27, 2025",
+      "label": "Total change in unrealized gains/losses on derivative instruments",
+      "value": "637",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 28, 2024",
+      "label": "Total change in unrealized gains/losses on derivative instruments",
+      "value": "-2169",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 30, 2023",
+      "label": "Total change in unrealized gains/losses on derivative instruments",
+      "value": "-1394",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 27, 2025",
+      "label": "Total change in unrealized gains/losses on marketable debt securities",
+      "value": "1231",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 28, 2024",
+      "label": "Total change in unrealized gains/losses on marketable debt securities",
+      "value": "6054",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 30, 2023",
+      "label": "Total change in unrealized gains/losses on marketable debt securities",
+      "value": "1816",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 27, 2025",
+      "label": "Total comprehensive income",
+      "value": "113611",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 28, 2024",
+      "label": "Total comprehensive income",
+      "value": "98016",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 30, 2023",
+      "label": "Total comprehensive income",
+      "value": "96652",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 27, 2025",
+      "label": "Total other comprehensive income/(loss)",
+      "value": "1601",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 28, 2024",
+      "label": "Total other comprehensive income/(loss)",
+      "value": "4280",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 33,
+      "column": "September 30, 2023",
+      "label": "Total other comprehensive income/(loss)",
+      "value": "-343",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total assets",
+      "value": "359241",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total assets",
+      "value": "364980",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total current assets",
+      "value": "147957",
+      "outcome": "confirmed",
+      "sum": "147957",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "35934",
+        "18763",
+        "39777",
+        "33180",
+        "5718",
+        "14585"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total current assets",
+      "value": "152987",
+      "outcome": "confirmed",
+      "sum": "152987",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "29943",
+        "35228",
+        "33410",
+        "32833",
+        "7286",
+        "14287"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total current liabilities",
+      "value": "165631",
+      "outcome": "confirmed",
+      "sum": "165631",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "69860",
+        "66387",
+        "9055",
+        "7979",
+        "12350"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total current liabilities",
+      "value": "176392",
+      "outcome": "confirmed",
+      "sum": "176392",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "68960",
+        "78304",
+        "8249",
+        "9967",
+        "10912"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total liabilities",
+      "value": "285508",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total liabilities",
+      "value": "308030",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total liabilities and shareholders’ equity",
+      "value": "359241",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total liabilities and shareholders’ equity",
+      "value": "364980",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total non-current assets",
+      "value": "211284",
+      "outcome": "confirmed",
+      "sum": "211284",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "77723",
+        "49834",
+        "83727"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total non-current assets",
+      "value": "211993",
+      "outcome": "confirmed",
+      "sum": "211993",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "91479",
+        "45680",
+        "74834"
+      ]
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total non-current liabilities",
+      "value": "119877",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total non-current liabilities",
+      "value": "131638",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 34,
+      "column": "September 27, 2025",
+      "label": "Total shareholders’ equity",
+      "value": "73733",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 34,
+      "column": "September 28, 2024",
+      "label": "Total shareholders’ equity",
+      "value": "56950",
+      "outcome": "confirmed",
+      "sum": "56950",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "83276",
+        "-19154",
+        "-7172"
+      ]
+    },
+    {
+      "page": 35,
+      "column": "September 27, 2025",
+      "label": "Net income",
+      "value": "112010",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 35,
+      "column": "September 28, 2024",
+      "label": "Net income",
+      "value": "93736",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 35,
+      "column": "September 30, 2023",
+      "label": "Net income",
+      "value": "96995",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 35,
+      "column": "September 27, 2025",
+      "label": "Total shareholders’ equity, beginning balances",
+      "value": "56950",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 35,
+      "column": "September 28, 2024",
+      "label": "Total shareholders’ equity, beginning balances",
+      "value": "62146",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 35,
+      "column": "September 30, 2023",
+      "label": "Total shareholders’ equity, beginning balances",
+      "value": "50672",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 35,
+      "column": "September 27, 2025",
+      "label": "Total shareholders’ equity, ending balances",
+      "value": "73733",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 35,
+      "column": "September 28, 2024",
+      "label": "Total shareholders’ equity, ending balances",
+      "value": "56950",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 35,
+      "column": "September 30, 2023",
+      "label": "Total shareholders’ equity, ending balances",
+      "value": "62146",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 36,
+      "column": "September 27, 2025",
+      "label": "Net income",
+      "value": "112010",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 36,
+      "column": "September 28, 2024",
+      "label": "Net income",
+      "value": "93736",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 36,
+      "column": "September 30, 2023",
+      "label": "Net income",
+      "value": "96995",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 39,
+      "column": "2023",
+      "label": "Net income",
+      "value": "96995",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 39,
+      "column": "2024",
+      "label": "Net income",
+      "value": "93736",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 39,
+      "column": "2025",
+      "label": "Net income",
+      "value": "112010",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 39,
+      "column": "2023",
+      "label": "Total net sales",
+      "value": "383285",
+      "outcome": "confirmed",
+      "sum": "383285",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "200583",
+        "29357",
+        "28300",
+        "39845",
+        "85200"
+      ]
+    },
+    {
+      "page": 39,
+      "column": "2024",
+      "label": "Total net sales",
+      "value": "391035",
+      "outcome": "confirmed",
+      "sum": "391035",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "201183",
+        "29984",
+        "26694",
+        "37005",
+        "96169"
+      ]
+    },
+    {
+      "page": 39,
+      "column": "2025",
+      "label": "Total net sales",
+      "value": "416161",
+      "outcome": "confirmed",
+      "sum": "416161",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "209586",
+        "33708",
+        "28023",
+        "35686",
+        "109158"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Subtotal",
+      "value": "5951",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Subtotal",
+      "value": "100493",
+      "outcome": "confirmed",
+      "sum": "100493",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "16074",
+        "5269",
+        "6586",
+        "917",
+        "100",
+        "47210",
+        "207",
+        "24130"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Subtotal",
+      "value": "1293",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Subtotal",
+      "value": "132108",
+      "outcome": "confirmed",
+      "sum": "132108",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "16150",
+        "5431",
+        "17959",
+        "873",
+        "1066",
+        "65622",
+        "412",
+        "24595"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Subtotal",
+      "value": "5272",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Subtotal",
+      "value": "2395",
+      "outcome": "confirmed",
+      "sum": "2395",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1190",
+        "251",
+        "904",
+        "50"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Subtotal",
+      "value": "778",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Subtotal",
+      "value": "1966",
+      "outcome": "confirmed",
+      "sum": "1966",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "212",
+        "155",
+        "1158",
+        "387",
+        "28",
+        "26"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "854",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "17909",
+      "outcome": "confirmed",
+      "sum": "17909",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3712",
+        "2456",
+        "855",
+        "50",
+        "10623",
+        "119",
+        "94"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "617",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "34611",
+      "outcome": "confirmed",
+      "sum": "34611",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "4087",
+        "703",
+        "10810",
+        "478",
+        "1038",
+        "16027",
+        "190",
+        "1278"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Subtotal",
+      "value": "6126",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Subtotal",
+      "value": "98027",
+      "outcome": "confirmed",
+      "sum": "98027",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "15848",
+        "5120",
+        "6273",
+        "917",
+        "100",
+        "46560",
+        "205",
+        "23004"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Subtotal",
+      "value": "1395",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Subtotal",
+      "value": "128056",
+      "outcome": "confirmed",
+      "sum": "128056",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "15679",
+        "5159",
+        "17568",
+        "873",
+        "1066",
+        "63939",
+        "405",
+        "23367"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Non-Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "77723",
+      "outcome": "confirmed",
+      "sum": "77723",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10946",
+        "2413",
+        "5418",
+        "13",
+        "35937",
+        "86",
+        "22910"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Non-Current Marketable Securities",
+      "label": "Subtotal",
+      "value": "91479",
+      "outcome": "confirmed",
+      "sum": "91479",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11380",
+        "4301",
+        "5600",
+        "8",
+        "47886",
+        "215",
+        "22089"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Subtotal",
+      "value": "177",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Subtotal",
+      "value": "559",
+      "outcome": "confirmed",
+      "sum": "559",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "56",
+        "111",
+        "266",
+        "126"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Subtotal",
+      "value": "105",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Subtotal",
+      "value": "583",
+      "outcome": "confirmed",
+      "sum": "583",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "45",
+        "93",
+        "270",
+        "175"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Subtotal",
+      "value": "-2",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Subtotal",
+      "value": "-3025",
+      "outcome": "confirmed",
+      "sum": "-3025",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-282",
+        "-149",
+        "-424",
+        "-916",
+        "-2",
+        "-1252"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Subtotal",
+      "value": "-3",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Subtotal",
+      "value": "-4635",
+      "outcome": "confirmed",
+      "sum": "-4635",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-516",
+        "-272",
+        "-484",
+        "-1953",
+        "-7",
+        "-1403"
+      ]
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Total",
+      "value": "134711",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Total",
+      "value": "35934",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Total",
+      "value": "18763",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Total",
+      "value": "132420",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Non-Current Marketable Securities",
+      "label": "Total",
+      "value": "77723",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Total",
+      "value": "736",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Total",
+      "value": "-3027",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Adjusted Cost",
+      "label": "Total (2)(3)",
+      "value": "160600",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Cash and Cash Equivalents",
+      "label": "Total (2)(3)",
+      "value": "29943",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Current Marketable Securities",
+      "label": "Total (2)(3)",
+      "value": "35228",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Fair Value",
+      "label": "Total (2)(3)",
+      "value": "156650",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Non-Current Marketable Securities",
+      "label": "Total (2)(3)",
+      "value": "91479",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Gains",
+      "label": "Total (2)(3)",
+      "value": "688",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 40,
+      "column": "Unrealized Losses",
+      "label": "Total (2)(3)",
+      "value": "-4638",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 42,
+      "column": "2024",
+      "label": "Gross property, plant and equipment",
+      "value": "119128",
+      "outcome": "confirmed",
+      "sum": "119128",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "24690",
+        "80205",
+        "14233"
+      ]
+    },
+    {
+      "page": 42,
+      "column": "2025",
+      "label": "Gross property, plant and equipment",
+      "value": "125848",
+      "outcome": "confirmed",
+      "sum": "125848",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "27337",
+        "83420",
+        "15091"
+      ]
+    },
+    {
+      "page": 42,
+      "column": "2024",
+      "label": "Total property, plant and equipment, net",
+      "value": "45680",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 42,
+      "column": "2025",
+      "label": "Total property, plant and equipment, net",
+      "value": "49834",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2023",
+      "label": "Total",
+      "value": "5801",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2023",
+      "label": "Total",
+      "value": "1521",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2023",
+      "label": "Total",
+      "value": "9419",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2024",
+      "label": "Total",
+      "value": "2491",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2024",
+      "label": "Total",
+      "value": "1428",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2024",
+      "label": "Total",
+      "value": "25830",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2025",
+      "label": "Total",
+      "value": "9683",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2025",
+      "label": "Total",
+      "value": "1541",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2025",
+      "label": "Total",
+      "value": "9495",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2024",
+      "label": "Total other current liabilities",
+      "value": "78304",
+      "outcome": "confirmed",
+      "sum": "78304",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "26601",
+        "7679",
+        "44024"
+      ]
+    },
+    {
+      "page": 43,
+      "column": "2025",
+      "label": "Total other current liabilities",
+      "value": "66387",
+      "outcome": "confirmed",
+      "sum": "66387",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "13016",
+        "8919",
+        "44452"
+      ]
+    },
+    {
+      "page": 43,
+      "column": "2024",
+      "label": "Total other non-current assets",
+      "value": "74834",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 43,
+      "column": "2025",
+      "label": "Total other non-current assets",
+      "value": "83727",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 44,
+      "column": "2024",
+      "label": "Net deferred tax assets",
+      "value": "19202",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 44,
+      "column": "2025",
+      "label": "Net deferred tax assets",
+      "value": "19980",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 44,
+      "column": "2024",
+      "label": "Total deferred tax assets",
+      "value": "34873",
+      "outcome": "confirmed",
+      "sum": "34873",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10739",
+        "8856",
+        "6114",
+        "3413",
+        "2410",
+        "3341"
+      ]
+    },
+    {
+      "page": 44,
+      "column": "2025",
+      "label": "Total deferred tax assets",
+      "value": "38417",
+      "outcome": "confirmed",
+      "sum": "38417",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "15041",
+        "8643",
+        "6154",
+        "2953",
+        "2577",
+        "3049"
+      ]
+    },
+    {
+      "page": 44,
+      "column": "2024",
+      "label": "Total deferred tax assets, net",
+      "value": "26007",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 44,
+      "column": "2025",
+      "label": "Total deferred tax assets, net",
+      "value": "27451",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 44,
+      "column": "2024",
+      "label": "Total deferred tax liabilities",
+      "value": "6805",
+      "outcome": "confirmed",
+      "sum": "6805",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2551",
+        "2125",
+        "1674",
+        "455"
+      ]
+    },
+    {
+      "page": 44,
+      "column": "2025",
+      "label": "Total deferred tax liabilities",
+      "value": "7471",
+      "outcome": "confirmed",
+      "sum": "7471",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3276",
+        "2300",
+        "1217",
+        "678"
+      ]
+    },
+    {
+      "page": 45,
+      "column": "2024",
+      "label": "Total lease liabilities",
+      "value": "12430",
+      "outcome": "confirmed",
+      "sum": "12430",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1488",
+        "10046",
+        "144",
+        "752"
+      ]
+    },
+    {
+      "page": 45,
+      "column": "2025",
+      "label": "Total lease liabilities",
+      "value": "13720",
+      "outcome": "confirmed",
+      "sum": "13720",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1579",
+        "10911",
+        "538",
+        "692"
+      ]
+    },
+    {
+      "page": 45,
+      "column": "2024",
+      "label": "Total right-of-use assets",
+      "value": "11303",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 45,
+      "column": "2025",
+      "label": "Total right-of-use assets",
+      "value": "12238",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 46,
+      "column": "Finance Leases",
+      "label": "Total lease liabilities",
+      "value": "1230",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 46,
+      "column": "Operating Leases",
+      "label": "Total lease liabilities",
+      "value": "12490",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 46,
+      "column": "Total",
+      "label": "Total lease liabilities",
+      "value": "13720",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 46,
+      "column": "2023",
+      "label": "Total proceeds from/(repayments of) commercial paper, net",
+      "value": "-3978",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 46,
+      "column": "2024",
+      "label": "Total proceeds from/(repayments of) commercial paper, net",
+      "value": "3960",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 46,
+      "column": "2025",
+      "label": "Total proceeds from/(repayments of) commercial paper, net",
+      "value": "-2032",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 46,
+      "column": "Finance Leases",
+      "label": "Total undiscounted liabilities",
+      "value": "1579",
+      "outcome": "confirmed",
+      "sum": "1579",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "563",
+        "73",
+        "51",
+        "48",
+        "43",
+        "801"
+      ]
+    },
+    {
+      "page": 46,
+      "column": "Operating Leases",
+      "label": "Total undiscounted liabilities",
+      "value": "14725",
+      "outcome": "confirmed",
+      "sum": "14725",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1967",
+        "1988",
+        "1848",
+        "1585",
+        "1381",
+        "5956"
+      ]
+    },
+    {
+      "page": 46,
+      "column": "Total",
+      "label": "Total undiscounted liabilities",
+      "value": "16304",
+      "outcome": "confirmed",
+      "sum": "16304",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2530",
+        "2061",
+        "1899",
+        "1633",
+        "1424",
+        "6757"
+      ]
+    },
+    {
+      "page": 47,
+      "column": "2024",
+      "label": "Total non-current portion of term debt",
+      "value": "85750",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 47,
+      "column": "Amount (in millions)",
+      "label": "Total non-current portion of term debt",
+      "value": "78328",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 47,
+      "column": "2024",
+      "label": "Total term debt",
+      "value": "96662",
+      "outcome": "confirmed",
+      "sum": "96662",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "97341",
+        "-321",
+        "-358"
+      ]
+    },
+    {
+      "page": 47,
+      "column": "Amount (in millions)",
+      "label": "Total term debt",
+      "value": "90678",
+      "outcome": "confirmed",
+      "sum": "90678",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "91281",
+        "-309",
+        "-294"
+      ]
+    },
+    {
+      "page": 47,
+      "column": "",
+      "label": "Total term debt principal",
+      "value": "91281",
+      "outcome": "confirmed",
+      "sum": "91281",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "12393",
+        "10078",
+        "9300",
+        "5235",
+        "4972",
+        "49303"
+      ]
+    },
+    {
+      "page": 47,
+      "column": "2024",
+      "label": "Total term debt principal",
+      "value": "97341",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 47,
+      "column": "Amount (in millions)",
+      "label": "Total term debt principal",
+      "value": "91281",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 48,
+      "column": "Number of RSUs (in thousands)",
+      "label": "Balance as of September 27, 2025",
+      "value": "151574",
+      "outcome": "confirmed",
+      "sum": "151574",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "163326",
+        "73466",
+        "-76845",
+        "-8373"
+      ]
+    },
+    {
+      "page": 48,
+      "column": "Weighted-Average Grant-Date Fair Value Per RSU",
+      "label": "Balance as of September 27, 2025",
+      "value": "189.75",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-plausible-run"
+    },
+    {
+      "page": 48,
+      "column": "Number of RSUs (in thousands)",
+      "label": "Balance as of September 28, 2024",
+      "value": "163326",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 48,
+      "column": "Weighted-Average Grant-Date Fair Value Per RSU",
+      "label": "Balance as of September 28, 2024",
+      "value": "158.73",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 49,
+      "column": "",
+      "label": "Total",
+      "value": "13308",
+      "outcome": "confirmed",
+      "sum": "13308",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "4752",
+        "3708",
+        "1981",
+        "1306",
+        "788",
+        "773"
+      ]
+    },
+    {
+      "page": 50,
+      "column": "Americas",
+      "label": "Net sales",
+      "value": "178353",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Americas",
+      "label": "Net sales",
+      "value": "167045",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Americas",
+      "label": "Net sales",
+      "value": "162560",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Europe",
+      "label": "Net sales",
+      "value": "111032",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Europe",
+      "label": "Net sales",
+      "value": "101328",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Europe",
+      "label": "Net sales",
+      "value": "94294",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Greater China",
+      "label": "Net sales",
+      "value": "64377",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Greater China",
+      "label": "Net sales",
+      "value": "66952",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Greater China",
+      "label": "Net sales",
+      "value": "72559",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Japan",
+      "label": "Net sales",
+      "value": "28703",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Japan",
+      "label": "Net sales",
+      "value": "25052",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Japan",
+      "label": "Net sales",
+      "value": "24257",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Rest of Asia Pacific",
+      "label": "Net sales",
+      "value": "33696",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Rest of Asia Pacific",
+      "label": "Net sales",
+      "value": "30658",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Rest of Asia Pacific",
+      "label": "Net sales",
+      "value": "29615",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Total",
+      "label": "Net sales",
+      "value": "416161",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Total",
+      "label": "Net sales",
+      "value": "391035",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 50,
+      "column": "Total",
+      "label": "Net sales",
+      "value": "383285",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 51,
+      "column": "2024",
+      "label": "Total long-lived assets",
+      "value": "45680",
+      "outcome": "confirmed",
+      "sum": "45680",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "35664",
+        "4797",
+        "5219"
+      ]
+    },
+    {
+      "page": 51,
+      "column": "2025",
+      "label": "Total long-lived assets",
+      "value": "49834",
+      "outcome": "confirmed",
+      "sum": "49834",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "40274",
+        "3617",
+        "5943"
+      ]
+    },
+    {
+      "page": 51,
+      "column": "2023",
+      "label": "Total net sales",
+      "value": "383285",
+      "outcome": "confirmed",
+      "sum": "383285",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "138573",
+        "72559",
+        "172153"
+      ]
+    },
+    {
+      "page": 51,
+      "column": "2024",
+      "label": "Total net sales",
+      "value": "391035",
+      "outcome": "confirmed",
+      "sum": "391035",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "142196",
+        "66952",
+        "181887"
+      ]
+    },
+    {
+      "page": 51,
+      "column": "2025",
+      "label": "Total net sales",
+      "value": "416161",
+      "outcome": "confirmed",
+      "sum": "416161",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "151790",
+        "64377",
+        "199994"
+      ]
+    }
+  ]
+}

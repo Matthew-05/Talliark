@@ -24,7 +24,7 @@ export class FindingsSidebar {
     context.textContent = model.summary.breaks > 0
       ? `${model.summary.breaks} arithmetic ${model.summary.breaks === 1 ? "exception" : "exceptions"} need review.`
       : `${model.summary.confirmed} ${model.summary.confirmed === 1 ? "total was" : "totals were"} mathematically verified.`;
-    header.append(heading, count, context);
+    header.append(heading, count, context, this.scorecard(model));
 
     const list = document.createElement("div");
     list.className = "findings-sidebar__list";
@@ -34,6 +34,38 @@ export class FindingsSidebar {
       for (const finding of model.findings) list.appendChild(this.finding(finding));
     }
     this.element.replaceChildren(header, list);
+  }
+
+  /**
+   * What the scan ran over, before what it found.
+   *
+   * A clean result is affirmative rather than empty: `verified` is published
+   * beside the exceptions so a scan that found nothing wrong can be told from a
+   * scan that never ran. `Not checked` is stated in the same breath, because a
+   * count of verified totals means nothing without the count of the ones the
+   * scan could not reach.
+   */
+  private scorecard(model: ReconcileModel): HTMLElement {
+    const scorecard = document.createElement("div");
+    scorecard.className = "findings-sidebar__scorecard";
+    const stats: ReadonlyArray<[string, number, string]> = [
+      ["Tables", model.summary.tablesExamined, ""],
+      ["Totals", model.summary.totalsNominated, ""],
+      ["Verified", model.summary.confirmed, "verified"],
+      ["Exceptions", model.summary.breaks, "exceptions"],
+      ["Not checked", model.summary.unresolved, ""],
+    ];
+    for (const [label, value, modifier] of stats) {
+      const stat = document.createElement("span");
+      stat.className = `findings-sidebar__stat${modifier ? ` findings-sidebar__stat--${modifier}` : ""}`;
+      const amount = document.createElement("b");
+      amount.textContent = String(value);
+      const name = document.createElement("span");
+      name.textContent = label;
+      stat.append(amount, name);
+      scorecard.appendChild(stat);
+    }
+    return scorecard;
   }
 
   showUnavailable(title: string): void {

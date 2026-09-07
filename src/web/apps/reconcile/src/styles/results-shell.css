@@ -79,9 +79,12 @@
   min-height: 0;
 }
 
+/* The active review mode owns the sidebar column and scrolls its own contents. */
 .results-shell__sidebar-slot {
+  display: flex;
   min-width: 0;
   min-height: 0;
+  flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--color-border);
 }

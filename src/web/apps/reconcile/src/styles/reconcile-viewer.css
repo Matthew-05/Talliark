@@ -67,16 +67,68 @@
 .reconcile-search__input:disabled { opacity: .55; }
 .reconcile-search__count { min-width: 48px; color: var(--color-text-muted); font-size: 10px; text-align: center; }
 
-.reconcile-viewer__finding-highlight,
+.reconcile-viewer__footing-highlight,
+.reconcile-viewer__category-highlight,
 .reconcile-viewer__search-highlight {
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
   pointer-events: none;
 }
-.reconcile-viewer__finding-highlight {
-  border: 2px solid #d94841;
-  background: rgba(217, 72, 65, .15);
+
+.reconcile-viewer__category-highlight {
+  z-index: 3;
+  border: 2px solid;
+  border-radius: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: box-shadow 120ms ease, background 120ms ease;
+}
+
+.reconcile-viewer__category-highlight--confirmed {
+  border-color: #178447;
+  background: rgba(23, 132, 71, .15);
+}
+
+.reconcile-viewer__category-highlight--break {
+  border-color: #d94841;
+  background: rgba(217, 72, 65, .17);
+}
+
+.reconcile-viewer__category-highlight--unresolved {
+  border-color: #b47b00;
+  background: rgba(180, 123, 0, .16);
+}
+
+.reconcile-viewer__category-highlight:hover,
+.reconcile-viewer__category-highlight--active {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .38);
+}
+.reconcile-viewer__footing-footprint {
+  z-index: 1;
+  border: 2px dashed rgba(37, 99, 235, .8);
+  border-radius: 3px;
+  background: rgba(37, 99, 235, .035);
+}
+.reconcile-viewer__footing-highlight--addend {
+  border: 1.5px solid #2563eb;
+  background: rgba(37, 99, 235, .13);
+}
+.reconcile-viewer__footing-highlight--total {
+  border-width: 2px;
+  border-style: solid;
+}
+.reconcile-viewer__footing-highlight--total.reconcile-viewer__footing-highlight--confirmed {
+  border-color: #178447;
+  background: rgba(23, 132, 71, .18);
+}
+.reconcile-viewer__footing-highlight--total.reconcile-viewer__footing-highlight--break {
+  border-color: #d94841;
+  background: rgba(217, 72, 65, .18);
+}
+.reconcile-viewer__footing-highlight--total.reconcile-viewer__footing-highlight--unresolved {
+  border-color: #b47b00;
+  background: rgba(180, 123, 0, .18);
 }
 .reconcile-viewer__search-highlight { background: rgba(250, 204, 21, .35); }
 .reconcile-viewer__search-highlight--active {

@@ -9,7 +9,7 @@ import {
   searchPageWithIndex,
 } from "@talliark/shared";
 import type { CharacterEntry, SearchMatch, SearchPageIndex } from "@talliark/shared";
-import type { Bounds } from "../../types/index.js";
+import type { Bounds, ReconcileOutcome } from "../../types/index.js";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const MIN_ZOOM = 0.25;
@@ -17,7 +17,19 @@ const MAX_ZOOM = 4;
 
 export interface ViewerFocus {
   readonly pageIndex: number;
-  readonly bounds: Bounds[];
+  readonly outcome: ReconcileOutcome;
+  readonly rectangles: ReadonlyArray<{
+    readonly bounds: Bounds;
+    readonly role: "addend" | "total";
+  }>;
+  readonly footprint?: Bounds | undefined;
+}
+
+export interface CategoryOverviewItem {
+  readonly id: string;
+  readonly pageIndex: number;
+  readonly bounds: Bounds;
+  readonly outcome: ReconcileOutcome;
 }
 
 /**
@@ -44,6 +56,10 @@ export class ReconcileViewer {
   private activeSearchIndex = -1;
   private readonly characters = new Map<number, CharacterEntry[]>();
   private readonly searchIndices = new Map<number, SearchPageIndex>();
+  private categoryOverview: {
+    items: readonly CategoryOverviewItem[];
+    onSelect: (id: string) => void;
+  } | null = null;
 
   constructor() {
     this.element = document.createElement("section");
@@ -145,6 +161,7 @@ export class ReconcileViewer {
     this.objectUrl = URL.createObjectURL(new Blob([decodeBase64(pdfBase64)], { type: "application/pdf" }));
     await this.viewer.loadDocument(this.objectUrl, pdfId, pageRotations);
     this.viewer.startBackgroundRender();
+    this.renderCategoryOverview();
     const document_ = this.viewer.getDocument();
     if (!document_) return;
     try {
@@ -170,19 +187,85 @@ export class ReconcileViewer {
   }
 
   focus(focus: ViewerFocus): void {
-    this.viewer.element.querySelectorAll(".reconcile-viewer__finding-highlight")
-      .forEach((element) => element.remove());
+    this.clearFocus();
     const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${focus.pageIndex + 1}"]`);
     if (!page) return;
-    for (const bounds of focus.bounds) {
+    const layer = ensureOverlayLayer(page);
+    if (focus.footprint) {
+      const footprint = document.createElement("div");
+      footprint.className = `reconcile-viewer__footing-highlight reconcile-viewer__footing-footprint reconcile-viewer__footing-highlight--${focus.outcome}`;
+      applyNormalizedRectToElement(footprint, focus.footprint);
+      layer.appendChild(footprint);
+    }
+    for (const rectangle of focus.rectangles) {
       const highlight = document.createElement("div");
-      highlight.className = "reconcile-viewer__finding-highlight";
-      applyNormalizedRectToElement(highlight, bounds);
-      ensureOverlayLayer(page).appendChild(highlight);
+      highlight.className = `reconcile-viewer__footing-highlight reconcile-viewer__footing-highlight--${rectangle.role} reconcile-viewer__footing-highlight--${focus.outcome}`;
+      applyNormalizedRectToElement(highlight, rectangle.bounds);
+      layer.appendChild(highlight);
     }
     void this.viewer.renderPageNow(focus.pageIndex + 1).then(() => {
       page.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+  }
+
+  clearFocus(): void {
+    this.viewer.element.querySelectorAll(".reconcile-viewer__footing-highlight")
+      .forEach((element) => element.remove());
+  }
+
+  showCategory(
+    items: readonly CategoryOverviewItem[] | null,
+    onSelect: (id: string) => void,
+  ): void {
+    this.clearFocus();
+    this.viewer.element.querySelectorAll(".reconcile-viewer__category-highlight")
+      .forEach((element) => element.remove());
+    this.categoryOverview = items ? { items, onSelect } : null;
+    this.renderCategoryOverview();
+  }
+
+  focusCategory(id: string, pageIndex?: number): void {
+    this.viewer.element.querySelectorAll(".reconcile-viewer__category-highlight--active")
+      .forEach((element) => element.classList.remove("reconcile-viewer__category-highlight--active"));
+    const highlight = this.viewer.element.querySelector<HTMLElement>(
+      `[data-category-total-id="${CSS.escape(id)}"]`,
+    );
+    highlight?.classList.add("reconcile-viewer__category-highlight--active");
+    const targetPage = pageIndex ?? Number(highlight?.dataset["pageIndex"] ?? 1) - 1;
+    void this.viewer.renderPageNow(targetPage + 1).then(() => {
+      const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${targetPage + 1}"]`);
+      page?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  private renderCategoryOverview(): void {
+    const overview = this.categoryOverview;
+    if (!overview) return;
+    this.viewer.element.querySelectorAll(".reconcile-viewer__category-highlight")
+      .forEach((element) => element.remove());
+    for (const item of overview.items) {
+      const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${item.pageIndex + 1}"]`);
+      if (!page) continue;
+      const highlight = document.createElement("div");
+      highlight.className = `reconcile-viewer__category-highlight reconcile-viewer__category-highlight--${item.outcome}`;
+      highlight.dataset["categoryTotalId"] = item.id;
+      highlight.dataset["pageIndex"] = String(item.pageIndex + 1);
+      highlight.setAttribute("role", "button");
+      highlight.setAttribute("tabindex", "0");
+      highlight.setAttribute("aria-label", "Focus this footing result");
+      applyNormalizedRectToElement(highlight, item.bounds);
+      const select = (): void => {
+        this.focusCategory(item.id, item.pageIndex);
+        overview.onSelect(item.id);
+      };
+      highlight.addEventListener("click", select);
+      highlight.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        select();
+      });
+      ensureOverlayLayer(page).appendChild(highlight);
+    }
   }
 
   private scheduleSearch(): void {

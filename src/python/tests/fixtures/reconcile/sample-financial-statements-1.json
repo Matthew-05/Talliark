@@ -1,0 +1,105 @@
+{
+  "document": "Sample-Financial-Statements-1.pdf",
+  "detectorVersion": "reconcile-detector-1",
+  "approved": false,
+  "pages": [],
+  "note": "Candidate, not a golden. Check every entry against the printed page, correct the outcomes the scan got wrong, list in `pages` the page numbers you checked in full, then set `approved` to true. Any total confirmed on a listed page that is absent from `totals` scores as a false tie, which is what makes the hard bar mean anything.",
+  "totals": [
+    {
+      "page": 1,
+      "column": "2021",
+      "label": "Net income",
+      "value": "945",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 1,
+      "column": "Retained Earnings",
+      "label": "Net income",
+      "value": "945",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 1,
+      "column": "2021",
+      "label": "Total operating expenses",
+      "value": "1360",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 2,
+      "column": "$6,875",
+      "label": "Gross Profit",
+      "value": "2750",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 2,
+      "column": "$6,875",
+      "label": "Net income",
+      "value": "945",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 2,
+      "column": "Retained Earnings",
+      "label": "Net income",
+      "value": "945",
+      "outcome": "unresolved",
+      "unresolvedReason": "run-too-short"
+    },
+    {
+      "page": 2,
+      "column": "$6,875",
+      "label": "Total operating expenses",
+      "value": "1360",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 3,
+      "column": "",
+      "label": "Total Current Liabilities",
+      "value": "895",
+      "outcome": "confirmed",
+      "sum": "895",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "60",
+        "80",
+        "100",
+        "405",
+        "250"
+      ]
+    },
+    {
+      "page": 3,
+      "column": "",
+      "label": "Total assets",
+      "value": "13060",
+      "outcome": "unresolved",
+      "unresolvedReason": "no-candidate-run"
+    },
+    {
+      "page": 3,
+      "column": "",
+      "label": "Total current assets",
+      "value": "2360",
+      "outcome": "confirmed",
+      "sum": "2360",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1550",
+        "770",
+        "40"
+      ]
+    }
+  ]
+}

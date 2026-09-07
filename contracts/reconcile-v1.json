@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:talliark:schemas:reconcile:1",
   "title": "Talliark Reconcile v1",
-  "description": "The result of one Reconcile scan of one document: the sum tree the document's own totals assert, and what the arithmetic made of it. Produced on demand -- the user selects a document and runs a scan -- and never in the cache build, which is what separates this artifact from table-structure-v1, document-values-v1 and financial-structure-v1. The whole tree is published, not only the exceptions: a home screen that can say '14 totals verified, 0 exceptions' is what makes a clean scan trustworthy instead of indistinguishable from a scan that never ran. Everything here is derived from the PDF alone; no XBRL, no taxonomy, no external fact set. Coordinates use normalized displayed-page, top-left-origin 0-1 space. Cell membership is derived per scan over the grid the scan itself re-detected, and is deliberately not published back into document-values-v1.",
+  "description": "The result of one Reconcile scan of one document: the sum tree the document's own totals assert, and what the arithmetic made of it. The tree stands on a page-local alignment lattice derived from value spans; detected tables are corroborating evidence, never a prerequisite. Produced on demand and derived from the PDF alone.",
   "type": "object",
   "required": ["version", "coordinateSpace", "detectorVersion", "source", "summary", "tables", "findings"],
   "additionalProperties": false,
@@ -14,7 +14,7 @@
     "summary": { "$ref": "#/definitions/Summary" },
     "tables": {
       "type": "array",
-      "description": "One entry per detected table the scan examined, in page then reading order. A table with nothing nominated is still published: it is the record that the table was looked at and yielded nothing, which is what lets the window say it found nothing to check rather than implying the document passed.",
+      "description": "One entry per value-alignment block the scan examined, in page then reading order. The historical property name is retained for the v1 envelope; an entry need not have a detected table behind it.",
       "items": { "$ref": "#/definitions/Table" }
     },
     "findings": {
@@ -52,7 +52,7 @@
         "documentId": { "type": "string", "minLength": 1, "description": "GUID of the PdfDocument in the workbook this scan ran on." },
         "pageCount": { "type": "integer", "minimum": 0 },
         "geometryFingerprint": { "type": "string", "pattern": "^[0-9a-f]{16}$", "description": "Hash over the text geometry the scan read. Span ids are stable across detector versions but not across a re-OCR that moves geometry, so this is the fact that tells a result anchored to the old geometry from one anchored to the new." },
-        "tableDetectorVersion": { "type": "string", "minLength": 1, "description": "Version of the table detector the scan re-ran, unbudgeted and privately. Not necessarily the version whose output the viewer is reading." },
+        "tableDetectorVersion": { "type": "string", "minLength": 1, "description": "Version of the cached table model used as optional corroboration, or 'unavailable'." },
         "valueDetectorVersion": { "type": "string", "minLength": 1 },
         "financialStructureDetectorVersion": { "type": "string", "minLength": 1, "description": "Absent when the financial tier did not publish a model for this document." },
         "scannedAt": { "type": "string", "format": "date-time", "description": "When the scan completed, in UTC. Presentation only; staleness is decided by the versions and the fingerprint, never by age." }
@@ -75,13 +75,14 @@
 
     "Table": {
       "type": "object",
-      "description": "One detected table, with the cell layer Reconcile derived over it and every total nominated inside it.",
-      "required": ["id", "pageIndex", "bounds", "columnCount", "rowCount", "cells", "totals"],
+      "description": "One footing block, with every total nominated inside it. Normally its cells come from the value lattice; a cached detected-table cell layer may contribute a deduplicated fallback block under the same corroboration policy.",
+      "required": ["id", "pageIndex", "bounds", "provenance", "columnCount", "rowCount", "cells", "totals"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "pageIndex": { "type": "integer", "minimum": 0 },
         "bounds": { "$ref": "#/definitions/Bounds" },
+        "provenance": { "type": "string", "enum": ["lattice", "lattice+table", "table"], "description": "Whether the block was inferred from values alone, corroborated by a detected table, or admitted by the corroborated grid fallback after the lattice bake-off missed it." },
         "columnCount": { "type": "integer", "minimum": 0 },
         "rowCount": { "type": "integer", "minimum": 0, "description": "Body rows only. Header bands are not rows of the table for this purpose; table-structure-v1 remains the authority on which leading bands are header." },
         "headerLabels": {
@@ -117,7 +118,7 @@
 
     "Cell": {
       "type": "object",
-      "description": "One cell of the grid, as Reconcile joined it: grid geometry intersected with text geometry for the text, and with document-values-v1 spans for the value. This membership is derived per scan and describes the grid the analysis actually used, which the cache build's grid may no longer be.",
+      "description": "One cell of the scan-local alignment lattice. Numeric cells are derived from value-span row centres and last-digit right edges; label and dash evidence comes from text geometry.",
       "required": ["id", "rowIndex", "columnIndex", "text", "bounds"],
       "additionalProperties": false,
       "properties": {
@@ -129,15 +130,15 @@
         "spanId": { "$ref": "#/definitions/SpanId", "description": "The value span this cell contains. Absent when the cell carries no recognized value -- a label, a blank, or a dash." },
         "normalizedValue": { "type": "string", "description": "Exact canonical decimal, copied from the span unchanged. Sums are computed over this as decimal arithmetic and never as a binary float, and its decimal specificity is preserved through the addition because a near-miss diagnosis reads it. Absent when the cell has no value." },
         "decimals": { "type": "integer", "minimum": 0, "description": "Printed decimal places. Members of a run must agree in this with each other and with the total, which is what keeps a per-share figure out of a column of whole millions without knowing what 'per share' means." },
-        "dash": { "type": "boolean", "description": "True when the cell holds a dash alone. A dash in a detected table cell is an addend worth zero, uniformly and wherever in a run it appears. A cell that is merely empty is not published at all, because a blank ends a candidate rather than contributing to it." },
+        "dash": { "type": "boolean", "description": "True when the cell holds a dash alone. A dash in an aligned block cell is an addend worth zero. A cell that is merely empty is not published at all, because a blank ends a candidate rather than contributing to it." },
         "rowLabel": { "type": "string", "description": "The normalized label of this cell's row, taken from the row's leading cell. Present on value cells so a finding can name a row without a second lookup." }
       }
     },
 
     "SignalName": {
       "type": "string",
-      "enum": ["label-total", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
-      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. No signal may be inferred from the arithmetic -- a cell that happens to tie with the run above it is not thereby a total. Note what is absent: text-geometry-v1 carries no font or weight, so bold is not a signal that exists. Only label-total is enabled in the first pass; the rest are defined and switched on as measurement says they earn it."
+      "enum": ["label-total", "column-corroboration", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
+      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. Column corroboration is leave-one-out: arithmetic in other independent columns may nominate the cell being judged, while its own arithmetic may not. Text geometry carries no font or weight, so bold is not a signal that exists."
     },
 
     "Signal": {

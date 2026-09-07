@@ -13,20 +13,331 @@ never published back into `document-values-v1`. That is what keeps the
 membership a description of the grid the analysis actually used, which the cache
 build's grid may no longer be.
 
-R-1 fills this in.
+Two narrowings are decisions rather than omissions, and both serve the hard pass
+bar of zero false ties:
+
+* **Only a number becomes a cell value.** A percentage or a date is published
+  with its text and no `normalizedValue`, so it can never enter a sum. A column
+  of percentages therefore reads to the run search as a column with no values,
+  which ends a candidate rather than contributing to it -- the correct outcome,
+  and one reached without the module knowing what "per share" means.
+* **Two spans in one cell publish none.** A cell reading "2025 - 2062" or
+  "0.03% - 5.75%" is a range, not an addend. Its text is published so the row
+  still reads, and its value is withheld.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace
 
-# --- R-1 -------------------------------------------------------------------
-# build_cells(table, page_geometry, values_page) -> list[dict]
-#   * intersect the table's column extents and row bands with text geometry for
-#     cell text;
-#   * intersect the same grid with document-values-v1 spans for the cell value,
-#     keyed by spanId so a finding can name it;
-#   * take the row label from the leading cell and hand it to labels.normalize.
-#
-# A dash alone in a cell is an addend worth zero and is published with
-# dash: true. A cell with no text at all is NOT published: its absence is the
-# fact a run search reads, because a blank ends a candidate rather than
-# contributing to it.
+from engines.table.grid import assign_tokens
+from engines.table.layout import PageLayout, VisualLine
+
+from . import labels
+
+
+# A dash alone in a detected table cell is an addend worth zero, uniformly and
+# wherever in a run it appears. Every dash a filing sets: hyphen, figure dash,
+# en dash, em dash, horizontal bar.
+DASHES = "-‐‒–—―"
+
+
+@dataclass
+class TableCells:
+    """One table's cell layer, in the two shapes its consumers need.
+
+    `published` is the contract's `cells` array. `by_position` and `row_labels`
+    are the working index nomination and the run search read: both walk a single
+    column upward from a row, which a flat array in row-then-column order cannot
+    answer without a scan per step.
+    """
+
+    table_id: str
+    page_index: int
+    column_count: int
+    row_count: int
+    published: list[dict] = field(default_factory=list)
+    by_position: dict[tuple[int, int], dict] = field(default_factory=dict)
+    by_id: dict[str, dict] = field(default_factory=dict)
+    row_labels: list[str] = field(default_factory=list)
+    header_labels: list[dict] = field(default_factory=list)
+    bounds: dict = field(default_factory=dict)
+    provenance: str = "lattice"
+
+    def cell(self, row_index: int, column_index: int) -> dict | None:
+        return self.by_position.get((row_index, column_index))
+
+    def is_caption_row(self, row_index: int) -> bool:
+        """A row that fills only the label column and no value column at all.
+
+        "Deferred tax assets:" and "August 3, 2025 to August 30, 2025:" are the
+        statement separating one block from the next, not a row of it. This is a
+        different fact from a row that carries figures elsewhere and leaves this
+        column blank, which really is the end of a block.
+        """
+        return not any(
+            column for (row, column) in self.by_position if row == row_index and column
+        )
+
+
+def boundaries_of(table: dict) -> list[float]:
+    """The column boundaries the published extents were cut from.
+
+    `table-structure-v1` publishes columns as contiguous extents, so every
+    interior edge is one column's `x1` and the next column's `x0`. Recovering
+    them is what lets this module place tokens with `grid.assign_tokens` -- the
+    same placement, including its currency and percent re-attachment, that the
+    grid was fitted with. Placing tokens a second way here would let the cell
+    layer disagree with the table the scan is describing.
+    """
+    columns = table.get("columns", [])
+    return [float(column["x1"]) for column in columns[:-1]]
+
+
+def decimals_of(text: str) -> int:
+    """Printed decimal places, read from the span's own text.
+
+    Not from `normalizedValue`: that is canonical decimal and strips trailing
+    zeros, so "1.50" arrives as "1.5" and a column of two-decimal amounts would
+    disagree with itself. The printed form is what the eligibility rule is about.
+    """
+    digits = ""
+    for character in reversed(text or ""):
+        if character.isdigit():
+            digits += character
+            continue
+        if character == "." and digits:
+            return len(digits)
+        if character in ",'  ":
+            # A group separator inside the integer part; keep scanning left.
+            digits = ""
+            continue
+        if digits:
+            return 0
+    return 0
+
+
+def _is_dash(tokens: list) -> bool:
+    """Is this cell a dash and nothing else?
+
+    Markers are ignored, because an accounting layout floats the currency symbol
+    beside the dash it qualifies and "$ --" is still a dash.
+    """
+    meaningful = [token for token in tokens if not token.is_marker]
+    if len(meaningful) != 1:
+        return False
+    text = meaningful[0].text.strip()
+    return bool(text) and all(character in DASHES for character in text)
+
+
+def _bounds_of(tokens: list) -> dict:
+    x0 = min(token.x0 for token in tokens)
+    y0 = min(token.y0 for token in tokens)
+    x1 = max(token.x1 for token in tokens)
+    y1 = max(token.y1 for token in tokens)
+    return {
+        "x": max(0.0, min(1.0, round(x0, 6))),
+        "y": max(0.0, min(1.0, round(y0, 6))),
+        "width": max(1e-6, min(1.0, round(x1 - x0, 6))),
+        "height": max(1e-6, min(1.0, round(y1 - y0, 6))),
+    }
+
+
+def _numbers_on(page_values: dict | None) -> list[tuple[float, float, dict]]:
+    """Every number span on the page, with the point that places it in a cell.
+
+    Percentages and dates are left out: they measure, but they do not add, and
+    the first pass would rather publish a cell with no value than let one into a
+    column of amounts.
+    """
+    if not page_values:
+        return []
+    placed = []
+    for value in page_values.get("values", []):
+        if value.get("kind") != "number":
+            continue
+        if not value.get("normalizedValue"):
+            continue
+        bounds = value["bounds"]
+        placed.append(
+            (
+                bounds["x"] + bounds["width"] / 2,
+                bounds["y"] + bounds["height"] / 2,
+                value,
+            )
+        )
+    return placed
+
+
+def build_table_cells(
+    table: dict,
+    layout: PageLayout,
+    page_values: dict | None,
+    *,
+    page_index: int,
+) -> TableCells:
+    """The cell layer for one detected table."""
+    columns = table.get("columns", [])
+    rows = table.get("rows", [])
+    body = [row for row in rows if row.get("kind") == "body"]
+    column_count = len(columns)
+    built = TableCells(
+        table_id=table["id"],
+        page_index=page_index,
+        column_count=column_count,
+        row_count=len(body),
+        row_labels=[""] * len(body),
+        bounds=dict(table.get("bounds", {})),
+        provenance="table",
+    )
+    header = table.get("header") or None
+    if header:
+        built.header_labels = labels.header_semantics(list(header.get("labels", [])))
+    if column_count < 2 or not body:
+        return built
+
+    boundaries = boundaries_of(table)
+    left = float(columns[0]["x0"])
+    right = float(columns[-1]["x1"])
+    numbers = _numbers_on(page_values)
+
+    # Every row's tokens are placed first, and the labels are decided afterwards,
+    # because which column labels a cell is a fact about the whole table.
+    rows_of_tokens: list[list[list]] = []
+    for row in body:
+        y0, y1 = float(row["y0"]), float(row["y1"])
+        buckets: list[list] = [[] for _ in range(column_count)]
+        for line in _lines_in(layout, y0, y1):
+            # Tokens outside the table's own extent would otherwise fall into
+            # the first or last column -- `column_index` has no notion of an
+            # edge -- and a page number or a marginal note would arrive as a row
+            # label.
+            inside = [token for token in line.tokens if left <= token.center <= right]
+            if not inside:
+                continue
+            for index, bucket in enumerate(assign_tokens(replace(line, tokens=inside), boundaries)):
+                if index < column_count:
+                    buckets[index].extend(bucket)
+        rows_of_tokens.append(buckets)
+
+    label_columns = _label_columns(rows_of_tokens, columns, body, numbers)
+
+    for row_index, buckets in enumerate(rows_of_tokens):
+        y0, y1 = float(body[row_index]["y0"]), float(body[row_index]["y1"])
+        texts = [" ".join(token.text for token in bucket).strip() for bucket in buckets]
+        built.row_labels[row_index] = labels.row_label(texts[0])
+
+        for column_index, tokens in enumerate(buckets):
+            if not tokens:
+                # An empty cell is not published. Its absence is the fact a run
+                # search reads: a blank ends a candidate rather than
+                # contributing a zero to it.
+                continue
+            cell = {
+                "id": f"{table['id']}-r{row_index}-c{column_index}",
+                "rowIndex": row_index,
+                "columnIndex": column_index,
+                "text": texts[column_index],
+                "bounds": _bounds_of(tokens),
+            }
+            span = _value_in(numbers, columns[column_index], y0, y1)
+            if span is not None:
+                cell["spanId"] = span["id"]
+                cell["normalizedValue"] = span["normalizedValue"]
+                cell["decimals"] = decimals_of(span["text"])
+            elif _is_dash(tokens):
+                cell["dash"] = True
+            if "spanId" in cell or "dash" in cell:
+                label = labels.row_label(
+                    _label_for(texts, column_index, label_columns)
+                )
+                if label:
+                    cell["rowLabel"] = label
+            built.published.append(cell)
+            built.by_position[(row_index, column_index)] = cell
+            built.by_id[cell["id"]] = cell
+
+    return built
+
+
+def _label_columns(
+    rows_of_tokens: list[list[list]], columns: list[dict], body: list[dict], numbers
+) -> list[int]:
+    """Which columns carry row labels rather than figures.
+
+    Column 0 always does. The reason to look for others is the two-panel balance
+    sheet: assets down the left, liabilities and equity down the right, printed
+    as one grid. Its fourth column's figures are labelled by its third, and
+    reading them against the first produces nonsense with a straight face --
+    "Total current assets" beside the balance of income taxes payable, which is a
+    break reported in a statement that foots perfectly.
+
+    A label column is one whose cells are mostly words and mostly not values. The
+    alphabetic test is what keeps a floated currency column or a footnote column
+    from being mistaken for one: those carry text and no letters, and treating
+    one as a label column would quietly retitle every row to its right.
+    """
+    found = [0]
+    for column_index in range(1, len(columns)):
+        cells = [
+            " ".join(token.text for token in row[column_index]).strip()
+            for row in rows_of_tokens
+            if row[column_index]
+        ]
+        valued = sum(
+            1
+            for row_index, row in enumerate(rows_of_tokens)
+            if row[column_index]
+            and _value_in(
+                numbers,
+                columns[column_index],
+                float(body[row_index]["y0"]),
+                float(body[row_index]["y1"]),
+            )
+            is not None
+        )
+        if is_label_column(cells, valued):
+            found.append(column_index)
+    return found
+
+
+def is_label_column(cells: list[str], valued: int) -> bool:
+    """Mostly words, mostly not values, and more than one of them."""
+    if len(cells) < 2:
+        return False
+    wordy = sum(1 for text in cells if any(character.isalpha() for character in text))
+    return wordy * 2 > len(cells) and valued * 2 <= len(cells)
+
+
+def _label_for(texts: list[str], column_index: int, label_columns: list[int]) -> str:
+    """The nearest label column to this cell's left, and what it says."""
+    for candidate in reversed(label_columns):
+        if candidate < column_index and texts[candidate]:
+            return texts[candidate]
+    return texts[0] if column_index else ""
+
+
+def _lines_in(layout: PageLayout, y0: float, y1: float) -> list[VisualLine]:
+    """The visual lines whose centre falls in this row band.
+
+    By centre rather than by overlap, so a tall line straddling a band edge
+    belongs to one row instead of both -- which is also how the grid built the
+    row in the first place.
+    """
+    return [line for line in layout.lines if y0 <= line.center <= y1 and line.tokens]
+
+
+def _value_in(
+    numbers: list[tuple[float, float, dict]], column: dict, y0: float, y1: float
+) -> dict | None:
+    """The one number span standing in this cell, or nothing.
+
+    Two spans in one cell publish none: a range is not an addend, and a cell
+    that cannot be reduced to a single figure must not be able to enter a sum.
+    """
+    x0, x1 = float(column["x0"]), float(column["x1"])
+    found = [
+        value
+        for center_x, center_y, value in numbers
+        if x0 <= center_x <= x1 and y0 <= center_y <= y1
+    ]
+    return found[0] if len(found) == 1 else None

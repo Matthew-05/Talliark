@@ -1,10 +1,32 @@
 .findings-sidebar {
   display: flex;
-  height: 100%;
   min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
   background: var(--color-surface);
 }
+
+/* The scorecard: the first question a result has to answer is whether the scan
+   ran and what its scope was. A clean result is affirmative, not empty. */
+.findings-sidebar__scorecard {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 4px;
+}
+
+.findings-sidebar__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.findings-sidebar__stat b { color: var(--color-text); font-size: 13px; font-weight: 650; }
+.findings-sidebar__stat span { color: var(--color-text-muted); }
+.findings-sidebar__stat--verified b { color: var(--color-success); }
+.findings-sidebar__stat--exceptions b { color: var(--color-danger); }
 
 .findings-sidebar__header {
   display: grid;

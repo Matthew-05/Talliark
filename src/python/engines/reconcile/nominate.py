@@ -11,12 +11,14 @@ Note what is not available as a signal: `text-geometry-v1` carries no font or
 weight, so **bold is not a signal that exists**. Rulings and glyph height are the
 only typographic evidence there is.
 
-R-2 fills this in. The registry and the policy constants are here now because
-they are the module's decisions, not its mechanics.
+The registry and the policy constants come first in this file because they are
+the module's decisions; the nominator underneath them is only their mechanics.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from . import labels
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,11 @@ SIGNALS: tuple[SignalDefinition, ...] = (
         enabled=True,
         sees="the row label matches the total lexicon: Total, Net, Subtotal, "
         "Gross, Balance at / as of, and the compound forms",
+    ),
+    SignalDefinition(
+        "column-corroboration",
+        enabled=True,
+        sees="the same row structure foots independently in another value column",
     ),
     SignalDefinition(
         "ruling-above",
@@ -77,16 +84,62 @@ MIN_ADDENDS = 2
 def two_addend_runs_publishable() -> bool:
     """Whether a two-addend run can be published yet.
 
-    False for the whole of the first pass, and it becomes true by enabling
-    `ruling-above` or `outdent` rather than by changing anything here. That is
-    why one of those two is effectively a first-pass dependency and not a later
-    refinement.
+    Parallel-column corroboration is the second signal. The structure search
+    applies it per candidate, so a label-only nomination still carries one
+    signal and still needs three addends.
     """
     return len(ENABLED_SIGNALS) >= 2
 
 
-# --- R-2 -------------------------------------------------------------------
-# nominate(table_cells, rulings) -> list[NominatedTotal]
-#
-# No signal may be inferred from the arithmetic. A cell that ties with the run
-# above it is not thereby a total, and sums.py never calls back into here.
+@dataclass(frozen=True)
+class Nomination:
+    """A cell proposed as a total, and the evidence that proposed it."""
+
+    cell: dict
+    signals: tuple[dict, ...]
+
+    @property
+    def row_index(self) -> int:
+        return int(self.cell["rowIndex"])
+
+    @property
+    def column_index(self) -> int:
+        return int(self.cell["columnIndex"])
+
+
+def label_total(cell: dict) -> dict | None:
+    """The one signal enabled in the first pass.
+
+    The row label announces the total, and the evidence is the label itself --
+    a phrase a reviewer can check against the page without re-running anything.
+    """
+    label = cell.get("rowLabel", "")
+    if not labels.is_total_label(label):
+        return None
+    return {"name": "label-total", "evidence": f'row label reads "{label}"'}
+
+
+def nominate(table_cells) -> list[Nomination]:
+    """Every cell in this table that structure proposes as a total.
+
+    No signal may be inferred from the arithmetic. A cell that ties with the run
+    above it is not thereby a total, and `sums` never calls back into here.
+
+    Only a cell carrying a single recognized number can be nominated: a total is
+    a figure, and a cell whose value was withheld -- a range, a percentage, a
+    blank -- has nothing for a run to foot to.
+    """
+    found: list[Nomination] = []
+    for cell in table_cells.published:
+        if "normalizedValue" not in cell:
+            continue
+        if cell["columnIndex"] == 0:
+            # The leading column carries the labels. A figure standing in it is
+            # a row label that happens to be a number, not a column's total.
+            continue
+        signals = tuple(
+            signal for signal in (label_total(cell),) if signal is not None
+        )
+        if signals:
+            found.append(Nomination(cell=cell, signals=signals))
+    return found
