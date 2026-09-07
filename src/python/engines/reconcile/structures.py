@@ -15,10 +15,24 @@ class Evaluation:
     column: int
     total_cell: dict
     run: sums.Run
+    tied_runs: tuple[sums.Run, ...]
+    # Fewer than two addends actually carry a figure -- "778 + dash = 778". Such
+    # a column proves nothing on its own and may never establish or corroborate
+    # a structure, but once two independent columns have established one it is
+    # entitled to ride along: the evidence is the row structure the others
+    # proved, not this column's own arithmetic. Withholding it leaves a row half
+    # ticked, with the reviewer unable to tell a scan limit from a real gap.
+    degenerate: bool = False
 
     @property
     def ties(self) -> bool:
-        return self.run.delta == 0
+        return bool(self.tied_runs)
+
+    def tied_on(self, negated_indices: tuple[int, ...]) -> sums.Run | None:
+        return next(
+            (run for run in self.tied_runs if run.negated_indices == negated_indices),
+            None,
+        )
 
 
 @dataclass(frozen=True)
@@ -41,22 +55,21 @@ def _evaluation(block, column: int, top: int, total_row: int) -> Evaluation | No
         return None
     concrete = [cell for cell in cells if cell is not None]
     nonzero = sum(1 for cell in concrete if sums.value_of(cell) != 0)
-    if len(concrete) < 2 or nonzero < 2:
+    if len(concrete) < 2:
         return None
     run = sums.Run("leaves", tuple(concrete), sums.value_of(total), decimals)
     if sums.double_counts(run):
         return None
-    return Evaluation(column, total, run)
+    return Evaluation(
+        column, total, run, sums.tied_variants(run), degenerate=nonzero < 2
+    )
 
 
 def _proportional(first: Evaluation, second: Evaluation) -> bool:
-    left = [sums.value_of(cell) or Decimal(0) for cell in first.run.cells]
-    right = [sums.value_of(cell) or Decimal(0) for cell in second.run.cells]
-    pairs = [(a, b) for a, b in zip(left, right) if a != 0 or b != 0]
-    if not pairs:
-        return True
-    anchor_a, anchor_b = pairs[0]
-    return all(a * anchor_b == b * anchor_a for a, b in pairs[1:])
+    return sums.proportional_values(
+        [sums.value_of(cell) or Decimal(0) for cell in first.run.cells],
+        [sums.value_of(cell) or Decimal(0) for cell in second.run.cells],
+    )
 
 
 def _independent(evaluations: list[Evaluation]) -> list[Evaluation]:
@@ -81,7 +94,11 @@ def discover(block) -> tuple[list[Structure], int]:
                 for column in range(1, block.column_count)
                 if (evaluation := _evaluation(block, column, top, total_row)) is not None
             ]
-            if any(evaluation.ties for evaluation in evaluations):
+            if any(
+                evaluation.ties
+                for evaluation in evaluations
+                if not evaluation.degenerate
+            ):
                 retained.append(Structure(top, total_row, tuple(evaluations)))
     return retained, tested
 
@@ -93,47 +110,209 @@ def resolve(block) -> tuple[list[dict], dict]:
         evaluation.column
         for structure in structures
         for evaluation in structure.evaluations
-        if evaluation.ties and len(_independent([item for item in structure.evaluations if item.ties])) >= 2
+        if not evaluation.degenerate
+        for pattern in {
+            run.negated_indices
+            for item in structure.evaluations
+            if not item.degenerate
+            for run in item.tied_runs
+        }
+        if evaluation.tied_on(pattern) is not None
+        and len(_independent([
+            item
+            for item in structure.evaluations
+            if not item.degenerate and item.tied_on(pattern) is not None
+        ])) >= 2
     }
-    proposals: dict[str, list[tuple[tuple[int, int, int], dict]]] = {}
+    proposals: dict[str, list[tuple[tuple[int, int, int, int], dict]]] = {}
     for structure in structures:
-        tied = [evaluation for evaluation in structure.evaluations if evaluation.ties]
-        agreeing = _independent(tied)
-        agreeing_columns = {evaluation.column for evaluation in agreeing}
-        for evaluation in structure.evaluations:
-            own_label = labels.is_total_label(evaluation.total_cell.get("rowLabel", ""))
-            other_agreement = len([column for column in agreeing_columns if column != evaluation.column])
-            if evaluation.ties:
-                publish = len(agreeing) >= 2 or (len(agreeing) >= 1 and own_label)
-            else:
-                publish = other_agreement >= 2 or (
-                    other_agreement >= 1
-                    and (own_label or evaluation.column in established_columns)
-                )
-            if not publish or (not evaluation.ties and not sums._plausible(evaluation.run)):
-                continue
-            signals = []
-            if own_label:
-                label = evaluation.total_cell.get("rowLabel", "")
-                signals.append({"name": "label-total", "evidence": f'row label reads "{label}"'})
-            if other_agreement:
-                columns = ", ".join(str(column) for column in sorted(agreeing_columns - {evaluation.column}))
-                signals.append({
-                    "name": "column-corroboration",
-                    "evidence": f"the same rows foot independently in column{'s' if other_agreement != 1 else ''} {columns}",
-                })
-            if not signals:
-                continue
-            outcome = "confirmed" if evaluation.ties else "break"
-            payload = {
-                "cell": evaluation.total_cell,
-                "signals": signals,
-                "outcome": outcome,
-                "resolution": evaluation.run.as_dict(),
-                "top": structure.top,
-            }
-            score = (other_agreement, len(evaluation.run.cells), -structure.top)
-            proposals.setdefault(evaluation.total_cell["id"], []).append((score, payload))
+        patterns = {
+            run.negated_indices
+            for evaluation in structure.evaluations
+            if not evaluation.degenerate
+            for run in evaluation.tied_runs
+        }
+        for pattern in patterns:
+            tied = [
+                evaluation
+                for evaluation in structure.evaluations
+                if not evaluation.degenerate
+                and evaluation.tied_on(pattern) is not None
+            ]
+            agreeing = _independent(tied)
+            agreeing_columns = {evaluation.column for evaluation in agreeing}
+            for evaluation in structure.evaluations:
+                own_label = labels.is_total_label(evaluation.total_cell.get("rowLabel", ""))
+                own_tie = evaluation.tied_on(pattern)
+                assessed = own_tie or evaluation.run.with_negated(pattern)
+                other_agreement = len([column for column in agreeing_columns if column != evaluation.column])
+                if evaluation.degenerate:
+                    # Rides on a structure two independent columns established,
+                    # and only ever to confirm. A degenerate column that misses
+                    # says nothing, so it never speaks.
+                    publish = own_tie is not None and len(agreeing) >= 2
+                elif own_tie is not None:
+                    publish = len(agreeing) >= 2 or (len(agreeing) >= 1 and own_label)
+                else:
+                    publish = other_agreement >= 2 or (
+                        other_agreement >= 1
+                        and (own_label or evaluation.column in established_columns)
+                    )
+                if not publish or (own_tie is None and not sums._plausible(assessed)):
+                    continue
+                signals = []
+                if own_label:
+                    label = evaluation.total_cell.get("rowLabel", "")
+                    signals.append({"name": "label-total", "evidence": f'row label reads "{label}"'})
+                if other_agreement:
+                    columns = ", ".join(str(column) for column in sorted(agreeing_columns - {evaluation.column}))
+                    signals.append({
+                        "name": "column-corroboration",
+                        "evidence": f"the same signed rows foot independently in column{'s' if other_agreement != 1 else ''} {columns}",
+                    })
+                if not signals:
+                    continue
+                outcome = "confirmed" if own_tie is not None else "break"
+                payload = {
+                    "cell": evaluation.total_cell,
+                    "signals": signals,
+                    "outcome": outcome,
+                    "resolution": assessed.as_dict(),
+                    "top": structure.top,
+                }
+                # The nearest exact relationship wins. Once sign reversal is
+                # available, preferring the longest algebraic identity can hide
+                # the statement's immediate subtotal relationship through
+                # cancellation.
+                score = (other_agreement, -len(pattern), -len(evaluation.run.cells), structure.top)
+                proposals.setdefault(evaluation.total_cell["id"], []).append((score, payload))
     chosen = [max(candidates, key=lambda item: item[0])[1] for candidates in proposals.values()]
+    chosen.extend(_resolve_subtotal_pairs(block, chosen))
     chosen.sort(key=lambda item: (item["cell"]["rowIndex"], item["cell"]["columnIndex"]))
     return chosen, {"hypotheses": tested, "retained": len(structures)}
+
+
+def _resolve_subtotal_pairs(block, chosen: list[dict]) -> list[dict]:
+    """Resolve totals built from sibling subtotals separated by their blocks.
+
+    The value lattice deliberately splits at section captions. The detected
+    grid preserves the full statement, but a contiguous row-span search still
+    sees the components inside each subtotal. This pass walks only already
+    corroborated subtotal rows and asks whether two sibling subtotals foot the
+    immediately following row. Newly established rows participate in the next
+    iteration, which builds Gross margin and then Operating income on the Apple
+    statement without adding label vocabulary.
+    """
+    added: list[dict] = []
+    emitted = {entry["cell"]["id"] for entry in chosen}
+    while True:
+        all_entries = chosen + added
+        established_rows = sorted({
+            int(entry["cell"]["rowIndex"])
+            for entry in all_entries
+            if entry["outcome"] == "confirmed"
+            and any(signal["name"] == "column-corroboration" for signal in entry["signals"])
+        })
+        proposals: dict[str, list[tuple[tuple[int, int, int], dict]]] = {}
+        for last in established_rows:
+            total_row = last + 1
+            if total_row >= block.row_count:
+                continue
+            for first in (row for row in established_rows if row < last):
+                evaluations = [
+                    evaluation
+                    for column in range(1, block.column_count)
+                    if (
+                        evaluation := _sparse_evaluation(
+                            block, column, (first, last), total_row
+                        )
+                    ) is not None
+                ]
+                patterns = {
+                    run.negated_indices
+                    for evaluation in evaluations
+                    for run in evaluation.tied_runs
+                }
+                for pattern in patterns:
+                    tied = [
+                        evaluation for evaluation in evaluations
+                        if evaluation.tied_on(pattern) is not None
+                    ]
+                    agreeing = _independent(tied)
+                    if len(agreeing) < 2:
+                        continue
+                    agreeing_columns = {evaluation.column for evaluation in agreeing}
+                    for evaluation in evaluations:
+                        own_tie = evaluation.tied_on(pattern)
+                        # A sparse pair proves only columns that tie. A sibling
+                        # column may legitimately carry extra components not in
+                        # this pair (Apple's marketable-securities table does),
+                        # so a miss here is not evidence of a break.
+                        if own_tie is None:
+                            continue
+                        assessed = own_tie
+                        other_agreement = len(agreeing_columns - {evaluation.column})
+                        signals = [{
+                            "name": "column-corroboration",
+                            "evidence": (
+                                "the same signed subtotal rows foot independently "
+                                f"in columns {', '.join(str(column) for column in sorted(agreeing_columns - {evaluation.column}))}"
+                            ),
+                        }]
+                        if labels.is_total_label(evaluation.total_cell.get("rowLabel", "")):
+                            label = evaluation.total_cell.get("rowLabel", "")
+                            signals.insert(0, {
+                                "name": "label-total",
+                                "evidence": f'row label reads "{label}"',
+                            })
+                        top = min(
+                            (
+                                int(entry["top"])
+                                for entry in all_entries
+                                if entry["cell"]["columnIndex"] == evaluation.column
+                                and entry["cell"]["rowIndex"] in (first, last)
+                            ),
+                            default=first,
+                        )
+                        payload = {
+                            "cell": evaluation.total_cell,
+                            "signals": signals,
+                            "outcome": "confirmed",
+                            "resolution": assessed.as_dict(),
+                            "top": top,
+                        }
+                        score = (other_agreement, -len(pattern), first)
+                        proposals.setdefault(evaluation.total_cell["id"], []).append((score, payload))
+        iteration = [
+            max(candidates, key=lambda item: item[0])[1]
+            for cell_id, candidates in proposals.items()
+            if cell_id not in emitted
+        ]
+        if not iteration:
+            break
+        added.extend(iteration)
+        newly_confirmed = {
+            entry["cell"]["id"] for entry in iteration if entry["outcome"] == "confirmed"
+        }
+        if not newly_confirmed:
+            break
+        emitted.update(entry["cell"]["id"] for entry in iteration)
+    return added
+
+
+def _sparse_evaluation(
+    block, column: int, addend_rows: tuple[int, int], total_row: int
+) -> Evaluation | None:
+    header = next((item for item in block.header_labels if item["columnIndex"] == column), None)
+    if header and labels.is_non_additive_column(header.get("text", "")):
+        return None
+    total = block.cell(total_row, column)
+    cells = [block.cell(row, column) for row in addend_rows]
+    if total is None or sums.value_of(total) in (None, Decimal(0)) or any(cell is None for cell in cells):
+        return None
+    decimals = int(total.get("decimals", -1))
+    concrete = [cell for cell in cells if cell is not None]
+    if any(sums.value_of(cell) is None or not sums._eligible(cell, decimals) for cell in concrete):
+        return None
+    run = sums.Run("subtotals", tuple(concrete), sums.value_of(total), decimals)
+    return Evaluation(column, total, run, sums.tied_variants(run))

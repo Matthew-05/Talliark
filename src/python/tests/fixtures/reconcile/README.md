@@ -24,6 +24,10 @@ py scripts/score_reconcile.py "test-imports.local/financial-statements/apple 10k
 Each entry is keyed by page, column header, row label and value, so it can be
 checked against the printed page without opening the model.
 
+Confirmed entries also list `addends` and `negatedAddends`. The latter are the
+printed figures whose sign the run reverses, so approving a subtraction checks
+the equation rather than merely approving that the same rows were selected.
+
 1. Read every entry against the page and correct any `outcome` the scan got
    wrong.
 2. List in `pages` the page numbers you checked **in full**.

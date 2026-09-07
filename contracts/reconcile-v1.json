@@ -137,8 +137,8 @@
 
     "SignalName": {
       "type": "string",
-      "enum": ["label-total", "column-corroboration", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
-      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. Column corroboration is leave-one-out: arithmetic in other independent columns may nominate the cell being judged, while its own arithmetic may not. Text geometry carries no font or weight, so bold is not a signal that exists."
+      "enum": ["label-total", "column-corroboration", "total-column", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
+      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. total-column is the cross-foot's only nominator and its only signal: the cell's own column header names a total. Having one signal and nothing to corroborate it is why a cross-foot confirms and never breaks. Column corroboration is leave-one-out: arithmetic in other independent columns may nominate the cell being judged, while its own arithmetic may not. Text geometry carries no font or weight, so bold is not a signal that exists."
     },
 
     "Signal": {
@@ -183,15 +183,21 @@
 
     "SumRun": {
       "type": "object",
-      "description": "A contiguous sequence of body cells added together, and what they came to. Subsets are not searched and non-contiguous combinations are not searched: both would restore precisely the coincidence problem that making structure the only nominator exists to remove.",
-      "required": ["basis", "addendCellIds", "sum", "delta"],
+      "description": "A contiguous sequence of body cells combined together, and what they came to. Every cell remains in run order; negatedAddendCellIds records the cells whose printed sign is reversed when the statement asserts a subtractive relationship. Subsets are not searched and non-contiguous combinations are not searched: both would restore precisely the coincidence problem that making structure the only nominator exists to remove.",
+      "required": ["basis", "addendCellIds", "negatedAddendCellIds", "sum", "delta"],
       "additionalProperties": false,
       "properties": {
-        "basis": { "type": "string", "enum": ["subtotals", "leaves"], "description": "Whether the run is made of the nominated subtotals between this total and the previous one, or of the leaf rows beneath them." },
+        "basis": { "type": "string", "enum": ["subtotals", "leaves", "row"], "description": "Whether the run is made of the nominated subtotals between this total and the previous one, of the leaf rows beneath them, or -- for a cross-foot -- of the cells to the left of it in its own row, bounded by the previous total-headed column." },
         "addendCellIds": {
           "type": "array",
           "minItems": 2,
           "description": "The cells added, in run order. A dash cell appears here and contributes zero.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "negatedAddendCellIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "The addend cells whose printed numeric sign is reversed for this run. Each id must also appear in addendCellIds. Empty for ordinary addition.",
           "items": { "type": "string", "minLength": 1 }
         },
         "sum": { "type": "string", "description": "Exact decimal sum of the addends, at the run's shared decimal specificity. A string, never a binary float." },

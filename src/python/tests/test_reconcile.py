@@ -23,7 +23,7 @@ from pathlib import Path
 import pymupdf
 
 from engines.geometry_engine import extract_text_geometry
-from engines.reconcile import findings, labels, nominate, structures, sums
+from engines.reconcile import findings, labels, nominate, structures, sums, cells
 from engines.reconcile.cells import (
     TableCells,
     _label_for,
@@ -33,6 +33,7 @@ from engines.reconcile.cells import (
 from engines.reconcile.detector import (
     DETECTOR_VERSION,
     _reconcile_block,
+    _select_grid_totals,
     detect_reconcile,
     geometry_fingerprint,
 )
@@ -285,8 +286,128 @@ class Decisions(unittest.TestCase):
         for label in ("Cost of sales", "the total of these amounts", "Percentage of total"):
             self.assertFalse(labels.is_total_label(label), label)
 
-    def test_label_and_column_corroboration_are_enabled(self) -> None:
-        self.assertEqual(nominate.ENABLED_SIGNALS, ("label-total", "column-corroboration"))
+    def test_the_enabled_signals_are_the_four_that_have_been_measured(self) -> None:
+        self.assertEqual(
+            nominate.ENABLED_SIGNALS,
+            (
+                "label-total",
+                "column-corroboration",
+                "total-column",
+                "double-rule-below",
+            ),
+        )
+
+    def test_a_double_rule_is_two_rules_and_a_single_rule_is_not(self) -> None:
+        built = cells.TableCells(
+            table_id="t", page_index=0, column_count=2, row_count=3
+        )
+        for row, y in ((0, 0.10), (1, 0.14), (2, 0.18)):
+            cell = {
+                "id": f"t-r{row}-c1", "rowIndex": row, "columnIndex": 1, "text": "1",
+                "bounds": {"x": 0.5, "y": y, "width": 0.05, "height": 0.011},
+            }
+            built.published.append(cell)
+            built.by_position[(row, 1)] = cell
+            built.by_id[cell["id"]] = cell
+        # A single rule under row 0, a double rule under row 2.
+        cells.mark_double_rules(built, [0.1125, 0.1925, 0.1950])
+        self.assertEqual(built.double_ruled, frozenset({2}))
+
+    def test_a_row_does_not_borrow_the_rule_of_the_row_beneath_it(self) -> None:
+        built = cells.TableCells(
+            table_id="t", page_index=0, column_count=2, row_count=2
+        )
+        for row, y in ((0, 0.100), (1, 0.115)):
+            cell = {
+                "id": f"t-r{row}-c1", "rowIndex": row, "columnIndex": 1, "text": "1",
+                "bounds": {"x": 0.5, "y": y, "width": 0.05, "height": 0.011},
+            }
+            built.published.append(cell)
+            built.by_position[(row, 1)] = cell
+            built.by_id[cell["id"]] = cell
+        # Row 0's own rule, then row 1's -- two rules, but not one double rule,
+        # because row 1's glyphs stand between them.
+        cells.mark_double_rules(built, [0.1120, 0.1270])
+        self.assertEqual(built.double_ruled, frozenset())
+
+    def test_a_reversal_found_among_many_candidates_is_not_evidence(self) -> None:
+        # A discovered sign reversal is worth what the search space it came from
+        # is worth. Every real signed confirmation on the corpus was found among
+        # seven candidates or fewer; every false one among 210 or more.
+        self.assertEqual(sums.MAX_SIGN_CANDIDATES, 20)
+        from math import comb
+        self.assertLessEqual(comb(7, 1), sums.MAX_SIGN_CANDIDATES)
+        self.assertGreater(comb(10, 4), sums.MAX_SIGN_CANDIDATES)
+
+    def test_a_run_that_subtracts_a_figure_it_also_adds_is_cancellation(self) -> None:
+        def cell(index, value):
+            return {
+                "id": f"c{index}", "rowIndex": index, "columnIndex": 1,
+                "text": value, "normalizedValue": value, "decimals": 0,
+            }
+        run = sums.Run(
+            "leaves",
+            tuple(cell(index, value) for index, value in enumerate(
+                ("500", "10558", "933", "10558")
+            )),
+            Decimal("11991"),
+            0,
+        )
+        # Subtracting the 10,558 the run also adds says nothing: the pair
+        # cancels, and whatever ties is the shorter run underneath -- which the
+        # search can find on its own without inventing a sign to get there.
+        self.assertTrue(sums.double_counts(run.with_negated((3,))))
+        # The same members with their printed signs are an ordinary run.
+        self.assertFalse(sums.double_counts(run))
+
+    def test_a_total_proposed_by_a_rule_alone_never_accuses(self) -> None:
+        # The published rule positions carry no extent, so the signal says a
+        # double rule is under the row, not under this column. Thin evidence
+        # confirms and stays quiet otherwise.
+        signal = nominate.double_rule_below(
+            {"rowIndex": 4}, type("B", (), {"double_ruled": frozenset({4})})()
+        )
+        self.assertEqual(signal["name"], "double-rule-below")
+        self.assertIsNone(
+            nominate.double_rule_below(
+                {"rowIndex": 3}, type("B", (), {"double_ruled": frozenset({4})})()
+            )
+        )
+
+    def test_the_total_column_signal_nominates_only_across(self) -> None:
+        # It is the only thing that may propose a cross-foot, and it proposes
+        # nothing vertically: a cell is not a column total because its own
+        # column header says Total.
+        self.assertIsNotNone(nominate.total_column({"isTotalColumn": True, "text": "Total"}))
+        self.assertIsNone(nominate.total_column({"isTotalColumn": False, "text": "Europe"}))
+        self.assertIsNone(nominate.total_column(None))
+
+    def test_two_period_headers_disable_cross_footing_for_the_table(self) -> None:
+        comparative = [
+            {"columnIndex": 1, "text": "2025", "isPeriodColumn": True, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "2024", "isPeriodColumn": True, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Total", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+        self.assertEqual(nominate.cross_foot_columns(comparative), [])
+
+    def test_a_cross_foot_confirms_and_never_accuses(self) -> None:
+        # A row carries one signal -- the word in its own column header -- and
+        # nothing corroborates it, so a miss is recorded and not spoken.
+        self.assertFalse(sums.CROSS_FOOT_MAY_BREAK)
+
+    def test_corporate_is_a_column_of_amounts_and_not_a_rate(self) -> None:
+        # "rate" inside "Corporate" is the expensive false match: Corporate is a
+        # real segment column in every segment schedule a filing prints.
+        for header in ("Corporate", "Separate accounts", "Incorporated"):
+            self.assertFalse(labels.is_non_additive_column(header), header)
+        for header in ("Effective Rate", "Interest Rates", "Weighted-Average", "% of total"):
+            self.assertTrue(labels.is_non_additive_column(header), header)
+
+    def test_a_consumed_block_s_own_caption_is_not_a_boundary(self) -> None:
+        # A caption directly above a block taken whole is that block's heading.
+        # Every other caption still ends the run.
+        self.assertTrue(sums.STEP_OVER_SECTION_CAPTIONS)
+        self.assertFalse(sums.SKIP_CAPTION_ROWS)
 
     def test_corroboration_makes_two_addend_runs_publishable(self) -> None:
         # The structure search still supplies the signal per candidate: a
@@ -481,6 +602,33 @@ class SumTree(unittest.TestCase):
         self.assertEqual(run["sum"], "4.10")
         self.assertEqual(run["delta"], "0.00")
 
+    def test_a_total_may_reverse_one_printed_sign(self) -> None:
+        built = _table([
+            ("Revenue", "100"),
+            ("Cost of sales", "40"),
+            ("Other", "5"),
+            ("Gross margin", "65"),
+        ])
+        run = _resolve(built)[0]["resolution"]
+        self.assertEqual(run["sum"], "65")
+        self.assertEqual(run["delta"], "0")
+        self.assertEqual(run["negatedAddendCellIds"], ["t-r1-c1"])
+
+    def test_a_total_may_reverse_multiple_printed_signs(self) -> None:
+        built = _table([
+            ("Revenue", "100"),
+            ("Returns", "10"),
+            ("Discounts", "5"),
+            ("Allowances", "2"),
+            ("Net revenue", "83"),
+        ])
+        run = _resolve(built)[0]["resolution"]
+        self.assertEqual(run["sum"], "83")
+        self.assertEqual(
+            run["negatedAddendCellIds"],
+            ["t-r1-c1", "t-r2-c1", "t-r3-c1"],
+        )
+
     def test_nothing_above_a_total_is_recorded_without_accusing_the_document(self) -> None:
         built = _table([("Total net sales", "100"), ("Cost of sales", "40")])
         resolved = _resolve(built)
@@ -555,6 +703,50 @@ class ParallelColumnCorroboration(unittest.TestCase):
         self.assertEqual(diagnostics["hypotheses"], 1)
         self.assertTrue(all(len(entry["resolution"]["addendCellIds"]) == 2 for entry in resolved))
 
+    def test_parallel_columns_corroborate_the_same_subtractive_rows(self) -> None:
+        built = _table([
+            ("Net sales", "100", "90", "80"),
+            ("Cost of sales", "40", "35", "30"),
+            ("Gross margin", "60", "55", "50"),
+        ])
+        resolved, _ = structures.resolve(built)
+        self.assertEqual([entry["outcome"] for entry in resolved], [
+            "confirmed", "confirmed", "confirmed",
+        ])
+        self.assertTrue(all(
+            entry["resolution"]["negatedAddendCellIds"] == [
+                f"t-r1-c{entry['cell']['columnIndex']}"
+            ]
+            for entry in resolved
+        ))
+
+    def test_sibling_subtotals_build_derived_totals_across_captioned_blocks(self) -> None:
+        built = _table([
+            ("Products", "70", "60", "50"),
+            ("Services", "30", "30", "30"),
+            ("Total net sales", "100", "90", "80"),
+            ("Cost of sales:", "", "", ""),
+            ("Products", "30", "25", "20"),
+            ("Services", "10", "10", "10"),
+            ("Total cost of sales", "40", "35", "30"),
+            ("Gross margin", "60", "55", "50"),
+            ("Operating expenses:", "", "", ""),
+            ("Research", "8", "7", "6"),
+            ("Administrative", "2", "3", "4"),
+            ("Total operating expenses", "10", "10", "10"),
+            ("Operating income", "50", "45", "40"),
+        ])
+        resolved, _ = structures.resolve(built)
+        by_label = {}
+        for entry in resolved:
+            by_label.setdefault(entry["cell"].get("rowLabel"), []).append(entry)
+        for label in ("Gross margin", "Operating income"):
+            self.assertEqual(
+                [entry["outcome"] for entry in by_label[label]],
+                ["confirmed", "confirmed", "confirmed"],
+            )
+            self.assertTrue(all(entry["resolution"]["basis"] == "subtotals" for entry in by_label[label]))
+
     def test_a_bad_column_cannot_veto_its_own_examination(self) -> None:
         built = _table([
             ("Opening", "10", "7", "20"),
@@ -600,6 +792,22 @@ class ParallelColumnCorroboration(unittest.TestCase):
         built.bounds = {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}
         model, _ = _reconcile_block(built, page_index=0, findings=[])
         self.assertEqual(model["totals"][0]["outcome"], "unresolved")
+
+    def test_a_resolved_grid_total_replaces_its_unresolved_lattice_duplicate(self) -> None:
+        cell = {"id": "lattice-cell", "spanId": "shared-span"}
+        lattice = {
+            "cells": [cell],
+            "totals": [{"id": "lattice-total", "cellId": cell["id"], "outcome": "unresolved"}],
+        }
+        grid_cell = {"id": "grid-cell", "spanId": "shared-span"}
+        grid_total = {"id": "grid-total", "cellId": grid_cell["id"], "outcome": "confirmed"}
+        selected, replaced = _select_grid_totals(
+            {"cells": [grid_cell], "totals": [grid_total]},
+            [lattice],
+        )
+        self.assertEqual(selected, [grid_total])
+        self.assertEqual(replaced, {"lattice-total"})
+        self.assertEqual(lattice["totals"], [])
 
 
 class HeaderSemantics(unittest.TestCase):

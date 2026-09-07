@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from itertools import combinations
+from math import comb
 
 from . import nominate
 
@@ -44,41 +46,96 @@ PLAUSIBLE_DELTA_FRACTION = Decimal("0.5")
 # Whether a caption row -- one filling the label column and no value column at
 # all -- is stepped over rather than ending a run.
 #
-# Off, because it amends a decision in the plan of record: blank cells break the
-# run, and a row with no value in this column is not a zero but the end of the
-# candidate. The corpus argues for the amendment. Apple's issuer-purchases table
-# sets three monthly captions between the three rows that foot to its Total, and
-# the share-repurchase, marketable-securities and deferred-tax tables are all
-# shaped the same way, so the rule as written cannot reach a large class of real
-# totals. The distinction the amendment turns on is structural rather than
-# arithmetic: a row carrying figures in other columns and a blank in this one
-# genuinely ends a block, while a row carrying no figures anywhere was never a
-# row of the block to begin with. `scripts/score_reconcile.py` measures both
-# settings; flipping this is a decision about the plan, not about the code.
+# Off in general, because it amends a decision in the plan of record: blank
+# cells break the run, and a row with no value in this column is not a zero but
+# the end of the candidate. Measured on the corpus, stepping over every caption
+# row bought 8 confirmations for 6 wrong findings, and that is the trade the
+# plan refuses.
+#
+# One caption is different, and `STEP_OVER_SECTION_CAPTIONS` below governs it.
 SKIP_CAPTION_ROWS = False
+
+# Whether a caption row sitting directly on top of a block this run has already
+# consumed in full is stepped over.
+#
+# The reason a caption ends a run is that a run stopped at one holds a fragment
+# of the addends rather than all of them. That reason does not apply to the
+# caption immediately above a resolved subtotal's own block: the block below it
+# is accounted for entire, in one addend, so the caption is that block's heading
+# rather than a boundary the run failed to cross. Apple's marketable-securities
+# note is the shape -- "Level 1:" over its two rows and their subtotal,
+# "Level 2 (1):" over its eight and theirs, and a Total that is Cash plus both
+# subtotals. Without this the walk stops at "Level 2 (1):" holding one addend,
+# and the three columns where the Cash row carries a figure rather than a dash
+# go unresolved while the four where it carries a dash confirm.
+#
+# The step is narrow twice over: only in the subtotal walk, and only for the row
+# directly above the block just jumped. A run that took it is marked, and the
+# marking carries §7.3's rule -- such a run may confirm and may never break.
+STEP_OVER_SECTION_CAPTIONS = True
+
+# A statement occasionally asserts a difference while printing every component
+# as a positive figure: gross margin is net sales less cost of sales, for
+# example. Search the smallest exact set of sign reversals, bounded so a long
+# column cannot turn into an unbounded subset-sum search. The row run remains
+# contiguous and no cell is omitted.
+MAX_NEGATED_ADDENDS = 4
+MAX_SIGN_COMBINATIONS = 4096
+
+# How many sign interpretations the search may have had to choose from before
+# the one it lands on stops being evidence.
+#
+# A discovered reversal is worth exactly as much as the search space it was found
+# in. Reversing one of two members is the relationship a statement asserts when
+# it prints gross margin under sales and cost: two ways to read it, one of which
+# ties. Reversing four of seventeen is a subset-sum with 2,380 ways to hit any
+# number at all, and on the corpus it hit three: Apple's cash-flow statement
+# (210 ways), Amazon's RSU rollforward (495) and Disney's segment expense note
+# (2,380), all three exact, all three arithmetic nonsense. Disney's is the one
+# worth naming, because it cancelled a segment subtotal against the very leaves
+# that make it and still tied to the printed grand total.
+#
+# The measured split is absolute: every one of the 59 real signed confirmations
+# on the corpus was found among 7 candidates or fewer, and every false one among
+# 210 or more. The constant sits in the gap and is a measurement, not a taste.
+MAX_SIGN_CANDIDATES = 20
 
 
 @dataclass(frozen=True)
 class Run:
-    """A contiguous sequence of cells added together, and what they came to."""
+    """A contiguous sequence of cells combined together, and what they came to."""
 
     basis: str
     cells: tuple[dict, ...]
     total: Decimal
     decimals: int
+    negated_indices: tuple[int, ...] = ()
 
     @property
     def sum(self) -> Decimal:
-        return sum((value_of(cell) or Decimal(0) for cell in self.cells), Decimal(0))
+        negated = set(self.negated_indices)
+        return sum(
+            (
+                -(value_of(cell) or Decimal(0))
+                if index in negated
+                else (value_of(cell) or Decimal(0))
+                for index, cell in enumerate(self.cells)
+            ),
+            Decimal(0),
+        )
 
     @property
     def delta(self) -> Decimal:
         return self.total - self.sum
 
+    def with_negated(self, indices: tuple[int, ...]) -> Run:
+        return Run(self.basis, self.cells, self.total, self.decimals, indices)
+
     def as_dict(self) -> dict:
         published = {
             "basis": self.basis,
             "addendCellIds": [cell["id"] for cell in self.cells],
+            "negatedAddendCellIds": [self.cells[index]["id"] for index in self.negated_indices],
             "sum": _quantize(self.sum, self.decimals),
             "delta": _quantize(self.delta, self.decimals),
         }
@@ -86,6 +143,54 @@ class Run:
         if diagnosis is not None:
             published["diagnosis"] = diagnosis
         return published
+
+
+def tied_variants(run: Run) -> tuple[Run, ...]:
+    """The least-complex exact sign interpretations of one contiguous run.
+
+    Printed signs are authoritative when they already tie. Otherwise the
+    equation `printed sum - 2 * negated values = total` identifies the required
+    subset. Only the smallest number of reversals is returned. Parallel-column
+    corroboration then requires the same row positions to be reversed in the
+    independent columns, keeping a coincidental sign choice from becoming a
+    structural signal.
+    """
+    if run.delta == TOLERANCE:
+        return (run,)
+
+    target = (run.sum - run.total) / Decimal(2)
+    eligible = [
+        index
+        for index, cell in enumerate(run.cells)
+        if (value_of(cell) or Decimal(0)) != 0
+    ]
+    tested = 0
+    limit = min(MAX_NEGATED_ADDENDS, len(eligible))
+    for count in range(1, limit + 1):
+        if comb(len(eligible), count) > MAX_SIGN_CANDIDATES:
+            # Past here the search is a subset-sum rather than a reading of the
+            # statement, and a tie found among hundreds of candidates says
+            # nothing about the page. Longer reversals are not tried either:
+            # they are drawn from a larger space still.
+            return ()
+        found: list[Run] = []
+        for indices in combinations(eligible, count):
+            tested += 1
+            if tested > MAX_SIGN_COMBINATIONS:
+                return tuple(found)
+            if sum((value_of(run.cells[index]) or Decimal(0) for index in indices), Decimal(0)) == target:
+                candidate = run.with_negated(indices)
+                if not double_counts(candidate):
+                    found.append(candidate)
+        if found:
+            return tuple(found)
+    return ()
+
+
+def preferred_tied_variant(run: Run) -> Run | None:
+    """One deterministic exact interpretation for label-nominated arithmetic."""
+    variants = tied_variants(run)
+    return variants[0] if variants else None
 
 
 def is_transposition(delta: Decimal) -> bool:
@@ -118,6 +223,21 @@ def _quantize(value: Decimal, decimals: int) -> str:
     """A decimal rendered at the run's shared specificity, never as a float."""
     quantized = value.quantize(Decimal(1).scaleb(-decimals)) if decimals else value
     return format(quantized, "f")
+
+
+def proportional_values(left: list[Decimal], right: list[Decimal]) -> bool:
+    """Whether two runs are the same figures scaled, and so not independent.
+
+    Two columns that agree only because one is a fixed multiple of the other are
+    one piece of evidence wearing two hats -- a percentage column beside the
+    amounts it is a percentage of, most often. Corroboration counts independent
+    columns, and this is the test for independence.
+    """
+    pairs = [(a, b) for a, b in zip(left, right) if a != 0 or b != 0]
+    if not pairs:
+        return True
+    anchor_a, anchor_b = pairs[0]
+    return all(a * anchor_b == b * anchor_a for a, b in pairs[1:])
 
 
 def min_addends(signal_count: int) -> int:
@@ -173,6 +293,103 @@ def subtotal_run(
     return _walk(table_cells, column_index, total_row, decimals, nominated_rows, jump=jump)
 
 
+def cross_run(table_cells, row_index: int, total_column: int, decimals: int, total_columns):
+    """The contiguous cells to the left of a row's total, and what stopped them.
+
+    The horizontal twin of `leaf_run`, and deliberately the same walk: a blank
+    ends the candidate, a dash is an addend worth zero, and the printed decimal
+    count has to agree. It stops at the label column without needing to know
+    which column that is, because a label carries no value and a cell with no
+    value is where a run ends.
+
+    It also stops at the previous total-headed column, exactly as the vertical
+    walk stops at the previous nominated total. A statement of equity prints
+    "Total Disney Shareholders' Equity" and then "Total Equity", and the second
+    is the first plus noncontrolling interests -- not the first plus every
+    component the first already consumed.
+    """
+    cells: list[dict] = []
+    stopped = "edge-of-table"
+    for column in range(total_column - 1, 0, -1):
+        if column in total_columns:
+            stopped = "previous-total"
+            break
+        cell = table_cells.cell(row_index, column)
+        if cell is None:
+            stopped = "blank"
+            break
+        if value_of(cell) is None:
+            stopped = "no-value"
+            break
+        if not _eligible(cell, decimals):
+            stopped = "mixed-decimals"
+            break
+        cells.insert(0, cell)
+    return cells, stopped
+
+
+# Whether a cross-foot that misses may be published as a break.
+#
+# Off, and this is a decision about evidence rather than about the code. The
+# vertical pass has two signals -- a label that announces a total and the same
+# row structure footing independently in another column -- and only accuses when
+# it has them. A row has one: the word in its own column header. Nothing
+# corroborates it, and the corpus says what that costs. Disney's statement of
+# equity sets a share count in the first column, so every row of it "misses" by
+# the share count; its market-risk table cross-foots value-at-risk figures that
+# do not add across by construction, there being a diversification benefit and
+# no header word that says so. Thirty-four accusations on two documents, none of
+# them real.
+#
+# So a cross-foot confirms and stays quiet otherwise, which is worth having on
+# its own: an exact tie across six segment columns is a real corroboration of
+# every figure in the row, and it is what ticks the row totals of a segment
+# schedule. A miss becomes `no-plausible-run` and is counted, never spoken.
+CROSS_FOOT_MAY_BREAK = False
+
+
+def resolve_cross(table_cells, total_cell: dict, signal_count: int, total_columns) -> dict:
+    """What the arithmetic makes of one row against a total-headed column.
+
+    Narrow by design, per the plan: a cross-foot is attempted only against a
+    column whose own header names a total, and the caller enforces the period
+    guard that disables the whole table. What is left for here is the same
+    addition and the same floor as the vertical pass, and -- until a second
+    signal exists for a row -- two outcomes rather than three.
+    """
+    decimals = int(total_cell.get("decimals", 0))
+    total = value_of(total_cell)
+    if total is None:
+        return {"outcome": "unresolved", "unresolvedReason": "no-candidate-run"}
+
+    cells, stopped = cross_run(
+        table_cells,
+        int(total_cell["rowIndex"]),
+        int(total_cell["columnIndex"]),
+        decimals,
+        total_columns,
+    )
+    if len(cells) < min_addends(signal_count):
+        return {
+            "outcome": "unresolved",
+            "unresolvedReason": (
+                "mixed-decimals" if stopped == "mixed-decimals"
+                else "no-candidate-run" if not cells
+                else "run-too-short"
+            ),
+        }
+
+    run = Run("row", tuple(cells), total, decimals)
+    if double_counts(run):
+        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+    chosen = preferred_tied_variant(run) or run
+    if chosen.delta == TOLERANCE:
+        return {"outcome": "confirmed", "resolution": chosen.as_dict()}
+    if not CROSS_FOOT_MAY_BREAK or not _plausible(chosen):
+        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+    return {"outcome": "break", "resolution": chosen.as_dict()}
+
+
 def _walk(
     table_cells,
     column_index: int,
@@ -185,18 +402,32 @@ def _walk(
     cells: list[dict] = []
     stopped = "top-of-table"
     consumed_a_subtotal = False
+    crossed_a_caption = False
+    # The top row of the block the walk has just stepped over, which is the one
+    # row whose caption is that block's own heading rather than a boundary.
+    block_below = None
     row = total_row - 1
     while row >= 0:
         cell = table_cells.cell(row, column_index)
         if cell is None:
             if table_cells.is_caption_row(row):
                 if SKIP_CAPTION_ROWS:
+                    crossed_a_caption = True
+                    row -= 1
+                    continue
+                if STEP_OVER_SECTION_CAPTIONS and block_below == row + 1:
+                    # The caption of a block already taken whole. Crossing it
+                    # fragments nothing, and the crossing is recorded so the
+                    # run may confirm without ever being able to accuse.
+                    crossed_a_caption = True
+                    block_below = None
                     row -= 1
                     continue
                 stopped = "caption"
             else:
                 stopped = "blank"
             break
+        block_below = None
         if value_of(cell) is None:
             stopped = "no-value"
             break
@@ -216,20 +447,32 @@ def _walk(
                 # thing this run takes.
                 stopped = "unresolved-subtotal"
                 break
+            block_below = above
             row = above - 1
             continue
         row -= 1
-    return cells, stopped, consumed_a_subtotal
+    return cells, stopped, consumed_a_subtotal, crossed_a_caption
 
 
 def resolve(
-    table_cells, total_cell: dict, signal_count: int, nominated_rows, jump: dict
+    table_cells,
+    total_cell: dict,
+    signal_count: int,
+    nominated_rows,
+    jump: dict,
+    *,
+    floor: int | None = None,
 ) -> dict:
     """What the arithmetic makes of one nominated total.
 
     Three outcomes, and the distinction between the last two is the module's
     credibility. `unresolved` describes the scan's limitation and is never
     phrased as a failure of the document.
+
+    `floor` overrides how many addends a run needs before it may be published.
+    The caller passes it only to ask the second question -- what would this total
+    resolve to if two addends were enough -- and may publish that answer only on
+    evidence the floor exists to demand, which is parallel-column agreement.
     """
     decimals = int(total_cell.get("decimals", 0))
     column = total_cell["columnIndex"]
@@ -238,20 +481,31 @@ def resolve(
     if total is None:
         return {"outcome": "unresolved", "unresolvedReason": "no-candidate-run"}
 
-    floor = min_addends(signal_count)
-    leaves, leaf_stop, _ = leaf_run(table_cells, column, row, decimals, nominated_rows)
-    nested, nested_stop, consumed = subtotal_run(
+    floor = min_addends(signal_count) if floor is None else floor
+    leaves, leaf_stop, _, leaf_crossed = leaf_run(
+        table_cells, column, row, decimals, nominated_rows
+    )
+    nested, nested_stop, consumed, nested_crossed = subtotal_run(
         table_cells, column, row, decimals, nominated_rows, jump
     )
 
     runs: list[Run] = []
     stops: dict[str, str] = {}
+    # A run that crossed a caption may confirm and may never break, whether the
+    # caption ended it (§7.3) or it stepped over the heading of a block it took
+    # whole. Both hold a run whose extent was decided by something other than
+    # the arithmetic, and a miss there is about the scan and not about the page.
+    silent: set[str] = set()
     if consumed and len(nested) >= floor:
         runs.append(Run("subtotals", tuple(nested), total, decimals))
         stops["subtotals"] = nested_stop
+        if nested_crossed:
+            silent.add("subtotals")
     if len(leaves) >= floor:
         runs.append(Run("leaves", tuple(leaves), total, decimals))
         stops["leaves"] = leaf_stop
+        if leaf_crossed:
+            silent.add("leaves")
 
     if not runs:
         return {"outcome": "unresolved", "unresolvedReason": _why(leaves, nested, leaf_stop)}
@@ -263,19 +517,29 @@ def resolve(
         # refutes a run it may not propose.
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
 
-    tied = [run for run in runs if run.delta == TOLERANCE]
+    evaluated = [preferred_tied_variant(run) or run for run in runs]
+    tied = [run for run in evaluated if run.delta == TOLERANCE]
     if tied:
         # The subtotals win where both resolve: that is the tree the statement
         # is asserting. The leaf resolution is recorded too, since it is the
         # same arithmetic and costs nothing, and never becomes the tree.
         chosen = tied[0]
         published = {"outcome": "confirmed", "resolution": chosen.as_dict()}
-        others = [run for run in runs if run is not chosen]
+        others = [run for run in evaluated if run.basis != chosen.basis]
         if others and others[0].cells != chosen.cells:
             published["leafResolution"] = others[0].as_dict()
         return published
 
-    chosen = runs[0]
+    chosen = evaluated[0]
+    if len(chosen.cells) < nominate.MIN_ADDENDS_ON_ONE_SIGNAL:
+        # A pair that happens to sum is nearly evidence-free, which is why the
+        # floor exists; a pair that happens not to sum is exactly as thin, and
+        # the same reasoning has to run both ways. A short run reaching here has
+        # already been let past the floor by corroboration or a second signal --
+        # enough to confirm on, never enough to accuse on.
+        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+    if chosen.basis in silent:
+        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
     if stops.get(chosen.basis) == "caption":
         # The run was cut short by a caption row -- "Changes in assets and
         # liabilities:", "Cash Flows from Investing Activities:" -- which is the
@@ -288,7 +552,7 @@ def resolve(
     if not _plausible(chosen):
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
     published = {"outcome": "break", "resolution": chosen.as_dict()}
-    others = [run for run in runs if run is not chosen]
+    others = [run for run in evaluated if run.basis != chosen.basis]
     if others and others[0].cells != chosen.cells:
         published["leafResolution"] = others[0].as_dict()
     return published
@@ -317,6 +581,26 @@ def double_counts(run: Run) -> bool:
     prints constantly.
     """
     values = [value_of(cell) or Decimal(0) for cell in run.cells]
+    # A signed search must not manufacture a tie by subtracting a subtotal from
+    # the very members that make it. That is algebraic cancellation, not the
+    # relationship the statement asserts (A + B - (A + B) + C = C).
+    negated = set(run.negated_indices)
+    for index in run.negated_indices:
+        if index >= 2 and sum(values[:index], Decimal(0)) == values[index]:
+            return True
+    # The plainest cancellation of all: a member subtracted and the same figure
+    # added somewhere else in the run. The pair contributes nothing, so whatever
+    # ties is really the shorter run underneath -- which the search can find on
+    # its own, without inventing two signs to get there. Disney's borrowings
+    # table pairs 10,558 against 10,558 exactly this way.
+    for index in run.negated_indices:
+        if values[index] == 0:
+            continue
+        if any(
+            other not in negated and values[other] == values[index]
+            for other in range(len(values))
+        ):
+            return True
     if len(values) < 3 or values[-1] == 0:
         return False
     return sum(values[:-1], Decimal(0)) == values[-1]

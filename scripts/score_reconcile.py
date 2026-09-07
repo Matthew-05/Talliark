@@ -119,6 +119,11 @@ def observed(model: dict) -> dict[str, dict]:
                     for cell_id in resolution["addendCellIds"]
                     if cell_id in cells and "normalizedValue" in cells[cell_id]
                 ]
+                entry["negatedAddends"] = [
+                    cells[cell_id]["normalizedValue"]
+                    for cell_id in resolution["negatedAddendCellIds"]
+                    if cell_id in cells and "normalizedValue" in cells[cell_id]
+                ]
             if total.get("unresolvedReason"):
                 entry["unresolvedReason"] = total["unresolvedReason"]
             found[
@@ -191,7 +196,10 @@ def score(model: dict, golden: dict) -> dict:
         if entry["outcome"] == "confirmed" and want["outcome"] != "confirmed":
             false_ties.append({**entry, "expected": want["outcome"]})
         elif entry["outcome"] == "confirmed" and want.get("addends") is not None:
-            if entry.get("addends") != want["addends"]:
+            if entry.get("addends") != want["addends"] or (
+                want.get("negatedAddends") is not None
+                and entry.get("negatedAddends") != want["negatedAddends"]
+            ):
                 wrong_addends.append({**entry, "expectedAddends": want["addends"]})
         elif entry["outcome"] == "break" and want["outcome"] != "break":
             unexpected_breaks.append({**entry, "expected": want["outcome"]})

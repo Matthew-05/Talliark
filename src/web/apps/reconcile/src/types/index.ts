@@ -108,6 +108,8 @@ export interface ReconcileSignal {
 export interface ReconcileSumRun {
   readonly basis: "subtotals" | "leaves";
   readonly addendCellIds: string[];
+  /** Cells whose printed numeric sign is reversed in this arithmetic run. */
+  readonly negatedAddendCellIds: string[];
   readonly sum: string;
   readonly delta: string;
   readonly diagnosis?: {

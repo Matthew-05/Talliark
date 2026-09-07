@@ -40,6 +40,21 @@ from . import labels
 # en dash, em dash, horizontal bar.
 DASHES = "-‐‒–—―"
 
+# The accounting convention is a single rule above a total and a double rule
+# beneath a grand total, and the double rule is the one a reader looks for. Two
+# rules are that mark when they are far enough apart to be two lines and close
+# enough to be one gesture; a gap outside this range is two unrelated rules.
+DOUBLE_RULE_MIN_GAP = 0.0004
+DOUBLE_RULE_MAX_GAP = 0.006
+
+# How far below a row's own glyphs its rule may be drawn, as a multiple of that
+# row's text height. Bounded above by the next row's glyphs as well, so a tightly
+# set statement cannot lend one row the rule belonging to the row beneath it.
+RULE_REACH = 1.25
+
+# A rule is sometimes drawn a hair above the glyph box it underlines.
+RULE_OVERLAP = 0.0015
+
 
 @dataclass
 class TableCells:
@@ -62,6 +77,10 @@ class TableCells:
     header_labels: list[dict] = field(default_factory=list)
     bounds: dict = field(default_factory=dict)
     provenance: str = "lattice"
+    # Body rows carrying the grand-total convention -- a double rule beneath
+    # them. Empty when the block has no ruling evidence to read, which is a
+    # different fact from a block whose rows carry no double rule.
+    double_ruled: frozenset = frozenset()
 
     def cell(self, row_index: int, column_index: int) -> dict | None:
         return self.by_position.get((row_index, column_index))
@@ -77,6 +96,68 @@ class TableCells:
         return not any(
             column for (row, column) in self.by_position if row == row_index and column
         )
+
+
+def text_bands(built: "TableCells") -> dict[int, tuple[float, float]]:
+    """The top and bottom of each row's own glyphs, which is what a rule hangs off.
+
+    Not the grid's row band: a band runs from one row's boundary to the next and
+    swallows the rules on both sides of it, so a rule read against a band cannot
+    be told from the rule belonging to the row above.
+    """
+    bands: dict[int, tuple[float, float]] = {}
+    for cell in built.published:
+        bounds = cell.get("bounds")
+        if not bounds:
+            continue
+        row = int(cell["rowIndex"])
+        top = float(bounds["y"])
+        bottom = top + float(bounds["height"])
+        if row in bands:
+            top = min(top, bands[row][0])
+            bottom = max(bottom, bands[row][1])
+        bands[row] = (top, bottom)
+    return bands
+
+
+def mark_double_rules(built: "TableCells", rule_positions) -> None:
+    """Record which rows a double rule is drawn beneath.
+
+    Reads `table-structure-v1`'s published horizontal rule positions, which the
+    table module owns; what a rule *means* is decided here, per the division in
+    `labels`. The positions carry no extent, so a double rule is read as a fact
+    about the row rather than about one cell of it -- which is how a filing draws
+    it, across every value column of the total.
+    """
+    positions = sorted({round(float(position), 6) for position in rule_positions or ()})
+    if len(positions) < 2:
+        return
+    bands = text_bands(built)
+    ordered = sorted(bands)
+    found: set[int] = set()
+    for index, row in enumerate(ordered):
+        top, bottom = bands[row]
+        reach = bottom + max(1e-4, (bottom - top) * RULE_REACH)
+        if index + 1 < len(ordered):
+            reach = min(reach, bands[ordered[index + 1]][0])
+        window = [
+            position
+            for position in positions
+            if bottom - RULE_OVERLAP <= position <= reach
+        ]
+        if any(
+            DOUBLE_RULE_MIN_GAP <= second - first <= DOUBLE_RULE_MAX_GAP
+            for first, second in zip(window, window[1:])
+        ):
+            found.add(row)
+    built.double_ruled = frozenset(found)
+
+
+def horizontal_rules(table: dict | None) -> list[float]:
+    """The horizontal rule positions a detected table published, if any."""
+    if not table:
+        return []
+    return list((table.get("rulings") or {}).get("horizontal") or [])
 
 
 def boundaries_of(table: dict) -> list[float]:
@@ -256,6 +337,7 @@ def build_table_cells(
             built.by_position[(row_index, column_index)] = cell
             built.by_id[cell["id"]] = cell
 
+    mark_double_rules(built, horizontal_rules(table))
     return built
 
 

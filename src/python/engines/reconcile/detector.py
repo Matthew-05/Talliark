@@ -18,6 +18,7 @@ import hashlib
 import json
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from engines.binary_codec import json_to_base64
 from engines.table.layout import build_page_layout
@@ -31,7 +32,7 @@ from .cells import build_table_cells
 from .lattice import build_page_lattice
 
 
-DETECTOR_VERSION = "reconcile-detector-2-lattice"
+DETECTOR_VERSION = "reconcile-detector-3-signed-runs"
 
 
 def geometry_fingerprint(geometry: dict) -> str:
@@ -113,7 +114,6 @@ def detect_reconcile(
         # The ADR's bake-off gate chose the union fallback when pure lattice
         # recall trailed the grid corpus. Both substrates use the identical
         # corroboration policy; span identity removes duplicate totals.
-        existing_spans = _total_span_ids(published)
         for table in detected_by_page.get(page_index, []):
             grid = build_table_cells(
                 table, layout, values_by_page.get(page_index), page_index=page_index
@@ -123,22 +123,20 @@ def detect_reconcile(
                 grid, page_index=page_index, findings=grid_findings
             )
             hypotheses += grid_diagnostics["hypotheses"]
-            novel = [
-                total for total in reconciled["totals"]
-                if _span_for_total(reconciled, total) not in existing_spans
-            ]
-            if not novel:
+            selected, replaced_ids = _select_grid_totals(reconciled, published)
+            if not selected:
                 continue
-            novel_ids = {total["id"] for total in novel}
-            reconciled["totals"] = novel
+            selected_ids = {total["id"] for total in selected}
+            reconciled["totals"] = selected
             published.append(reconciled)
             blocks_examined += 1
+            if replaced_ids:
+                findings[:] = [
+                    finding for finding in findings
+                    if finding["totalId"] not in replaced_ids
+                ]
             findings.extend(
-                finding for finding in grid_findings if finding["totalId"] in novel_ids
-            )
-            existing_spans.update(
-                span for total in novel
-                if (span := _span_for_total(reconciled, total)) is not None
+                finding for finding in grid_findings if finding["totalId"] in selected_ids
             )
 
     model = {
@@ -196,6 +194,25 @@ def _reconcile_block(
     claimed = {proposal["cell"]["id"] for proposal in corroborated}
     nominations = [nomination for nomination in nominate_module.nominate(built) if nomination.cell["id"] not in claimed]
 
+    # A row the structure search corroborated is a subtotal as surely as a
+    # label-nominated one, and it already knows the top of the block it
+    # consumed. Both facts have to reach the run search or a total standing over
+    # corroborated subtotals has no tree to foot on: the walk would take the
+    # subtotal's own addends a second time, or -- because a corroborated row is
+    # not in `nominated_rows` -- run straight through it. Apple's marketable-
+    # securities note is the case: its two Subtotal rows are corroborated across
+    # seven columns, and without this the Total above them resolves only in the
+    # columns whose Cash row prints a dash.
+    #
+    # A corroborated break contributes the row and no top, which is exactly what
+    # §7.2 asks for: a block whose own top is unknown is not stepped over.
+    corroborated_blocks: dict[int, dict[int, int | None]] = {}
+    for proposal in corroborated:
+        cell = proposal["cell"]
+        corroborated_blocks.setdefault(int(cell["columnIndex"]), {})[
+            int(cell["rowIndex"])
+        ] = int(proposal["top"]) if proposal["outcome"] == "confirmed" else None
+
     by_column: dict[int, list] = {}
     for nomination in nominations:
         by_column.setdefault(nomination.column_index, []).append(nomination)
@@ -230,11 +247,17 @@ def _reconcile_block(
             if finding is not None:
                 findings.append(finding)
 
+    # Resolved per column first, published afterwards, because whether a
+    # two-addend run may be published is a fact about the other columns.
+    column_results: dict[int, list[tuple[object, dict]]] = {}
+    column_state: dict[int, tuple[set, dict]] = {}
     for column_index, column_nominations in sorted(by_column.items()):
-        column_label = labelled.get(column_index, "")
         column_nominations.sort(key=lambda nomination: nomination.row_index)
+        established = corroborated_blocks.get(column_index, {})
         nominated_rows = {nomination.row_index for nomination in column_nominations}
-        jump: dict[int, int] = {}
+        nominated_rows |= set(established)
+        jump: dict[int, int | None] = dict(established)
+        results: list[tuple[object, dict]] = []
         for nomination in column_nominations:
             resolved = sums.resolve(
                 built,
@@ -243,25 +266,22 @@ def _reconcile_block(
                 nominated_rows,
                 jump,
             )
-            if built.provenance.startswith("lattice") and resolved["outcome"] == "break":
+            named = {signal["name"] for signal in nomination.signals}
+            if resolved["outcome"] == "break" and (
+                built.provenance.startswith("lattice") or "label-total" not in named
+            ):
                 # A label can nominate on its own, but the looser lattice may
                 # have exposed only a fragment of the real block. Confirmation
                 # is safe; accusation requires leave-one-out column evidence.
+                #
+                # A drawn rule is thinner still: the published rule positions
+                # carry no extent, so `double-rule-below` says a double rule is
+                # under the row and not that it is under this column. A total
+                # holding it and no label confirms and stays quiet otherwise.
                 resolved = {
                     "outcome": "unresolved",
                     "unresolvedReason": "no-plausible-run",
                 }
-            total_id = f"{built.table_id}-t{column_index}-r{nomination.row_index}"
-            total = {
-                "id": total_id,
-                "cellId": nomination.cell["id"],
-                "rowIndex": nomination.row_index,
-                "columnIndex": column_index,
-                "axis": "vertical",
-                "signals": [dict(signal) for signal in nomination.signals],
-                **resolved,
-            }
-            totals.append(total)
             resolution = resolved.get("resolution")
             if resolution:
                 addends = [
@@ -273,20 +293,51 @@ def _reconcile_block(
                 # wherever one of them is itself a subtotal, so the resume point
                 # is the top of the deepest block beneath it.
                 jump[nomination.row_index] = sums.block_top(addends, jump, nominated_rows)
-                if resolved["outcome"] == "break":
-                    finding = findings_module.build_break(
-                        total_cell=nomination.cell,
-                        run=resolution,
-                        addends=addends,
-                        table_id=built.table_id,
-                        total_id=total_id,
-                        page_index=page_index,
-                        decimals=int(nomination.cell.get("decimals", 0)),
-                        column_label=column_label,
-                    )
-                    if finding is not None:
-                        findings.append(finding)
-            elif resolved["outcome"] == "unresolved":
+            results.append((nomination, resolved))
+        column_results[column_index] = results
+        column_state[column_index] = (nominated_rows, jump)
+
+    _corroborate_short_runs(built, column_results, column_state)
+
+    for column_index, results in sorted(column_results.items()):
+        column_label = labelled.get(column_index, "")
+        for nomination, resolved in results:
+            total_id = f"{built.table_id}-t{column_index}-r{nomination.row_index}"
+            total = {
+                "id": total_id,
+                "cellId": nomination.cell["id"],
+                "rowIndex": nomination.row_index,
+                "columnIndex": column_index,
+                "axis": "vertical",
+                "signals": [dict(signal) for signal in resolved.get("signals", nomination.signals)],
+                **{k: v for k, v in resolved.items() if k != "signals"},
+            }
+            totals.append(total)
+            resolution = resolved.get("resolution")
+            if resolution and resolved["outcome"] == "break":
+                finding = findings_module.build_break(
+                    total_cell=nomination.cell,
+                    run=resolution,
+                    addends=[
+                        built.by_id[cell_id]
+                        for cell_id in resolution["addendCellIds"]
+                        if cell_id in built.by_id
+                    ],
+                    table_id=built.table_id,
+                    total_id=total_id,
+                    page_index=page_index,
+                    decimals=int(nomination.cell.get("decimals", 0)),
+                    column_label=column_label,
+                )
+                if finding is not None:
+                    findings.append(finding)
+            elif resolved["outcome"] == "unresolved" and any(
+                signal["name"] == "label-total" for signal in nomination.signals
+            ):
+                # An unresolved total is spoken only where the document itself
+                # called the row a total. A row proposed by a drawn rule alone
+                # and not resolved is the scan reaching for something and
+                # missing, which is not worth a sentence.
                 finding = findings_module.build_unresolved(
                     total_cell=nomination.cell,
                     reason=resolved.get("unresolvedReason", ""),
@@ -297,6 +348,56 @@ def _reconcile_block(
                 )
                 if finding is not None:
                     findings.append(finding)
+
+    # Cross-footing, secondary and narrow: a row is added against a column whose
+    # own header names a total, and against nothing else. It runs after the
+    # vertical pass and never feeds it -- a row that cross-foots is not thereby
+    # a column total, and the tree stays the statement's own.
+    cross_columns = frozenset(nominate_module.cross_foot_columns(built.header_labels))
+    for nomination in nominate_module.nominate_cross(built):
+        column_index = nomination.column_index
+        resolved = sums.resolve_cross(
+            built, nomination.cell, len(nomination.signals), cross_columns
+        )
+        if built.provenance.startswith("lattice") and resolved["outcome"] == "break":
+            # The same rule the vertical pass keeps: the looser lattice may have
+            # exposed a fragment of the row, so confirmation is safe and
+            # accusation is not.
+            resolved = {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+        if resolved["outcome"] == "unresolved":
+            # A row that is simply not additive across is the common case in a
+            # table that has a Total column at all -- a per-share line, a rate, a
+            # count -- and saying so once per row would drown the column totals.
+            continue
+        total_id = f"{built.table_id}-x{column_index}-r{nomination.row_index}"
+        total = {
+            "id": total_id,
+            "cellId": nomination.cell["id"],
+            "rowIndex": nomination.row_index,
+            "columnIndex": column_index,
+            "axis": "cross",
+            "signals": [dict(signal) for signal in nomination.signals],
+            **resolved,
+        }
+        totals.append(total)
+        resolution = resolved.get("resolution")
+        if resolution and resolved["outcome"] == "break":
+            finding = findings_module.build_break(
+                total_cell=nomination.cell,
+                run=resolution,
+                addends=[
+                    built.by_id[cell_id]
+                    for cell_id in resolution["addendCellIds"]
+                    if cell_id in built.by_id
+                ],
+                table_id=built.table_id,
+                total_id=total_id,
+                page_index=page_index,
+                decimals=int(nomination.cell.get("decimals", 0)),
+                column_label=labelled.get(column_index, ""),
+            )
+            if finding is not None:
+                findings.append(finding)
 
     totals.sort(key=lambda total: (total["rowIndex"], total["columnIndex"]))
     model = {
@@ -312,6 +413,105 @@ def _reconcile_block(
     if built.header_labels:
         model["headerLabels"] = built.header_labels
     return model, structure_diagnostics
+
+
+def _corroborate_short_runs(built, column_results, column_state) -> None:
+    """Publish a two-addend run only where the parallel columns say the same.
+
+    A run of three or more addends may be confirmed on `label-total` alone. A
+    run of two may not: a pair that happens to sum is nearly evidence-free, and
+    the floor exists to say so. The second signal the floor waits for is the one
+    the plan already names -- the same row structure footing independently in
+    another value column -- and the walk has been run per column, so all that is
+    missing is to compare the answers before publishing them.
+
+    Apple's statement of comprehensive income is the case this was written for.
+    *Total comprehensive income* is net income plus total other comprehensive
+    income and nothing else, two addends with a section caption between them.
+    The structure search cannot reach it, because a contiguous span containing
+    that caption has a hole in it; the label walk reaches it in all three period
+    columns and is refused in each for being two addends long. Three independent
+    columns agreeing on the same two row positions is exactly the evidence that
+    was missing.
+
+    Only a total already resolved as `run-too-short` is reconsidered, and only
+    ever upward: a two-addend run that misses stays unresolved and never becomes
+    a break, because thin evidence may confirm and may not accuse.
+    """
+    candidates: dict[tuple[int, tuple[int, ...], tuple[int, ...]], list[tuple[int, int, dict]]] = {}
+    for column_index, results in column_results.items():
+        nominated_rows, jump = column_state[column_index]
+        for position, (nomination, resolved) in enumerate(results):
+            if resolved["outcome"] != "unresolved":
+                continue
+            if resolved.get("unresolvedReason") != "run-too-short":
+                continue
+            upgraded = sums.resolve(
+                built,
+                nomination.cell,
+                len(nomination.signals),
+                nominated_rows,
+                jump,
+                floor=nominate_module.MIN_ADDENDS,
+            )
+            if upgraded["outcome"] != "confirmed":
+                continue
+            resolution = upgraded["resolution"]
+            addends = [
+                built.by_id[cell_id]
+                for cell_id in resolution["addendCellIds"]
+                if cell_id in built.by_id
+            ]
+            if len(addends) != len(resolution["addendCellIds"]):
+                continue
+            # The signature is the row positions, and the positions reversed --
+            # the same test parallel-column corroboration uses for a signed run,
+            # so a coincidental sign choice cannot become a structural signal.
+            signature = (
+                nomination.row_index,
+                tuple(int(cell["rowIndex"]) for cell in addends),
+                tuple(
+                    int(built.by_id[cell_id]["rowIndex"])
+                    for cell_id in resolution["negatedAddendCellIds"]
+                    if cell_id in built.by_id
+                ),
+            )
+            candidates.setdefault(signature, []).append(
+                (column_index, position, upgraded)
+            )
+
+    for entries in candidates.values():
+        independent: list[list] = []
+        agreeing: list[tuple[int, int, dict]] = []
+        for column_index, position, upgraded in entries:
+            values = [
+                Decimal(built.by_id[cell_id]["normalizedValue"])
+                if "normalizedValue" in built.by_id[cell_id]
+                else Decimal(0)
+                for cell_id in upgraded["resolution"]["addendCellIds"]
+            ]
+            if not any(sums.proportional_values(values, prior) for prior in independent):
+                independent.append(values)
+                agreeing.append((column_index, position, upgraded))
+        if len(independent) < 2:
+            continue
+        columns = sorted({column_index for column_index, _, _ in entries})
+        for column_index, position, upgraded in entries:
+            others = [str(other) for other in columns if other != column_index]
+            if not others:
+                continue
+            nomination, _ = column_results[column_index][position]
+            published = dict(upgraded)
+            published["signals"] = [dict(signal) for signal in nomination.signals] + [
+                {
+                    "name": "column-corroboration",
+                    "evidence": (
+                        "the same rows foot independently in column"
+                        f"{'s' if len(others) != 1 else ''} {', '.join(others)}"
+                    ),
+                }
+            ]
+            column_results[column_index][position] = (nomination, published)
 
 
 def _boundary_disagreements(blocks, tables: list[dict]) -> int:
@@ -341,17 +541,51 @@ def _bounds_overlap(first: dict, second: dict) -> float:
 
 
 def _span_for_total(block: dict, total: dict) -> str | None:
+    """What identifies this total for deduplication, axis included.
+
+    One printed figure can be both the total of its column and the total of its
+    row, and those are two different assertions about it. Keying on the span
+    alone would let whichever arrived first delete the other.
+    """
     cell = next((cell for cell in block["cells"] if cell["id"] == total["cellId"]), None)
-    return cell.get("spanId") if cell else None
+    if cell is None or "spanId" not in cell:
+        return None
+    return "{}:{}".format(total.get("axis", "vertical"), cell["spanId"])
 
 
-def _total_span_ids(blocks: list[dict]) -> set[str]:
-    return {
-        span
-        for block in blocks
-        for total in block["totals"]
-        if (span := _span_for_total(block, total)) is not None
-    }
+def _select_grid_totals(grid: dict, published: list[dict]) -> tuple[list[dict], set[str]]:
+    """Keep novel grid totals and replace weaker lattice duplicates.
+
+    Span identity says two totals point at the same printed figure; it does not
+    say their evidence is equal. A page-local lattice may be cut at a section
+    gap while the detected grid still spans the full statement. In that case a
+    grid confirmation or break replaces the lattice's unresolved result rather
+    than being discarded merely because the lattice arrived first.
+    """
+    existing: dict[str, list[tuple[dict, dict]]] = {}
+    for block in published:
+        for total in block["totals"]:
+            span = _span_for_total(block, total)
+            if span is not None:
+                existing.setdefault(span, []).append((block, total))
+
+    selected: list[dict] = []
+    replaced_ids: set[str] = set()
+    rank = {"unresolved": 0, "break": 1, "confirmed": 1}
+    for total in grid["totals"]:
+        span = _span_for_total(grid, total)
+        matches = existing.get(span, []) if span is not None else []
+        if not matches:
+            selected.append(total)
+            continue
+        strongest = max(rank[item["outcome"]] for _, item in matches)
+        if rank[total["outcome"]] <= strongest:
+            continue
+        for block, prior in matches:
+            block["totals"].remove(prior)
+            replaced_ids.add(prior["id"])
+        selected.append(total)
+    return selected, replaced_ids
 
 
 def _summary(tables_examined: int, published: list[dict]) -> dict:

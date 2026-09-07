@@ -47,6 +47,12 @@ SIGNALS: tuple[SignalDefinition, ...] = (
         sees="the same row structure foots independently in another value column",
     ),
     SignalDefinition(
+        "total-column",
+        enabled=True,
+        sees="this cell's own column header names a total -- Total, Consolidated, "
+        "Combined -- which is the only thing that may propose a cross-foot",
+    ),
+    SignalDefinition(
         "ruling-above",
         enabled=False,
         sees="a horizontal rule crossing this cell's column in the gap above it",
@@ -63,8 +69,9 @@ SIGNALS: tuple[SignalDefinition, ...] = (
     ),
     SignalDefinition(
         "double-rule-below",
-        enabled=False,
-        sees="the grand-total convention",
+        enabled=True,
+        sees="two rules are drawn in the gap beneath this cell's row -- the "
+        "grand-total convention, and the mark a reader looks for",
     ),
 )
 
@@ -119,6 +126,82 @@ def label_total(cell: dict) -> dict | None:
     return {"name": "label-total", "evidence": f'row label reads "{label}"'}
 
 
+def total_column(header: dict | None) -> dict | None:
+    """The signal behind a cross-foot, and the only one there is.
+
+    A cross-foot is attempted only against a column whose own header names a
+    total. No total-headed column, no cross-foot: the alternative is adding
+    across a comparative statement, and 2025 plus 2024 is nonsense no tolerance
+    model would catch.
+    """
+    if header is None or not header.get("isTotalColumn"):
+        return None
+    text = " ".join((header.get("text") or "").split())
+    return {"name": "total-column", "evidence": f'the column header reads "{text}"'}
+
+
+def cross_foot_columns(header_labels: list[dict]) -> list[int]:
+    """Which columns a row may be cross-footed against, if any.
+
+    One guard, and it disables the table rather than a column: two or more
+    headers parsing as periods or years make this a comparative statement, where
+    a "Total" column totals something other than the columns beside it.
+    """
+    if sum(1 for header in header_labels if header.get("isPeriodColumn")) >= 2:
+        return []
+    return [
+        int(header["columnIndex"])
+        for header in header_labels
+        if header.get("isTotalColumn") and int(header["columnIndex"]) > 1
+    ]
+
+
+def nominate_cross(table_cells) -> list[Nomination]:
+    """Every cell structure proposes as the total of the row it stands in.
+
+    The same discipline as `nominate`: structure proposes, arithmetic confirms,
+    and a cell whose value was withheld has nothing for a run to foot to.
+    """
+    columns = cross_foot_columns(table_cells.header_labels)
+    if not columns:
+        return []
+    by_column = {
+        int(header["columnIndex"]): header for header in table_cells.header_labels
+    }
+    found: list[Nomination] = []
+    for cell in table_cells.published:
+        column_index = int(cell["columnIndex"])
+        if column_index not in columns or "normalizedValue" not in cell:
+            continue
+        signal = total_column(by_column.get(column_index))
+        if signal is not None:
+            found.append(Nomination(cell=cell, signals=(signal,)))
+    return found
+
+
+def double_rule_below(cell: dict, table_cells) -> dict | None:
+    """The grand-total convention, read off the page rather than off the label.
+
+    A filing draws a single rule above a total and a double rule beneath a grand
+    total, and it draws that mark whether or not the row says "Total" -- which is
+    the point. *Operating income/(loss)*, *Net periodic benefit cost*, *Cash at
+    end of period* and a great many segment lines announce themselves this way
+    and no other, and the total lexicon can never be extended far enough to cover
+    them without swallowing the ordinary rows in between.
+
+    It is weaker evidence than a label, in one specific way: the published rule
+    positions carry no extent, so this says a double rule is drawn beneath the
+    row and not that it is drawn beneath this column. That is why a total holding
+    this signal and no label may confirm and may never accuse.
+    """
+    if int(cell["rowIndex"]) not in getattr(table_cells, "double_ruled", frozenset()):
+        return None
+    return {
+        "name": "double-rule-below",
+        "evidence": "a double rule is drawn beneath this row",
+    }
+
+
 def nominate(table_cells) -> list[Nomination]:
     """Every cell in this table that structure proposes as a total.
 
@@ -138,7 +221,12 @@ def nominate(table_cells) -> list[Nomination]:
             # a row label that happens to be a number, not a column's total.
             continue
         signals = tuple(
-            signal for signal in (label_total(cell),) if signal is not None
+            signal
+            for signal in (
+                label_total(cell),
+                double_rule_below(cell, table_cells),
+            )
+            if signal is not None
         )
         if signals:
             found.append(Nomination(cell=cell, signals=signals))

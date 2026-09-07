@@ -163,3 +163,4 @@ installer/talliark-files.wxs
 *.temp
 **/.tmp-*/
 ~$*
+/tmp

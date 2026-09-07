@@ -246,9 +246,14 @@ export class SumTree {
 
     const addends = document.createElement("span");
     addends.className = "sum-tree__addends";
+    const negated = new Set(run.negatedAddendCellIds);
     addends.textContent = run.addendCellIds
-      .map((id) => cells.get(id)?.text.trim() ?? "?")
-      .join("  +  ");
+      .map((id, index) => {
+        const printed = cells.get(id)?.text.trim() ?? "?";
+        if (index === 0) return negated.has(id) ? `−${printed}` : printed;
+        return `${negated.has(id) ? "−" : "+"}  ${printed}`;
+      })
+      .join("  ");
 
     const result = document.createElement("span");
     result.className = "sum-tree__result";

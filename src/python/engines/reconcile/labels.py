@@ -48,8 +48,28 @@ TOTAL_COLUMN_LEXICON: tuple[str, ...] = (
     "combined",
 )
 
+# What a *column* header says to disqualify the column from addition. Matched at
+# a word boundary and not as a bare substring: "rate" inside "Corporate" is the
+# most expensive false match there is, because Corporate is a real segment column
+# in every segment schedule a filing prints, and silencing it leaves one column
+# of an otherwise fully ticked row unfooted. "Separate" and "Incorporated" fail
+# the same way. A trailing boundary is deliberately not required, so "rates",
+# "averaged" and "percentage" still match.
 NON_ADDITIVE_COLUMN_TERMS: tuple[str, ...] = (
     "percent", "%", "rate", "average", "per share", "per unit", "margin",
+)
+
+# "%" carries no word boundary of its own and is tested as a plain substring.
+_NON_ADDITIVE_SYMBOLS = tuple(
+    term for term in NON_ADDITIVE_COLUMN_TERMS if not term[0].isalpha()
+)
+_NON_ADDITIVE_WORDS = re.compile(
+    r"\b(?:%s)"
+    % "|".join(
+        re.escape(term)
+        for term in NON_ADDITIVE_COLUMN_TERMS
+        if term[0].isalpha()
+    )
 )
 
 _COLLAPSE = re.compile(r"\s+")
@@ -108,9 +128,15 @@ def is_period_column(text: str) -> bool:
 
 
 def is_non_additive_column(text: str) -> bool:
-    """Whether the header names a rate, average, or per-unit measure."""
+    """Whether the header names a rate, average, or per-unit measure.
+
+    On a word boundary, so a segment schedule's Corporate column is a column of
+    amounts like any other rather than a rate.
+    """
     normalized = normalize(text)
-    return any(term in normalized for term in NON_ADDITIVE_COLUMN_TERMS)
+    if any(symbol in normalized for symbol in _NON_ADDITIVE_SYMBOLS):
+        return True
+    return bool(_NON_ADDITIVE_WORDS.search(normalized))
 
 
 def header_semantics(labels: list[str]) -> list[dict]:
