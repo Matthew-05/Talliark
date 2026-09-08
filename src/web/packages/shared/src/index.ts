@@ -8,6 +8,7 @@ export type {
   TableColumn,
   TableRow,
   TableHeader,
+  TableHeaderGroup,
   TablePeriod,
   TableStructure,
   TableTextLine,

@@ -23,10 +23,13 @@ displayed page after rotation. Every output page preserves its zero-based
 `pageIndex`; tables are ordered top-to-bottom and left-to-right and conform to
 `table-structure-v1`.
 
-Published row and column bands cover the full detected region. A consumer may
-reconstruct cells by intersecting text geometry with those bands. Header rows are
-also present in `rows` and are labelled with `kind: "header"`. A candidate below
-the acceptance threshold is not published.
+Published row and column bands cover the table itself. A consumer may reconstruct
+cells by intersecting text geometry with those bands. Header rows are also
+present in `rows` and are labelled with `kind: "header"`. A label above the table
+that spans several columns is excluded from both the rows and table bounds. It is
+published in `header.groups` with its text geometry and inclusive final-column
+range, while `header.labels` remains one label per individual column. A candidate
+below the acceptance threshold is not published.
 
 ## 3. Types
 
@@ -38,8 +41,9 @@ the acceptance threshold is not published.
   rulings, or both.
 - **Grid hypothesis** - fitted column boundaries and logical rows for a candidate.
 - **Section row** - a label band inside a table that carries no values.
-- **Spanning label** - a leading band that qualifies several columns and is stored
-  as a caption rather than a table row.
+- **Header group** - a horizontally merged label above the table, stored with its
+  source bounds and the range of final columns it governs rather than as a row or
+  an individual column label.
 - **Graphic** - chart-like vector area, curve or diagonal evidence. Page canvas,
   white panels, row shading and embedded raster images are not graphics merely by
   occupying area; a raster image becomes graphic evidence only when it contains
@@ -60,15 +64,17 @@ the acceptance threshold is not published.
    coalesces empty bands again, and after header detection removes columns that
    only a centred title occupied.
 5. `refine.py` splits schema changes, repeated headers and prose interruptions;
-   merges adjacent fragments only when their columns agree; strips spanning
-   labels; and deduplicates overlapping proposals.
+   merges adjacent fragments only when their columns agree; recognizes and
+   removes horizontal header groups while retaining their geometry and column
+   coverage; and deduplicates overlapping proposals.
 6. `headers.py` recognizes period bands, stacked titles and complete all-word
    headers from the fitted cell matrix.
 7. `scoring.py` measures alignment, repetition, typing, spacing, headers, numeric
    content, rulings, graphics and negative layouts. Two parallel columns that are
    predominantly running prose are rejected even when their first line was
    inferred to be a header. A coherent ruled grid can override that ambiguity.
-8. `redesign.py` publishes accepted candidates as `table-detector-5`.
+8. `redesign.py` maps retained header-group coverage onto the final columns and
+   publishes accepted candidates as `table-detector-6`.
 
 ## 5. Tuning and thresholds
 

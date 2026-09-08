@@ -21,7 +21,7 @@ function table(overrides = {}) {
     confidence: 0.9,
     columns: [{ x0: 0.1, x1: 0.5 }, { x0: 0.5, x1: 0.9 }],
     rows: [row(0.1, 0.3, "header"), row(0.3, 0.5)],
-    header: { rowCount: 1, labels: ["Item", "Amount"] },
+    header: { rowCount: 1, labels: ["Item", "Amount"], groups: [] },
     rulings: { vertical: [], horizontal: [] },
     ...overrides,
   };
@@ -36,6 +36,21 @@ function structure(tables) {
   const parsed = parseTableStructure(structure([table()]));
   assert.equal(parsed.pages[0].tables.length, 1);
   assert.equal(parsed.pages[0].tables[0].header.rowCount, 1);
+}
+
+// A horizontal group relates source text above the table to final columns
+// without becoming another header row or changing either column label.
+{
+  const group = {
+    text: "Years Ended December 31,",
+    columnStart: 0,
+    columnEnd: 1,
+    bounds: { x: 0.42, y: 0.07, width: 0.26, height: 0.02 },
+  };
+  const parsed = parseTableStructure(structure([
+    table({ header: { rowCount: 1, labels: ["2025", "2024"], groups: [group] } }),
+  ]));
+  assert.deepEqual(parsed.pages[0].tables[0].header.groups, [group]);
 }
 
 // A payload that is not a table model at all is rejected outright.
@@ -55,8 +70,11 @@ const malformed = [
   table({ evidence: "guessed" }),
   table({ confidence: 4 }),
   table({ id: "" }),
-  table({ header: { rowCount: 9, labels: [] } }),
-  table({ header: { rowCount: 1, labels: [7] } }),
+  table({ header: { rowCount: 9, labels: [], groups: [] } }),
+  table({ header: { rowCount: 1, labels: [7], groups: [] } }),
+  table({ header: { rowCount: 1, labels: ["Item", "Amount"] } }),
+  table({ header: { rowCount: 1, labels: ["Item"], groups: [] } }),
+  table({ header: { rowCount: 1, labels: ["Item", "Amount"], groups: [{ text: "Group", columnStart: 0, columnEnd: 2, bounds: { x: 0.1, y: 0.05, width: 0.8, height: 0.02 } }] } }),
   table({ rows: [{ ...row(0.1, 0.3), kind: "footer" }, row(0.3, 0.5)] }),
   table({ rows: [{ ...row(0.1, 0.3), merged: "yes" }, row(0.3, 0.5)] }),
 ];

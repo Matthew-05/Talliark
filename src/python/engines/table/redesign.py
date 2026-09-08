@@ -24,7 +24,7 @@ from engines.table.rulings import PageRulings, detect_page_ruling_segments
 from engines.table.scoring import CandidateFeatures, evaluate
 
 
-DETECTOR_VERSION = "table-detector-5"
+DETECTOR_VERSION = "table-detector-6"
 
 # Period analysis — reporting what span of time a table's data is dated to — is
 # early alpha. It is off unless a caller asks for it, so production output keeps
@@ -140,6 +140,31 @@ def _merge_confidence(row, layout: PageLayout) -> float:
     return round(min(0.99, 0.6 + emptiness * 0.25 + proximity * 0.15), 4)
 
 
+def _published_header(header: dict | None, grid: GridHypothesis) -> dict | None:
+    """Attach group labels to the final, possibly coalesced, column grid."""
+    if header is None:
+        return None
+    groups = []
+    for group in grid.header_groups:
+        covered = [
+            index
+            for index, column in enumerate(grid.columns)
+            if min(column["x1"], group["coverageX1"])
+            > max(column["x0"], group["coverageX0"])
+        ]
+        if len(covered) < 2:
+            continue
+        groups.append(
+            {
+                "text": group["text"],
+                "columnStart": covered[0],
+                "columnEnd": covered[-1],
+                "bounds": group["bounds"],
+            }
+        )
+    return {**header, "groups": groups}
+
+
 def detect_page(
     page_geometry: dict,
     page,
@@ -201,6 +226,7 @@ def detect_page(
                 matrix, grid.column_count, ruled=candidate.evidence == "ruled"
             )
             header_rows = int(header["rowCount"]) if header else 0
+        header = _published_header(header, grid)
         features: CandidateFeatures = evaluate(
             candidate, grid, layout, header_rows=header_rows
         )

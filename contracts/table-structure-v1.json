@@ -51,10 +51,26 @@
       }
     },
     "Header": {
-      "type": "object", "required": ["rowCount", "labels"], "additionalProperties": false,
+      "type": "object", "required": ["rowCount", "labels", "groups"], "additionalProperties": false,
       "properties": {
         "rowCount": { "type": "integer", "minimum": 1 },
-        "labels": { "type": "array", "items": { "type": "string" } }
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "groups": {
+          "type": "array",
+          "description": "Labels printed above the table that span two or more final columns. They are metadata about the column hierarchy, not rows or per-column labels, and may lie above the table bounds.",
+          "items": { "$ref": "#/definitions/HeaderGroup" }
+        }
+      }
+    },
+    "HeaderGroup": {
+      "type": "object",
+      "required": ["text", "columnStart", "columnEnd", "bounds"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "columnStart": { "type": "integer", "minimum": 0, "description": "Zero-based index of the first column governed by this label." },
+        "columnEnd": { "type": "integer", "minimum": 1, "description": "Zero-based inclusive index of the last column governed by this label; always greater than columnStart." },
+        "bounds": { "$ref": "#/definitions/Bounds" }
       }
     },
     "Period": {

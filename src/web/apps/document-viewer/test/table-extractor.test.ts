@@ -184,7 +184,7 @@ test("uses detected table bands and collapses a multiline header", () => {
       { y0: 0.3, y1: 0.5, kind: "body", textLines: [{ y0: 0.35, y1: 0.39 }], merged: false, mergeConfidence: 1 },
       { y0: 0.5, y1: 0.8, kind: "body", textLines: [{ y0: 0.6, y1: 0.64 }], merged: false, mergeConfidence: 1 },
     ],
-    header: { rowCount: 2, labels: ["Account name", "Current year"] },
+    header: { rowCount: 2, labels: ["Account name", "Current year"], groups: [] },
     rulings: { vertical: [0.1, 0.5, 0.9], horizontal: [0.1, 0.2, 0.3, 0.5, 0.8] },
   };
 

@@ -15,9 +15,9 @@ from engines.table.candidates import (
     intersection_over_union,
     make_bounds,
 )
-from engines.table.grid import GridHypothesis, fit_grid
+from engines.table.grid import GridHypothesis, build_logical_rows, fit_grid
 from engines.table.headers import _PERIOD, detect_header_cells
-from engines.table.layout import LogicalRow, PageLayout
+from engines.table.layout import LogicalRow, PageLayout, VisualLine
 
 
 _MAX_DEPTH = 4
@@ -53,7 +53,106 @@ def _dated_band(row: LogicalRow) -> bool:
     return bool(filled) and all(_PERIOD.match(value) for value in filled)
 
 
-def strip_spanning_labels(grid: GridHypothesis) -> None:
+def _group_segments(row: LogicalRow, grid: GridHypothesis) -> list[dict]:
+    """Horizontally merged labels in one leading band.
+
+    A group is recognized from the printed island crossing one or more fitted
+    column boundaries. Its text bounds are retained separately from its column
+    coverage: centred text is usually much narrower than the columns it names.
+    Multiple islands permit two independent groups on the same tier.
+    """
+    groups: list[dict] = []
+    for line in row.lines:
+        for segment in line.segments:
+            crossed = [
+                index
+                for index, boundary in enumerate(grid.boundaries)
+                if segment.x0 < boundary < segment.x1
+            ]
+            if not crossed:
+                continue
+            start = crossed[0]
+            end = crossed[-1] + 1
+            groups.append(
+                {
+                    "text": segment.text.strip(),
+                    "columnStart": start,
+                    "columnEnd": end,
+                    "bounds": {
+                        "x": segment.x0,
+                        "y": line.y0,
+                        "width": segment.x1 - segment.x0,
+                        "height": line.y1 - line.y0,
+                    },
+                    "coverageX0": grid.columns[start]["x0"],
+                    "coverageX1": grid.columns[end]["x1"],
+                    "source": (line.index, segment.x0, segment.x1),
+                }
+            )
+    return groups
+
+
+def _single_group(row: LogicalRow, grid: GridHypothesis, columns: tuple[int, ...]) -> dict:
+    """One centred label whose children, rather than its ink, reveal its span."""
+    tokens = [token for line in row.lines for token in line.tokens]
+    start = min(columns)
+    end = max(columns)
+    return {
+        "text": " ".join(value for value in row.cells if value).strip(),
+        "columnStart": start,
+        "columnEnd": end,
+        "bounds": {
+            "x": min(token.x0 for token in tokens),
+            "y": row.y0,
+            "width": max(token.x1 for token in tokens) - min(token.x0 for token in tokens),
+            "height": row.y1 - row.y0,
+        },
+        "coverageX0": grid.columns[start]["x0"],
+        "coverageX1": grid.columns[end]["x1"],
+        "sourceLines": tuple(line.index for line in row.lines),
+    }
+
+
+def _remove_group_segments(
+    grid: GridHypothesis, groups: list[dict], layout: PageLayout
+) -> None:
+    """Remove only group-label ink, preserving leaf labels on the same band."""
+    whole_lines = {
+        index for group in groups for index in group.get("sourceLines", ())
+    }
+    segments = {group["source"] for group in groups if "source" in group}
+    remaining: list[VisualLine] = []
+    for row in grid.rows:
+        for line in row.lines:
+            if line.index in whole_lines:
+                continue
+            kept = [
+                segment
+                for segment in line.segments
+                if (line.index, segment.x0, segment.x1) not in segments
+            ]
+            if not kept:
+                continue
+            if len(kept) == len(line.segments):
+                remaining.append(line)
+                continue
+            tokens = [token for segment in kept for token in segment.tokens]
+            remaining.append(
+                VisualLine(
+                    index=line.index,
+                    tokens=tokens,
+                    segments=kept,
+                    x0=min(segment.x0 for segment in kept),
+                    y0=line.y0,
+                    x1=max(segment.x1 for segment in kept),
+                    y1=line.y1,
+                    source_lines=line.source_lines,
+                )
+            )
+    grid.rows = build_logical_rows(remaining, grid.boundaries, layout)
+
+
+def strip_spanning_labels(grid: GridHypothesis, layout: PageLayout) -> None:
     """Drop leading bands that name a group of columns rather than fill one.
 
     "Years ended" above three dated columns, or "Incorporated by Reference" above
@@ -86,22 +185,20 @@ def strip_spanning_labels(grid: GridHypothesis) -> None:
             and titles_below
             and _dated_band(row)
         )
-        if any(token.is_value for line in row.lines for token in line.tokens) and not block_caption:
-            break
-        straddles = any(
-            token.x0 < boundary < token.x1
-            for line in row.lines
-            for token in line.tokens
-            for boundary in grid.boundaries
-        )
+        segments = [segment for line in row.lines for segment in line.segments]
         qualifies_a_dated_band = (
-            len(row.occupied) == 1
+            len(segments) == 1
+            and row.occupied
+            and 0 not in row.occupied
             and 0 not in below.occupied
             and len(below.occupied) >= 2
             and set(below.occupied) == set(range(1, len(grid.columns)))
             and _dated_band(below)
         )
-        if not straddles and not qualifies_a_dated_band and not block_caption:
+        groups = _group_segments(row, grid)
+        if qualifies_a_dated_band or block_caption:
+            groups = [_single_group(row, grid, below.occupied)]
+        if not groups:
             break
         # Why it was removed says what it was. A dated band over titled columns
         # is the block's period; a phrase over dated columns qualifies them;
@@ -114,9 +211,10 @@ def strip_spanning_labels(grid: GridHypothesis) -> None:
         else:
             kind = "label"
         grid.captions.append(
-            {"kind": kind, "text": " ".join(value for value in row.cells if value).strip()}
+            {"kind": kind, "text": " ".join(group["text"] for group in groups).strip()}
         )
-        grid.rows.pop(0)
+        grid.header_groups.extend(groups)
+        _remove_group_segments(grid, groups, layout)
 
 
 def _looks_like_header_band(row: LogicalRow) -> bool:
@@ -303,7 +401,7 @@ def refine(
                     parts.extend(refine(part, layout, depth + 1))
             if parts:
                 return parts
-    strip_spanning_labels(grid)
+    strip_spanning_labels(grid, layout)
     tighten(candidate, grid, layout)
     return [(candidate, grid)]
 
@@ -361,6 +459,12 @@ def merge_adjacent(
                     )
                     refitted = fit_grid(combined, layout)
                     if refitted is not None:
+                        # The combined candidate still carries the original
+                        # source lines, including any group header stripped from
+                        # the earlier fragment. Reclassify it before publishing
+                        # the refitted grid so merging cannot turn it back into a
+                        # per-column header row.
+                        strip_spanning_labels(refitted, layout)
                         tighten(combined, refitted, layout)
                         merged[-1] = (combined, refitted)
                         continue

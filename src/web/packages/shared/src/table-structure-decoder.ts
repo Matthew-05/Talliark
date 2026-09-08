@@ -49,6 +49,16 @@ export interface TableRow {
 export interface TableHeader {
   rowCount: number;
   labels: string[];
+  groups: TableHeaderGroup[];
+}
+
+export interface TableHeaderGroup {
+  text: string;
+  /** Zero-based inclusive final-column range governed by this label. */
+  columnStart: number;
+  columnEnd: number;
+  /** Geometry of the printed label, which may sit above the table bounds. */
+  bounds: TableBounds;
 }
 
 /**
@@ -162,15 +172,31 @@ function parseRows(value: unknown, bounds: TableBounds): TableRow[] | null {
   return rows;
 }
 
-function parseHeader(value: unknown, rowCount: number): TableHeader | null | undefined {
+function parseHeader(
+  value: unknown,
+  rowCount: number,
+  columnCount: number,
+): TableHeader | null | undefined {
   if (value === null || value === undefined) return null;
   if (!isRecord(value)) return undefined;
-  const { rowCount: count, labels } = value;
+  const { rowCount: count, labels, groups } = value;
   if (typeof count !== "number" || !Number.isInteger(count) || count < 1 || count > rowCount) {
     return undefined;
   }
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== "string")) return undefined;
-  return { rowCount: count, labels: labels as string[] };
+  if (labels.length !== columnCount || !Array.isArray(groups)) return undefined;
+  const parsedGroups: TableHeaderGroup[] = [];
+  for (const group of groups) {
+    if (!isRecord(group) || typeof group.text !== "string" || !group.text.trim()) return undefined;
+    if (!Number.isInteger(group.columnStart) || !Number.isInteger(group.columnEnd)) return undefined;
+    const columnStart = group.columnStart as number;
+    const columnEnd = group.columnEnd as number;
+    if (columnStart < 0 || columnEnd <= columnStart || columnEnd >= columnCount) return undefined;
+    const bounds = parseBounds(group.bounds);
+    if (bounds === null) return undefined;
+    parsedGroups.push({ text: group.text, columnStart, columnEnd, bounds });
+  }
+  return { rowCount: count, labels: labels as string[], groups: parsedGroups };
 }
 
 const PERIOD_AXES = new Set(["columns", "rows", "both", "none"]);
@@ -223,7 +249,7 @@ function parseTable(value: unknown): DetectedTable | null {
   if (columns === null) return null;
   const rows = parseRows(value.rows, bounds);
   if (rows === null) return null;
-  const header = parseHeader(value.header, rows.length);
+  const header = parseHeader(value.header, rows.length, columns.length);
   if (header === undefined) return null;
   const period = parsePeriod(value.period, columns.length, rows.length);
   if (period === undefined) return null;

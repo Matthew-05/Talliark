@@ -18,7 +18,7 @@ from engines.table.grid import (
     occupied_columns,
 )
 from engines.table.headers import detect_header_cells, period_in
-from engines.table.redesign import _period
+from engines.table.redesign import _period, _published_header
 from engines.table.layout import build_page_layout, classify
 from engines.table.refine import refine
 from engines.table.rulings import PageRulings, RulingSegment, merge_parallel, ruling_components
@@ -258,8 +258,9 @@ class HeaderBandTests(unittest.TestCase):
     def _statement(self, with_span: bool = True):
         rows = []
         if with_span:
-            # "Years ended" floats across the date columns, naming them.
-            rows.append((0.100, [(0.62, "Years ended")]))
+            # A date-bearing group label floats across the date columns. The
+            # day number is still label text, not evidence that this is a row.
+            rows.append((0.100, [(0.59, "Years Ended December 31,")]))
         rows += [
             (0.116, [(0.50, "September 27,"), (0.68, "September 28,"), (0.86, "September 30,")]),
             (0.126, [(0.55, "2025"), (0.73, "2024"), (0.91, "2023")]),
@@ -270,12 +271,12 @@ class HeaderBandTests(unittest.TestCase):
         ]
         layout = build_page_layout(page(rows))
         candidate, grid = refine(whitespace_candidates(layout)[0], layout)[0]
-        return grid
+        return candidate, grid
 
     def test_a_wrapped_date_header_is_one_row(self) -> None:
         # "September 27," and "2025" fill the same columns on wrapped leading:
         # one header band, not a header and a stray first body row.
-        grid = self._statement(with_span=False)
+        _candidate, grid = self._statement(with_span=False)
         self.assertTrue(grid.rows[0].merged)
         self.assertEqual(grid.rows[0].cells[1], "September 27, 2025")
         self.assertEqual(grid.rows[0].cells[3], "September 30, 2023")
@@ -286,9 +287,48 @@ class HeaderBandTests(unittest.TestCase):
     def test_a_band_naming_a_group_of_columns_is_not_a_row(self) -> None:
         # "Years ended" carries no value, labels no row, and lies across the
         # boundaries between the columns it spans.
-        grid = self._statement(with_span=True)
+        candidate, grid = self._statement(with_span=True)
         self.assertNotIn("Years", " ".join(grid.rows[0].cells))
         self.assertEqual(grid.rows[0].cells[1], "September 27, 2025")
+        header = _published_header(
+            detect_header_cells(grid.cell_matrix(), grid.column_count), grid
+        )
+        self.assertEqual(header["rowCount"], 1)
+        self.assertEqual(
+            header["labels"],
+            ["", "September 27, 2025", "September 28, 2024", "September 30, 2023"],
+        )
+        self.assertEqual(len(header["groups"]), 1)
+        group = header["groups"][0]
+        self.assertEqual(group["text"], "Years Ended December 31,")
+        self.assertEqual((group["columnStart"], group["columnEnd"]), (1, 3))
+        self.assertLess(group["bounds"]["y"], candidate.bounds["y"])
+
+    def test_a_group_is_peeled_from_a_logical_row_shared_with_leaf_headers(self) -> None:
+        # Tight leading causes the group and years to enter grid fitting as one
+        # logical row on Quest page 29. Removing that whole logical row would
+        # also remove the real leaf headers.
+        rows = [
+            (0.100, [(0.60, "Years Ended December 31,")]),
+            (0.112, [(0.60, "2025"), (0.80, "2024")]),
+            (0.140, [(0.08, "Revenue"), (0.60, "250,217"), (0.80, "288,532")]),
+            (0.160, [(0.08, "Cost of revenue"), (0.60, "207,673"), (0.80, "238,537")]),
+            (0.180, [(0.08, "Gross profit"), (0.60, "42,544"), (0.80, "49,995")]),
+        ]
+        layout = build_page_layout(page(rows))
+        candidate, grid = refine(whitespace_candidates(layout)[0], layout)[0]
+        header = _published_header(
+            detect_header_cells(grid.cell_matrix(), grid.column_count), grid
+        )
+
+        self.assertEqual(header["rowCount"], 1)
+        self.assertEqual(header["labels"], ["", "2025", "2024"])
+        self.assertEqual(header["groups"][0]["text"], "Years Ended December 31,")
+        self.assertEqual(
+            (header["groups"][0]["columnStart"], header["groups"][0]["columnEnd"]),
+            (1, 2),
+        )
+        self.assertLess(header["groups"][0]["bounds"]["y"], candidate.bounds["y"])
 
     def test_a_caption_over_dated_columns_is_dropped_even_inside_one_column(self) -> None:
         # "Years ended" centred over the middle date column straddles nothing, so
