@@ -22,6 +22,7 @@ import { TableCopyModal } from "../table-copy-modal/table-copy-modal.js";
 import { TextContentCache } from "../../services/text-content-cache.js";
 import { TableStructureCache } from "../../services/table-structure-cache.js";
 import { TableNoticeDismissals } from "../../services/table-notice-dismissals.js";
+import { TableSuggestionVisibility } from "../../services/table-suggestion-visibility.js";
 import { ValuesCache } from "../../services/values-cache.js";
 import { ValuesOverlay } from "./values-overlay.js";
 import { getSpanLinkTarget } from "./span-link-bounds.js";
@@ -250,11 +251,13 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
    * it, and no way for someone to compare the two. Off means the viewer uses
    * the same purely visual grid detection it always did.
    */
-  let _tableModelEnabled = false;
+  const tableSuggestionVisibility = new TableSuggestionVisibility();
   const detectedTableAt = (
     pdfId: string, pageIndex: number, rect: NormalizedRect,
   ): DetectedTable | null => (
-    _tableModelEnabled ? tableCache.tableAt(pdfId, pageIndex, rect) : null
+    tableSuggestionVisibility.isEnabled(pdfId)
+      ? tableCache.tableAt(pdfId, pageIndex, rect)
+      : null
   );
   const editOverlay     = new RectEditOverlay(viewer, cache, detectedTableAt, renderer);
   const tableGridEditor = new TableGridEditor(viewer, cache, renderer);
@@ -323,12 +326,18 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     const pdfId = viewer.getActivePdfId();
     if (!pdfId) {
       _remainingTables = 0;
+      tableSuggestions.hide();
+      tableToggle.setActive(false);
       tableSuggestions.setLinkedTableIds(new Set());
       tableToggle.setState({ detected: false, total: 0, remaining: 0 });
       tableNotice.setCount(0);
       tableNotice.setVisible(false);
       return;
     }
+    const enabled = tableSuggestionVisibility.isEnabled(pdfId);
+    if (enabled) tableSuggestions.show();
+    else tableSuggestions.hide();
+    tableToggle.setActive(enabled);
     const linked = linkedTableIds(pdfId);
     tableSuggestions.setLinkedTableIds(linked);
     const total = tableCache.tableCount(pdfId);
@@ -339,7 +348,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     });
     tableNotice.setCount(remaining);
     tableNotice.setVisible(
-      !_tableModelEnabled && noticeDismissals.shouldShow(pdfId, remaining),
+      !enabled && noticeDismissals.shouldShow(pdfId, remaining),
     );
   };
 
@@ -351,8 +360,9 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   };
 
   const setTableModelEnabled = (enabled: boolean): void => {
-    if (_tableModelEnabled === enabled) return;
-    _tableModelEnabled = enabled;
+    const pdfId = viewer.getActivePdfId();
+    if (!pdfId || tableSuggestionVisibility.isEnabled(pdfId) === enabled) return;
+    tableSuggestionVisibility.setEnabled(pdfId, enabled);
     if (enabled) tableSuggestions.show();
     else tableSuggestions.hide();
     tableToggle.setActive(enabled);
@@ -814,7 +824,13 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     toggleValueNoise: () => valuesOverlay.toggleNoise(),
     showValueNoise: () => valuesOverlay.showNoise(),
     hideValueNoise: () => valuesOverlay.hideNoise(),
-    toggleTableSuggestions: () => { setTableModelEnabled(!_tableModelEnabled); return _tableModelEnabled; },
+    toggleTableSuggestions: () => {
+      const pdfId = viewer.getActivePdfId();
+      if (!pdfId) return false;
+      const enabled = !tableSuggestionVisibility.isEnabled(pdfId);
+      setTableModelEnabled(enabled);
+      return enabled;
+    },
     showTableSuggestions: () => setTableModelEnabled(true),
     hideTableSuggestions: () => setTableModelEnabled(false),
   };

@@ -72,7 +72,9 @@ below the acceptance threshold is not published.
 2. `rulings.py` extracts vector and raster rules with their real extents. It
    ignores near-page background rectangles and white fills. Raster image coverage
    remains neutral; a small Hough-style vote records only long diagonal series as
-   chart evidence.
+   chart evidence. Before the optional cell-aware OCR pass, raster candidates must
+   be substantially visible on the page and have the light surface of a document
+   scan; this keeps cropped spread art and photographic edges out of Tesseract.
 3. `candidates.py` proposes independent ruled and whitespace regions and combines
    evidence where their bounds agree.
 4. `grid.py` votes for persistent whitespace corridors, builds logical rows and
@@ -118,6 +120,8 @@ below the acceptance threshold is not published.
 | Grid iterations | `3` | Columns and wrapped-row membership settle within three passes on the regression corpus. |
 | Refinement depth | `4` | Bounds recursive splitting while allowing stacked independent tables to separate. |
 | Default document budget | `300,000 ms` | Production remains bounded; diagnostic and reconcile callers may disable the budget explicitly. |
+| Cell-recovery image visibility | `80%` of the placed image | Rejects spread artwork and other placements whose apparent area is mostly clipped off the current page. |
+| Cell-recovery light surface | `35%` of an autocontrasted `256 px` thumbnail at level `>= 220` | A ruled scan is predominantly paper; continuous-tone photography can contain long false rulings and is both inaccurate and pathologically expensive to OCR cell by cell. |
 | Sparse recovery enlargement | preferred `8×`, maximum `24,000 px` and `60,000,000 px²` | Keeps normal low-resolution regions legible without constructing a Tesseract raster large enough to abort the optional recovery pass. |
 
 Scoring uses positive weights for alignment (`0.20`), multi-column occupancy
@@ -142,6 +146,9 @@ density (`0.20`), unstable schemas (`0.30`) and unrepeated two-line blocks
   recorded raster budget. If that local recognition still fails, table-cell
   recovery continues and reports `page_text_regions_failed` rather than
   aborting the document.
+- Cell-aware OCR deliberately declines dark or continuous-tone raster tables.
+  Their background violates the light-document assumption used by cell cleanup;
+  direct page OCR remains authoritative for those pages.
 - Centred multi-line titles can initially create header-only columns. The
   post-header coalescing pass removes columns empty throughout the body, but a
   genuinely sparse optional column cannot be removed safely.

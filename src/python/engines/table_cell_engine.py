@@ -26,6 +26,9 @@ from engines.table.rulings import detect_ruled_grid
 
 
 _MIN_TABLE_IMAGE_PAGE_COVERAGE = 0.05
+_MIN_TABLE_IMAGE_VISIBLE_FRACTION = 0.80
+_DOCUMENT_IMAGE_SAMPLE_SIZE = 256
+_MIN_DOCUMENT_LIGHT_PIXEL_RATIO = 0.35
 _MAX_CELL_OCR_WORKERS = 8
 
 # Sparse page text is enlarged for Tesseract, but its raster has a hard practical
@@ -62,10 +65,45 @@ def _largest_table_placement(
     page_area = page_rect.get_area()
     if page_area <= 0 or not placements:
         return None
-    placement = max(placements, key=lambda rect: rect.get_area())
-    if placement.get_area() / page_area < _MIN_TABLE_IMAGE_PAGE_COVERAGE:
+    candidates: list[tuple[float, fitz.Rect]] = []
+    for placement in placements:
+        placement_area = placement.get_area()
+        if placement_area <= 0:
+            continue
+        visible_area = (placement & page_rect).get_area()
+        if (
+            visible_area / page_area < _MIN_TABLE_IMAGE_PAGE_COVERAGE
+            or visible_area / placement_area < _MIN_TABLE_IMAGE_VISIBLE_FRACTION
+        ):
+            continue
+        candidates.append((visible_area, placement))
+    if not candidates:
         return None
-    return placement
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _looks_like_document_scan(image: Image.Image) -> bool:
+    """Reject photographs and design art before expensive cell OCR.
+
+    Cell recovery assumes dark type and rules on a light document surface. Long
+    edges in photographs can satisfy the ruling detector, but their continuous
+    mid-tone backgrounds make them poor OCR inputs and can create enormous false
+    grids. Autocontrast accommodates gray or tinted paper before the inexpensive
+    thumbnail histogram is measured.
+    """
+    sample = ImageOps.grayscale(image)
+    sample.thumbnail(
+        (_DOCUMENT_IMAGE_SAMPLE_SIZE, _DOCUMENT_IMAGE_SAMPLE_SIZE),
+        Image.Resampling.BILINEAR,
+    )
+    if sample.width <= 0 or sample.height <= 0:
+        return False
+    histogram = ImageOps.autocontrast(sample).histogram()
+    pixel_count = sum(histogram)
+    if pixel_count <= 0:
+        return False
+    light_pixel_ratio = sum(histogram[220:]) / pixel_count
+    return light_pixel_ratio >= _MIN_DOCUMENT_LIGHT_PIXEL_RATIO
 
 
 def _clean_grid(image: Image.Image, x_lines: list[int], y_lines: list[int]) -> Image.Image:
@@ -917,6 +955,7 @@ def has_recoverable_ruled_table(
     stats = {
         "table_images_examined": 0,
         "table_images_skipped_small": 0,
+        "table_images_skipped_non_document": 0,
         "table_grid_candidates": 0,
     }
     del language  # retained for API compatibility; detection is image-only
@@ -942,6 +981,9 @@ def has_recoverable_ruled_table(
                         io.BytesIO(doc.extract_image(xref)["image"])
                     ).convert("RGB")
                 except (KeyError, OSError):
+                    continue
+                if not _looks_like_document_scan(image):
+                    stats["table_images_skipped_non_document"] += 1
                     continue
                 x_lines, y_lines = detect_ruled_grid(image)
                 if not x_lines or not y_lines:
@@ -970,6 +1012,7 @@ def recover_table_geometry(
         "table_cells_unresolved": 0,
         "table_images_examined": 0,
         "table_images_skipped_small": 0,
+        "table_images_skipped_non_document": 0,
         "table_grid_candidates": 0,
         "page_text_regions_detected": 0,
         "page_text_regions_failed": 0,
@@ -1015,6 +1058,9 @@ def recover_table_geometry(
                         io.BytesIO(source_doc.extract_image(xref)["image"])
                     ).convert("RGB")
                 except (KeyError, OSError):
+                    continue
+                if not _looks_like_document_scan(image):
+                    stats["table_images_skipped_non_document"] += 1
                     continue
                 x_lines, y_lines = detect_ruled_grid(image)
                 if not x_lines or not y_lines:

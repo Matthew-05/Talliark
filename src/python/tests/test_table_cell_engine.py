@@ -17,6 +17,7 @@ from engines.table_cell_engine import (
     _ink_line_boxes,
     _is_table_recovery_useful,
     _largest_table_placement,
+    _looks_like_document_scan,
     _select_general_text,
     _select_numeric,
     _select_city,
@@ -38,6 +39,47 @@ class TablePlacementTests(unittest.TestCase):
         table = fitz.Rect(100, 150, 500, 650)
 
         self.assertEqual(_largest_table_placement(page, [small, table]), table)
+
+    def test_rejects_large_placement_that_is_mostly_off_page(self) -> None:
+        page = fitz.Rect(0, 0, 600, 800)
+        spread_art = fitz.Rect(-600, 0, 600, 800)
+
+        self.assertIsNone(_largest_table_placement(page, [spread_art]))
+
+    def test_chooses_visible_candidate_over_larger_off_page_placement(self) -> None:
+        page = fitz.Rect(0, 0, 600, 800)
+        off_page = fitz.Rect(599, 0, 1199, 800)
+        table = fitz.Rect(100, 150, 500, 650)
+
+        self.assertEqual(
+            _largest_table_placement(page, [off_page, table]),
+            table,
+        )
+
+
+class DocumentImageTests(unittest.TestCase):
+    def test_accepts_dark_rules_on_a_light_document_surface(self) -> None:
+        image = Image.new("RGB", (400, 300), "white")
+        draw = ImageDraw.Draw(image)
+        for x in (20, 200, 380):
+            draw.line((x, 20, x, 280), fill="black", width=3)
+        for y in (20, 100, 180, 280):
+            draw.line((20, y, 380, y), fill="black", width=3)
+
+        self.assertTrue(_looks_like_document_scan(image))
+
+    def test_rejects_continuous_mid_tone_art(self) -> None:
+        image = Image.new("RGB", (400, 300))
+        pixels = image.load()
+        for y in range(image.height):
+            for x in range(image.width):
+                pixels[x, y] = (
+                    55 + x * 100 // image.width,
+                    85 + y * 90 // image.height,
+                    125 + (x + y) * 80 // (image.width + image.height),
+                )
+
+        self.assertFalse(_looks_like_document_scan(image))
 
 
 class TextCleanupTests(unittest.TestCase):

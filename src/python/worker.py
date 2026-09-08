@@ -455,6 +455,7 @@ def _handle_job(job: OcrJob) -> None:
                         "table_cells_unresolved",
                         "table_images_examined",
                         "table_images_skipped_small",
+                        "table_images_skipped_non_document",
                         "table_grid_candidates",
                         "page_text_regions_detected",
                         "page_text_regions_failed",
