@@ -711,6 +711,15 @@ namespace Talliark.Addin
             Excel.Workbook workbook = Application?.ActiveWorkbook;
             if (workbook == null) return;
 
+            if (!AppVersion.IsDevelopment)
+            {
+                MessageBox.Show(
+                    "Reconcile is in development. Use at your own risk. If you encounter any issues please report it to me.",
+                    "Talliark – Reconcile",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+
             WorkbookReconcileEntry entry = EnsureReconcileFor(workbook);
             entry.WasShown = true;
             entry.Window.Show();
