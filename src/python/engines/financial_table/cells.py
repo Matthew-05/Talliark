@@ -1,6 +1,7 @@
-"""Grid x text geometry x values -> the cell layer.
+"""General grid x text geometry x values -> a financial cell layer.
 
-Reconcile's first job is the one nothing else in the system does: connect a
+The financial-table engine's first job is the one nothing else in the system
+does: connect a
 value to a cell. `document-values-v1` carries bounds and no membership -- no
 table id, no row, no column, because the values engine's test for a figure
 standing in a column is a geometric proxy that deliberately works whether or not
@@ -29,8 +30,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
-from engines.table.grid import assign_tokens
-from engines.table.layout import PageLayout, VisualLine
+from engines.table.handoff import (
+    AnalysisLayout,
+    AnalysisLine,
+    JsonMapping,
+    assign_line_tokens,
+    table_geometry_digest,
+)
 
 from . import labels
 
@@ -82,6 +88,14 @@ class TableCells:
     header_labels: list[dict] = field(default_factory=list)
     bounds: dict = field(default_factory=dict)
     provenance: str = "lattice"
+    # Exact lineage back to the accepted general grid, when one contributed.
+    # The digest pins geometry as well as id so a fallback cannot silently drift
+    # while still appearing to describe the same source table.
+    source_general_table_id: str | None = None
+    source_general_geometry_digest: str | None = None
+    # Stable numeric right-edge alignments for lattice blocks. Grid fallbacks
+    # leave this empty because their columns are the general table's bands.
+    value_column_edges: tuple[float, ...] = ()
     # Body rows carrying the grand-total convention -- a double rule beneath
     # them. Empty when the block has no ruling evidence to read, which is a
     # different fact from a block whose rows carry no double rule.
@@ -199,22 +213,22 @@ def mark_double_rules(built: "TableCells", rule_positions) -> None:
     built.double_ruled = frozenset(found)
 
 
-def horizontal_rules(table: dict | None) -> list[float]:
+def horizontal_rules(table: JsonMapping | None) -> list[float]:
     """The horizontal rule positions a detected table published, if any."""
     if not table:
         return []
     return list((table.get("rulings") or {}).get("horizontal") or [])
 
 
-def boundaries_of(table: dict) -> list[float]:
+def boundaries_of(table: JsonMapping) -> list[float]:
     """The column boundaries the published extents were cut from.
 
     `table-structure-v1` publishes columns as contiguous extents, so every
     interior edge is one column's `x1` and the next column's `x0`. Recovering
-    them is what lets this module place tokens with `grid.assign_tokens` -- the
-    same placement, including its currency and percent re-attachment, that the
-    grid was fitted with. Placing tokens a second way here would let the cell
-    layer disagree with the table the scan is describing.
+    them is what lets this module place tokens through the stable table handoff
+    -- the same placement, including its currency and percent re-attachment,
+    that the grid was fitted with. Placing tokens a second way here would let
+    the cell layer disagree with the table the scan is describing.
     """
     columns = table.get("columns", [])
     return [float(column["x1"]) for column in columns[:-1]]
@@ -296,8 +310,8 @@ def _numbers_on(page_values: dict | None) -> list[tuple[float, float, dict]]:
 
 
 def build_table_cells(
-    table: dict,
-    layout: PageLayout,
+    table: JsonMapping,
+    layout: AnalysisLayout,
     page_values: dict | None,
     *,
     page_index: int,
@@ -315,6 +329,8 @@ def build_table_cells(
         row_labels=[""] * len(body),
         bounds=dict(table.get("bounds", {})),
         provenance="table",
+        source_general_table_id=str(table["id"]),
+        source_general_geometry_digest=table_geometry_digest(table),
     )
     header = table.get("header") or None
     if header:
@@ -341,7 +357,9 @@ def build_table_cells(
             inside = [token for token in line.tokens if left <= token.center <= right]
             if not inside:
                 continue
-            for index, bucket in enumerate(assign_tokens(replace(line, tokens=inside), boundaries)):
+            for index, bucket in enumerate(
+                assign_line_tokens(replace(line, tokens=inside), boundaries)
+            ):
                 if index < column_count:
                     buckets[index].extend(bucket)
         rows_of_tokens.append(buckets)
@@ -445,7 +463,9 @@ def _label_for(texts: list[str], column_index: int, label_columns: list[int]) ->
     return texts[0] if column_index else ""
 
 
-def _lines_in(layout: PageLayout, y0: float, y1: float) -> list[VisualLine]:
+def _lines_in(
+    layout: AnalysisLayout, y0: float, y1: float
+) -> list[AnalysisLine]:
     """The visual lines whose centre falls in this row band.
 
     By centre rather than by overlap, so a tall line straddling a band edge

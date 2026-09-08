@@ -4,7 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from . import labels, sums
+from engines.financial_table import labels
+
+from . import sums
 
 
 MAX_HYPOTHESES_PER_BLOCK = 5000

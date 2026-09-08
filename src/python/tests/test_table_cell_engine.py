@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 
 from engines.table_cell_engine import (
     _batch_cell_result,
+    _bounded_sparse_ocr_scale,
     _canonicalize_repeated_cells,
     _cell_candidates,
     _cleanup_text,
@@ -176,6 +177,16 @@ class ColumnSelectionTests(unittest.TestCase):
 
 
 class RecoveryAcceptanceTests(unittest.TestCase):
+    def test_sparse_ocr_scale_stays_inside_dimension_and_pixel_budgets(self) -> None:
+        scale = _bounded_sparse_ocr_scale(5090, 1061)
+
+        self.assertLess(scale, 8)
+        self.assertLessEqual(5090 * scale, 24_000)
+        self.assertLessEqual(5090 * 1061 * scale * scale, 60_000_000)
+
+    def test_ordinary_sparse_region_keeps_the_preferred_enlargement(self) -> None:
+        self.assertEqual(_bounded_sparse_ocr_scale(600, 150), 8)
+
     def test_verified_blank_cells_do_not_veto_recovery(self) -> None:
         items = [
             {"has_ink": True, "text": "Header"},

@@ -1,4 +1,4 @@
-"""Value geometry -> the footing lattice.
+"""Value geometry -> a financial-statement footing lattice.
 
 The sum tree needs alignment, not proof that a table exists.  This module
 clusters recognized number spans by baseline and by the right edge of their
@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import hashlib
 from statistics import median
 
-from engines.table.layout import PageLayout
+from engines.table.handoff import AnalysisLayout, JsonMapping, table_geometry_digest
 
 from . import labels
 from .cells import (
@@ -76,7 +76,7 @@ def _values(page_values: dict | None) -> list[_Value]:
     return result
 
 
-def _has_fence(layout: PageLayout, y0: float, y1: float) -> bool:
+def _has_fence(layout: AnalysisLayout, y0: float, y1: float) -> bool:
     # A rule immediately above a total is evidence for that total, not the end
     # of the structure it sums. Pitch and textual captions decide the block;
     # rules are retained by the caller for corroboration rather than allowed to
@@ -92,12 +92,12 @@ def _has_fence(layout: PageLayout, y0: float, y1: float) -> bool:
     return False
 
 
-def _row_groups(values: list[_Value], layout: PageLayout) -> list[list[_Value]]:
+def _row_groups(values: list[_Value], layout: AnalysisLayout) -> list[list[_Value]]:
     tolerance = max(0.003, layout.line_height * 0.65)
     return _cluster(values, lambda value: value.center_y, tolerance)
 
 
-def _blocks(rows: list[list[_Value]], layout: PageLayout) -> list[list[list[_Value]]]:
+def _blocks(rows: list[list[_Value]], layout: AnalysisLayout) -> list[list[list[_Value]]]:
     if not rows:
         return []
     pitch = median(
@@ -130,13 +130,13 @@ def _overlap(first: dict, second: dict) -> float:
     return x * y
 
 
-def _table_for(bounds: dict, tables: list[dict]) -> dict | None:
+def _table_for(bounds: dict, tables: tuple[JsonMapping, ...]) -> JsonMapping | None:
     matches = [(table, _overlap(bounds, table["bounds"])) for table in tables]
     match, area = max(matches, key=lambda pair: pair[1], default=(None, 0.0))
     return match if area >= bounds["width"] * bounds["height"] * 0.25 else None
 
 
-def _label_for(layout: PageLayout, value: _Value, row_values: list[_Value]) -> str:
+def _label_for(layout: AnalysisLayout, value: _Value, row_values: list[_Value]) -> str:
     candidates: list[tuple[float, str]] = []
     tolerance = max(0.004, layout.line_height * 0.7)
     for line in layout.lines:
@@ -151,7 +151,9 @@ def _label_for(layout: PageLayout, value: _Value, row_values: list[_Value]) -> s
     return labels.row_label(max(candidates, key=lambda candidate: candidate[0])[1])
 
 
-def _header_semantics(table: dict | None, column_edges: list[float]) -> list[dict]:
+def _header_semantics(
+    table: JsonMapping | None, column_edges: list[float]
+) -> list[dict]:
     if not table or not table.get("header"):
         return []
     original = labels.header_semantics(list(table["header"].get("labels", [])))
@@ -165,7 +167,9 @@ def _header_semantics(table: dict | None, column_edges: list[float]) -> list[dic
     return mapped
 
 
-def _add_dashes(built: TableCells, layout: PageLayout, rows, column_edges: list[float]) -> None:
+def _add_dashes(
+    built: TableCells, layout: AnalysisLayout, rows, column_edges: list[float]
+) -> None:
     """Recover zero addends that the values artifact intentionally omits."""
     row_centres = [sum(value.center_y for value in row) / len(row) for row in rows]
     tolerance = max(0.004, layout.line_height * 0.7)
@@ -199,11 +203,11 @@ def _add_dashes(built: TableCells, layout: PageLayout, rows, column_edges: list[
 
 
 def build_page_lattice(
-    layout: PageLayout,
+    layout: AnalysisLayout,
     page_values: dict | None,
     *,
     page_index: int,
-    detected_tables: list[dict] | None = None,
+    detected_tables: tuple[JsonMapping, ...] | None = None,
 ) -> list[TableCells]:
     """Build every footing block on a page from value alignment alone."""
     values = _values(page_values)
@@ -228,6 +232,10 @@ def build_page_lattice(
         )
         built.bounds = bounds
         built.provenance = "lattice+table" if table else "lattice"
+        built.value_column_edges = tuple(round(edge, 6) for edge in column_edges)
+        if table is not None:
+            built.source_general_table_id = str(table["id"])
+            built.source_general_geometry_digest = table_geometry_digest(table)
         built.header_labels = _header_semantics(table, column_edges)
         for row_index, row in enumerate(rows):
             for value in row:

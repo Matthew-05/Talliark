@@ -15,6 +15,22 @@ normalized bounds, columns, logical rows, header bands, confidence and supportin
 evidence. It is document-neutral: financial statements, invoices, forms, scanned
 pages and spreadsheet screenshots all travel through the same detector.
 
+It does not interpret a row as a subtotal, a dash as accounting zero, or a
+column as a fiscal period. The on-demand financial-table sister engine reads the
+general artifact as corroboration and owns those meanings.
+
+The canonical ownership matrix and concrete borderline examples live in
+[`financial-table/README.md` §1.1](../financial-table/README.md#11-ownership-boundary).
+Two constraints are enforced in tests: this package may not import
+`engines.financial_table` or `engines.reconcile`, and it may not branch on a
+document's financial classification. A generally useful visual invariant may
+have a financial example in its test without becoming financial semantics.
+
+Private downstream analysis reads this engine through `handoff.py`. That module
+creates a recursively immutable copy of the public tables, rebuilds page layout,
+and exposes the same token-placement operation used by the grid fitter. It is a
+stable internal Python seam, not a second serialized contract.
+
 ## 2. Inputs and outputs
 
 The detector reads character geometry from `text-geometry-v1` and inspects the PDF
@@ -75,6 +91,9 @@ below the acceptance threshold is not published.
    inferred to be a header. A coherent ruled grid can override that ambiguity.
 8. `redesign.py` maps retained header-group coverage onto the final columns and
    publishes accepted candidates as `table-detector-6`.
+9. `handoff.py` isolates accepted tables for downstream analysis and fingerprints
+   the source geometry. It makes no detection or financial interpretation
+   decision.
 
 ## 5. Tuning and thresholds
 
@@ -99,6 +118,7 @@ below the acceptance threshold is not published.
 | Grid iterations | `3` | Columns and wrapped-row membership settle within three passes on the regression corpus. |
 | Refinement depth | `4` | Bounds recursive splitting while allowing stacked independent tables to separate. |
 | Default document budget | `300,000 ms` | Production remains bounded; diagnostic and reconcile callers may disable the budget explicitly. |
+| Sparse recovery enlargement | preferred `8×`, maximum `24,000 px` and `60,000,000 px²` | Keeps normal low-resolution regions legible without constructing a Tesseract raster large enough to abort the optional recovery pass. |
 
 Scoring uses positive weights for alignment (`0.20`), multi-column occupancy
 (`0.15`), type stability (`0.10`), spacing (`0.08`), header evidence (`0.12`),
@@ -118,6 +138,10 @@ density (`0.20`), unstable schemas (`0.30`) and unrepeated two-line blocks
   unusually table-like charts can therefore remain ambiguous.
 - Poor OCR can merge adjacent values, erase gutters or move glyphs enough to
   change both candidate bounds and content-addressed row structure.
+- Optional sparse page-text OCR reduces its enlargement to remain inside the
+  recorded raster budget. If that local recognition still fails, table-cell
+  recovery continues and reports `page_text_regions_failed` rather than
+  aborting the document.
 - Centred multi-line titles can initially create header-only columns. The
   post-header coalescing pass removes columns empty throughout the body, but a
   genuinely sparse optional column cannot be removed safely.
@@ -131,6 +155,9 @@ Synthetic fixtures cover whitespace and ruled tables, stacked schemas, wrapped
 cells, currency markers, introductory prose, charts, lists and aligned prose.
 Unit tests separately pin ruling extraction, page-background neutrality, header
 analysis, post-alignment column coalescing, section-row handling and scoring.
+Boundary tests also prevent financial or Reconcile imports and prevent the
+financial-table sister from bypassing `handoff.py` to couple itself to layout or
+grid implementation modules.
 
 The Quest 10-K corpus goldens record pages 3 and 4 as negative editorial layouts,
 page 49 as three independent tables with centred multi-line headers, page 50 as a
@@ -144,7 +171,9 @@ visually approved and are never regenerated as an oracle from detector output.
 - [`../../../value-types.md`](../../../value-types.md) - the vocabulary used by
   the value tier whose geometry often corroborates table columns.
 - [`../reconcile/README.md`](../reconcile/README.md) - the main analytical
-  consumer. Reconcile uses table structure as corroboration rather than as the
-  sole arithmetic substrate.
+  consumer of the sister engine's statement blocks.
+- [`../financial-table/README.md`](../financial-table/README.md) - private
+  financial interpretation layered over this engine's public, conservative
+  geometry.
 - [`../../architecture.md`](../../architecture.md) - runtime and contract
   boundaries shared by all engines.

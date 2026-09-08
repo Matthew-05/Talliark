@@ -16,9 +16,10 @@ coincidental tie as a verified total is untrusted from the first demo.
 **Everything is derived from the PDF.** No XBRL, no taxonomy, no external fact
 set, at build time or at runtime.
 
-This is the fourth sibling engine and the only one that does not run in the
-cache build. `engines.financial` is cache-build detection and runs on every
-document; analysis code does not go there.
+This is the on-demand arithmetic engine. It consumes private statement blocks
+from the `engines.financial_table` sister engine; neither engine runs in the
+cache build. `engines.financial` remains cache-build note and item detection and
+does not contain analysis code.
 
 Engine record: docs/internal/engines/reconcile/README.md.
 """

@@ -6,9 +6,9 @@ command, one job id, one progress stream, one cancellation. A separate worker
 command was considered and rejected: it would have duplicated the whole
 pipeline's orchestration to add a stage at the end of it.
 
-The scan builds a page-local lattice from recognized value geometry. Detected
-tables are optional corroboration for headers and boundaries; they are not the
-substrate and are never re-run privately. Parallel columns nominate row
+The financial-table sister engine builds page-local statement blocks from
+recognized values and the cached general table model. Reconcile consumes those
+blocks and owns only arithmetic interpretation: parallel columns nominate row
 structures under leave-one-out evidence, while explicit total labels remain a
 co-equal route for single-column statements.
 """
@@ -21,18 +21,19 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from engines.binary_codec import json_to_base64
-from engines.table.layout import build_page_layout
+from engines.financial_table.detector import (
+    DETECTOR_VERSION as FINANCIAL_TABLE_VERSION,
+    detect_financial_tables,
+)
 from schemas.models import Stage
 
 from . import findings as findings_module
 from . import nominate as nominate_module
 from . import sums
 from . import structures
-from .cells import build_table_cells
-from .lattice import build_page_lattice
 
 
-DETECTOR_VERSION = "reconcile-detector-3-signed-runs"
+DETECTOR_VERSION = f"reconcile-detector-4+{FINANCIAL_TABLE_VERSION}"
 
 
 def geometry_fingerprint(geometry: dict) -> str:
@@ -62,48 +63,37 @@ def detect_reconcile(
     """Run one scan and return the `reconcile-v1` model.
 
     `values` is the `document-values-v1` model the same job just produced; the
-    cell layer joins its spans to the grid by geometry, and R-6 of the plan --
-    that Reconcile derives its own value-to-cell membership -- is why nothing
-    here writes back into it.
+    financial-table engine joins its spans to statement blocks by geometry.
+    Nothing writes that analysis-only membership back into a cache artifact.
     """
+    del pdf_bytes  # the cached general scan has already read the source PDF
     analysis_started = time.perf_counter()
+    table_model = tables or {"detectorVersion": "unavailable", "pages": []}
+    financial_scan = detect_financial_tables(
+        geometry,
+        values,
+        table_model,
+        progress_callback=progress_callback,
+    )
     if progress_callback:
-        progress_callback("Building the footing lattice…", Stage.RECONCILE_TABLES)
         progress_callback("Reconciling totals…", Stage.RECONCILE)
 
-    values_by_page = {
-        int(page["pageIndex"]): page for page in (values or {}).get("pages", [])
-    }
-
-    table_model = tables or {"detectorVersion": "unavailable", "pages": []}
-    detected_by_page = {
-        int(page["pageIndex"]): list(page.get("tables", []))
-        for page in table_model.get("pages", [])
-    }
     published: list[dict] = []
     findings: list[dict] = []
     blocks_examined = 0
     hypotheses = 0
-    disagreements = 0
-    for position, page_geometry in enumerate(geometry.get("pages", [])):
-        page_index = int(page_geometry["pageIndex"])
+    for position, page_scan in enumerate(financial_scan.pages):
+        page_index = page_scan.page_index
         if progress_callback:
             progress_callback(
                 "Reconciling totals…",
                 Stage.RECONCILE,
                 current=position + 1,
-                total=len(geometry.get("pages", [])),
+                total=len(financial_scan.pages),
                 unit="pages",
             )
-        layout = build_page_layout(page_geometry)
-        blocks = build_page_lattice(
-            layout,
-            values_by_page.get(page_index),
-            page_index=page_index,
-            detected_tables=detected_by_page.get(page_index, []),
-        )
+        blocks = page_scan.lattice_blocks
         blocks_examined += len(blocks)
-        disagreements += _boundary_disagreements(blocks, detected_by_page.get(page_index, []))
         for block in blocks:
             reconciled, block_diagnostics = _reconcile_block(
                 block, page_index=page_index, findings=findings
@@ -114,10 +104,7 @@ def detect_reconcile(
         # The ADR's bake-off gate chose the union fallback when pure lattice
         # recall trailed the grid corpus. Both substrates use the identical
         # corroboration policy; span identity removes duplicate totals.
-        for table in detected_by_page.get(page_index, []):
-            grid = build_table_cells(
-                table, layout, values_by_page.get(page_index), page_index=page_index
-            )
+        for grid in page_scan.grid_fallbacks:
             grid_findings: list[dict] = []
             reconciled, grid_diagnostics = _reconcile_block(
                 grid, page_index=page_index, findings=grid_findings
@@ -156,10 +143,21 @@ def detect_reconcile(
     }
 
     if diagnostics is not None:
+        diagnostics["financial_table_detector_version"] = (
+            financial_scan.detector_version
+        )
+        diagnostics["financial_table_lattice_blocks"] = (
+            financial_scan.lattice_blocks
+        )
+        diagnostics["financial_table_grid_fallbacks"] = (
+            financial_scan.grid_fallbacks
+        )
         diagnostics["reconcile_detector_version"] = DETECTOR_VERSION
-        diagnostics["reconcile_table_detection_ms"] = 0
+        diagnostics["reconcile_table_detection_ms"] = financial_scan.elapsed_ms
         diagnostics["reconcile_structure_hypotheses"] = hypotheses
-        diagnostics["reconcile_substrate_disagreements"] = disagreements
+        diagnostics["reconcile_substrate_disagreements"] = (
+            financial_scan.boundary_disagreements
+        )
         diagnostics["reconcile_ms"] = int((time.perf_counter() - analysis_started) * 1000)
         summary = model["summary"]
         diagnostics["reconcile_tables_examined"] = summary["tablesExamined"]
@@ -598,32 +596,6 @@ def _corroborate_short_runs(built, column_results, column_state) -> None:
                 }
             ]
             column_results[column_index][position] = (nomination, published)
-
-
-def _boundary_disagreements(blocks, tables: list[dict]) -> int:
-    """Count confident grid columns whose right edge matches no lattice column."""
-    count = 0
-    for block in blocks:
-        if block.provenance != "lattice+table":
-            continue
-        table = max(tables, key=lambda item: _bounds_overlap(block.bounds, item["bounds"]), default=None)
-        if table is None:
-            continue
-        lattice_edges = [
-            cell["bounds"]["x"] + cell["bounds"]["width"]
-            for cell in block.published if "normalizedValue" in cell
-        ]
-        for column in table.get("columns", [])[1:]:
-            edge = float(column["x1"])
-            if not any(abs(edge - lattice) <= 0.01 for lattice in lattice_edges):
-                count += 1
-    return count
-
-
-def _bounds_overlap(first: dict, second: dict) -> float:
-    x = max(0.0, min(first["x"] + first["width"], second["x"] + second["width"]) - max(first["x"], second["x"]))
-    y = max(0.0, min(first["y"] + first["height"], second["y"] + second["height"]) - max(first["y"], second["y"]))
-    return x * y
 
 
 def _span_for_total(block: dict, total: dict) -> str | None:

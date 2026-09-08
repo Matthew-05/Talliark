@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import labels
+from engines.financial_table import labels
 
 
 @dataclass(frozen=True)

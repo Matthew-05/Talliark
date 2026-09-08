@@ -1,6 +1,7 @@
-"""What a label means.
+"""What a financial-table label means.
 
-Reconcile owns interpretation; table detection keeps owning which bands are
+The financial-table engine owns interpretation; general table detection keeps
+owning which bands are
 header and what they say as printed. `engines.table.headers.header_row_count`
 stays exactly where it is -- the grid cannot build its rows without it, and
 table detection has to remain highly accurate for linking, which is what it is
@@ -10,11 +11,11 @@ label *means*, belongs here.
 One thing did not move, deliberately. `engines.table.headers.period_in` reads
 the printed period out of a label, and `table-structure-v1` still publishes that
 text in its own `period` field -- so moving the function here would have made
-table detection depend on the analysis module to fill a field it owns. What
-moved is the judgement built on top of it: whether a column *is* a period
-column, whether it names a total, and what a row label announces. Reconcile
-never reads `table-structure-v1.period` as an interpreted fact; it re-reads the
-printed label and decides for itself.
+table detection depend on the analysis tier to fill a field it owns. The
+judgement built on top of it lives here: whether a column *is* a period column,
+whether it names a total, and what a row label announces. Reconcile consumes
+this interpretation and never reads `table-structure-v1.period` as an asserted
+financial fact.
 """
 from __future__ import annotations
 

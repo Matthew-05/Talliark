@@ -457,6 +457,7 @@ def _handle_job(job: OcrJob) -> None:
                         "table_images_skipped_small",
                         "table_grid_candidates",
                         "page_text_regions_detected",
+                        "page_text_regions_failed",
                         "page_text_words_resolved",
                     )
                 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import io
+import math
 import os
 import re
 from collections import Counter
@@ -27,12 +28,30 @@ from engines.table.rulings import detect_ruled_grid
 _MIN_TABLE_IMAGE_PAGE_COVERAGE = 0.05
 _MAX_CELL_OCR_WORKERS = 8
 
+# Sparse page text is enlarged for Tesseract, but its raster has a hard practical
+# ceiling. A fixed 8x enlargement turned Boeing's 5,090 x 1,061 title region into
+# a 40,720-pixel-wide image and aborted the whole optional recovery pass. Keep the
+# preferred enlargement on ordinary regions and reduce it deterministically when
+# either dimension or total pixel work would become pathological.
+_PREFERRED_SPARSE_OCR_SCALE = 8
+_MAX_SPARSE_OCR_DIMENSION = 24_000
+_MAX_SPARSE_OCR_PIXELS = 60_000_000
+
 
 def _cell_ocr_worker_count(task_count: int) -> int:
     return min(
         max(1, task_count),
         max(1, min(_MAX_CELL_OCR_WORKERS, os.cpu_count() or 1)),
     )
+
+
+def _bounded_sparse_ocr_scale(width: int, height: int) -> int:
+    """Largest integer enlargement inside the sparse-region OCR budget."""
+    if width <= 0 or height <= 0:
+        return 1
+    by_dimension = _MAX_SPARSE_OCR_DIMENSION // max(width, height)
+    by_pixels = int(math.sqrt(_MAX_SPARSE_OCR_PIXELS / (width * height)))
+    return max(1, min(_PREFERRED_SPARSE_OCR_SCALE, by_dimension, by_pixels))
 
 
 def _largest_table_placement(
@@ -759,7 +778,9 @@ def _recognize_sparse_region(
     import pytesseract
 
     region = ImageOps.autocontrast(gray.crop(pixel_rect))
-    scale = 8
+    if region.width <= 0 or region.height <= 0:
+        return []
+    scale = _bounded_sparse_ocr_scale(region.width, region.height)
     prepared = region.resize(
         (region.width * scale, region.height * scale),
         Image.Resampling.LANCZOS,
@@ -951,6 +972,7 @@ def recover_table_geometry(
         "table_images_skipped_small": 0,
         "table_grid_candidates": 0,
         "page_text_regions_detected": 0,
+        "page_text_regions_failed": 0,
         "page_text_words_resolved": 0,
         "changed": False,
     }
@@ -1192,13 +1214,20 @@ def recover_table_geometry(
                 table_top = y_lines[header_row]
                 if 20 <= table_top <= image.height * 0.35:
                     region_pixel_rect = (0, 0, image.width, table_top)
-                    region_items = _recognize_sparse_region(
-                        gray,
-                        placement,
-                        image.size,
-                        region_pixel_rect,
-                        language,
-                    )
+                    try:
+                        region_items = _recognize_sparse_region(
+                            gray,
+                            placement,
+                            image.size,
+                            region_pixel_rect,
+                            language,
+                        )
+                    except Exception:
+                        # Page-text recovery is optional context around a table.
+                        # A failure here must not discard the table cells already
+                        # recognized, much less abort every later page.
+                        region_items = []
+                        stats["page_text_regions_failed"] += 1
                     if region_items:
                         region_rect = _map_image_rect(
                             placement,

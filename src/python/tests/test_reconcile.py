@@ -23,13 +23,15 @@ from pathlib import Path
 import pymupdf
 
 from engines.geometry_engine import extract_text_geometry
-from engines.reconcile import findings, labels, nominate, structures, sums, cells
-from engines.reconcile.cells import (
+from engines.financial_table import cells, labels
+from engines.financial_table.cells import (
     TableCells,
     _label_for,
     decimals_of,
     is_label_column,
 )
+from engines.financial_table.detector import DETECTOR_VERSION as FINANCIAL_TABLE_VERSION
+from engines.reconcile import findings, nominate, structures, sums
 from engines.reconcile.detector import (
     DETECTOR_VERSION,
     _reconcile_block,
@@ -252,14 +254,20 @@ class ScanEnvelope(unittest.TestCase):
         )
 
     def test_the_scan_reports_its_own_stages_not_the_cache_build_s(self) -> None:
-        # The re-detection is table detection's code, but reporting it as
-        # `table-structure` would run a consumer's progress bar backwards.
+        # Financial table interpretation follows the cache-build table stage;
+        # reporting it as `table-structure` would run a progress bar backwards.
         self.assertIn(Stage.RECONCILE_TABLES, self.stages)
         self.assertIn(Stage.RECONCILE, self.stages)
         self.assertNotIn(Stage.TABLE_STRUCTURE, self.stages)
 
-    def test_diagnostics_separate_the_re_detection_from_the_analysis(self) -> None:
+    def test_diagnostics_separate_financial_table_recognition_from_arithmetic(self) -> None:
         self.assertEqual(self.diagnostics["reconcile_detector_version"], DETECTOR_VERSION)
+        self.assertEqual(
+            self.diagnostics["financial_table_detector_version"],
+            FINANCIAL_TABLE_VERSION,
+        )
+        self.assertGreater(self.diagnostics["financial_table_lattice_blocks"], 0)
+        self.assertGreater(self.diagnostics["financial_table_grid_fallbacks"], 0)
         self.assertIn("reconcile_table_detection_ms", self.diagnostics)
         self.assertIn("reconcile_ms", self.diagnostics)
 

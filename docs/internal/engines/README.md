@@ -11,6 +11,7 @@ them.
 | [values](values/README.md) | `engines/values/` | `document-values-v1` | Which spans on a page are values, references or noise, and what category each falls in |
 | [table](table/README.md) | `engines/table/` | `table-structure-v1` | Where tables are and what their grid is |
 | [financial](financial/README.md) | `engines/financial/` | `financial-structure-v1` | The apparatus a filing indexes itself by — headings, items, notes |
+| [financial-table](financial-table/README.md) | `engines/financial_table/` | private analysis types | How general geometry and aligned values become statement-oriented blocks during a Reconcile scan |
 | [reconcile](reconcile/README.md) | `engines/reconcile/` | `reconcile-v1` | Which printed totals are the sums they claim to be, and which are not |
 
 The single-module engines beside the packages — `ocr_engine.py`,

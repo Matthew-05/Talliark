@@ -2,7 +2,7 @@
 
 The record of what is built and why it is shaped this way: the tier split, the
 line between the cache build and the Reconcile scan, the span categories, and
-what P1 changed. It spans all four engines rather than any one of them; the
+what P1 changed. It spans all five engines rather than any one of them; the
 per-engine records are in [`engines/`](engines/README.md).
 
 Everything here describes code that exists. Work that is intended but not
@@ -45,7 +45,7 @@ Two consequences, both live today:
 <!-- XBRL SUSPENDED: every scan detail must be derived from the PDF itself. Kept for reference only; do not build on it without a deliberate decision to reintroduce XBRL. -->
 <!-- was: | **D5** | Nothing leaves the machine at runtime. XBRL is a build-time asset only. | -->
 | **D6** | Span identity is content-addressed before Reconcile ships, not after. |
-| **D7** | The tiers are two sibling engines, `engines/values/` and `engines/financial/`, beside `engines/table/`. Reconcile is a fourth, `engines/reconcile/`, and the only one that does not run in the cache build. |
+| **D7** | The cache-build engines are `engines/values/`, `engines/financial/`, and `engines/table/`. The on-demand path first interprets their neutral artifacts in `engines/financial_table/`, then proves arithmetic in `engines/reconcile/`. |
 | **D8** | The rename off "financial-value" reaches everything in one pass — contracts, Python, viewer TypeScript, CSS, webview messages, id prefixes. |
 | **D9** | The cache build emits values and structure as two artifacts, so the viewer draws tier 1 without waiting on tier 2 and a non-financial document carries no structure payload. |
 
@@ -60,8 +60,47 @@ identified spans.
 
 | Tier | Applies to | Owns | Modules today |
 |---|---|---|---|
-| **1 — values** | any PDF | number / percent / date recognition, page furniture, superscripts, phone and identifier context, ordinal apparatus (list markers, footnote markers, indicators), currency and scale context, table-cell membership | `spans`, `profile`, `context`, `lists`, `evidence` |
-| **2 — financial documents** | audited GAAP, compilations, reviews, CAFRs, 10-K / 10-Q / 8-K | heading mechanics, note and item catalogues with their semantics, PART tracking, contents rows, statement-type classification, row-label → tag, period attribution, reconciliation, the checks | `headings`, `notes`, `items` + everything unbuilt |
+| **1 — values** | any PDF | number / percent / date recognition, page furniture, superscripts, phone and identifier context, ordinal apparatus (list markers, footnote markers, indicators), currency and scale context | `spans`, `profile`, `context`, `lists`, `evidence` |
+| **2 — financial documents** | audited GAAP, compilations, reviews, CAFRs, 10-K / 10-Q / 8-K | heading mechanics, note and item catalogues, statement-table cell membership and label meaning, reconciliation and checks | `financial/{headings,notes,items}`, `financial_table/{detector,cells,lattice,labels}`, `reconcile/*` |
+
+### 3.1 The table-recognition boundary
+
+The general table engine owns visible structure that should mean the same thing
+on an invoice, laboratory report, form, or financial statement. The
+financial-table engine owns a private interpretation of that structure under
+financial presentation conventions. Reconcile owns conclusions reached by
+addition.
+
+The dependency is one-way:
+
+```text
+table-structure-v1 + document-values-v1 + text geometry
+                         │
+                         ▼
+                 financial_table
+                 (private blocks)
+                         │
+                         ▼
+                    Reconcile
+                 (reconcile-v1)
+```
+
+The general engine never reads document class or imports either on-demand
+engine. The financial-table engine never rewrites `table-structure-v1`, and it
+does not decide arithmetic outcomes. The complete ownership matrix, including
+currency markers, dates, dashes, rulings, repeated headers, and partial statement
+recovery, is in
+[`engines/financial-table/README.md` §1.1](engines/financial-table/README.md#11-ownership-boundary).
+
+The boundary is executable. `table.handoff` gives private analysis a frozen
+copy, a fresh page layout and the grid's token-placement operation; the sister
+engine cannot import layout or grid implementation modules directly. Each grid
+fallback pins its source table id and geometry digest, and detection fails
+closed if page correspondence, fallback cardinality, geometry, provenance, or
+the original artifact changes. `scripts/audit_table_engine_drift.py` records
+structured cross-engine disagreements across the corpus. Those disagreements
+are review signals rather than failures, because making one recognizer the
+other's oracle would create exactly the drift the split prevents.
 
 `headings.py` is tier 2. Its mechanics are stated generically — identifier
 shapes, following a heading across the lines it wrapped onto, continuation
@@ -108,6 +147,9 @@ is close to free now and expensive once Reconcile has users.
 | `reconcile-v1` | statements, tagged facts, periods, exceptions, dispositions | Reconcile runtime |
 
 The Reconcile webview consumes `reconcile-v1` and nothing else.
+`engines/financial_table/` deliberately has no contract: its statement blocks
+exist only between Python packages during one scan, so no second public table
+model can disagree with `table-structure-v1`.
 
 ## 4. The two runtimes
 
@@ -131,8 +173,8 @@ Reconcile.
 | Trigger | viewer opens a document | user opens Reconcile for a document |
 | Budget | soft — **a minute for a whole document is fine, ten minutes is not** | generous; the user is waiting on a deliberate action |
 | Runs on | every document | financial statements only |
-| Produces | `document-values-v1`, `financial-structure-v1` | `reconcile-v1` |
-| Contains | recognition, evidence, ordinal apparatus, note and item recognition, catalogue assembly | statement classification, reconciliation, tagging, checks, exception dispositions |
+| Produces | `table-structure-v1`, `document-values-v1`, `financial-structure-v1` | private financial-table blocks, then `reconcile-v1` |
+| Contains | document-neutral table geometry, value recognition, ordinal apparatus, note and item recognition, catalogue assembly | financial table interpretation, statement classification, reconciliation, tagging, checks, exception dispositions |
 
 Two consequences worth stating before anything is built:
 
@@ -145,10 +187,11 @@ Two consequences worth stating before anything is built:
 - **A truncated table model no longer limits the scan.** Detection carries a
   time budget and publishes `truncated` when it stops early, and for a while the
   scan answered that by re-running detection unbudgeted and privately. It no
-  longer does: the sum tree stands on a value-alignment lattice derived from the
-  values themselves, and reads the cached grid only where that grid is confident
-  — so a truncated model costs corroboration, never arithmetic recall. See
-  [`engines/reconcile/README.md`](engines/reconcile/README.md) §4.1.
+  longer does: `engines/financial_table/` builds a value-alignment lattice and
+  reads the cached grid only where that grid is confident, then Reconcile proves
+  arithmetic over those blocks. A truncated model costs corroboration, never
+  arithmetic recall. See
+  [`engines/financial-table/README.md`](engines/financial-table/README.md) §4.
 
 ## 5. Span categories replace the value / noise binary
 
@@ -186,7 +229,9 @@ become reference *kinds* rather than refusals.
 What Reconcile does with the arithmetic is
 [`engines/reconcile/sum-tree.md`](engines/reconcile/sum-tree.md); how it nominates
 a total is [`engines/reconcile/corroboration.md`](engines/reconcile/corroboration.md).
-This section covers only what the module needs from the tiers above it.
+Statement-table recognition immediately upstream is documented in
+[`engines/financial-table/README.md`](engines/financial-table/README.md). This
+section covers only what Reconcile needs from the tiers above it.
 
 ### 6.1 Statement classification
 
