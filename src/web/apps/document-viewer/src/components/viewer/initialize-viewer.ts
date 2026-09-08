@@ -862,6 +862,18 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
       valuesOverlay.refresh();
     },
     {
+      onViewerSurfaceShown: () => {
+        // Let the native task pane/window and WebView2 settle before repainting.
+        // The current page is rendered first; the shared viewer repairs the rest
+        // without changing zoom, scroll position, document, or overlay state.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            void viewer.refreshRendering(currentPage).catch((error: unknown) => {
+              console.warn("[Talliark] Viewer repaint failed:", error);
+            });
+          });
+        });
+      },
       onLinkedRectangles: (rects) => {
         contextMenu.hide();
         // The authoritative list supersedes anything this viewer assumed.

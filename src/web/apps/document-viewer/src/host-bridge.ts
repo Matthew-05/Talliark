@@ -17,6 +17,7 @@ import type {
  */
 export interface HostMessageHandlers {
   onPdfsLoaded: (entries: PdfEntry[], folders: FolderEntry[]) => void;
+  onViewerSurfaceShown?: () => void;
   onFoldersUpdated?: (folders: FolderEntry[], assignments: Map<string, string | undefined>) => void;
   onLinkedRectangles?: (rects: LinkedRectEntry[]) => void;
   onLinkedRectangleAdded?: (rect: LinkedRectEntry) => void;
@@ -260,6 +261,7 @@ function toLinkedRectEntry(rect: LinkedRectPayload): LinkedRectEntry {
 function handleMessage(raw: unknown, handlers: HostMessageHandlers): void {
   const {
     onPdfsLoaded,
+    onViewerSurfaceShown,
     onFoldersUpdated,
     onLinkedRectangles,
     onLinkedRectangleAdded,
@@ -293,6 +295,11 @@ function handleMessage(raw: unknown, handlers: HostMessageHandlers): void {
     }
 
     const type = (parsed as { type?: unknown }).type;
+
+    if (type === "viewer-surface-shown") {
+      onViewerSurfaceShown?.();
+      return;
+    }
 
     if (type === "pdfs-loaded") {
       const msg = parsed as PdfsLoadedMessage;

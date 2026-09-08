@@ -45,6 +45,19 @@
       ]
     },
 
+    "ViewerSurfaceShownMessage": {
+      "description": "Sent by the C# host whenever an existing document-viewer surface is shown. The viewer must revalidate its page canvases without changing the active PDF, page, zoom, scroll position or overlays, because WebView2 may discard a hidden surface's painted canvas while JavaScript state still records it as rendered.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "viewer-surface-shown" }
+      },
+      "examples": [
+        { "type": "viewer-surface-shown" }
+      ]
+    },
+
     "OpenFileManagerMessage": {
       "description": "Sent by the document-viewer web app when the user asks to open the workbook's Manage Files window.",
       "type": "object",
@@ -1400,6 +1413,7 @@
     { "$ref": "#/definitions/ViewerReadyMessage" },
     { "$ref": "#/definitions/ViewerShellReadyMessage" },
     { "$ref": "#/definitions/ViewerContentReadyMessage" },
+    { "$ref": "#/definitions/ViewerSurfaceShownMessage" },
     { "$ref": "#/definitions/OpenFileManagerMessage" },
     { "$ref": "#/definitions/PdfsLoadedMessage" },
     { "$ref": "#/definitions/PdfUpdatedMessage" },

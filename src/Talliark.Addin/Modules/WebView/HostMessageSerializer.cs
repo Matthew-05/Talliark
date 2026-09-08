@@ -34,6 +34,14 @@ namespace Talliark.Addin.Modules.WebView
         }
 
         /// <summary>
+        /// Tells an existing viewer that its native host surface has become visible again.
+        /// The web app uses this to repaint canvases whose WebView2 backing surface may have
+        /// been discarded while hidden, without reloading the workbook catalogue.
+        /// </summary>
+        public static string BuildViewerSurfaceShown() =>
+            "{\"type\":\"viewer-surface-shown\"}";
+
+        /// <summary>
         /// Returns the JSON payload for a <c>viewer-folders-updated</c> message, carrying the
         /// full folder catalogue and every PDF's folder assignment without any PDF bytes.
         /// </summary>

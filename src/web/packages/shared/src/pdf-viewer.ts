@@ -150,7 +150,7 @@ export class PdfViewer {
     this.cancelZoomDebounce();
     this.zoomDebounce = setTimeout(() => {
       this.zoomDebounce = null;
-      this.renderingQueue = this.renderingQueue.then(() => this.renderAll());
+      void this.enqueueRender(() => this.renderAll());
     }, ZOOM_DEBOUNCE_MS);
   }
 
@@ -172,22 +172,42 @@ export class PdfViewer {
 
   startBackgroundRender(): void {
     const generation = ++this.renderGeneration;
-    this.renderingQueue = this.renderingQueue.then(() => this.renderPages(generation));
+    void this.enqueueRender(() => this.renderPages(generation));
   }
 
   async renderPageNow(pageNumber: number): Promise<void> {
     const document_ = this.document;
     const page = this.pages[pageNumber - 1];
-    if (!document_ || !page || page.renderedScale === this.scale) return;
+    if (!document_ || !page) return;
+    const canvas = page.wrapper.querySelector<HTMLCanvasElement>(".viewer__canvas");
+    if (page.renderedScale === this.scale && canvas) return;
     const generation = ++this.renderGeneration;
-    await new Promise<void>((resolve) => {
-      this.renderingQueue = this.renderingQueue.then(async () => {
-        if (generation === this.renderGeneration && document_ === this.document) {
-          await renderPdfPage(document_, pageNumber, page, this.scale, generation, () => this.renderGeneration);
-        }
-        resolve();
-      });
+    await this.enqueueRender(async () => {
+      if (generation === this.renderGeneration && document_ === this.document) {
+        await renderPdfPage(document_, pageNumber, page, this.scale, generation, () => this.renderGeneration);
+      }
     });
+  }
+
+  /**
+   * Repaints an already-loaded document without changing viewer state.
+   *
+   * A native host may hide WebView2 while this JavaScript context remains alive.
+   * Chromium can then return with a blank canvas even though `renderedScale` still
+   * says that page is current. Clear only that paint bookkeeping, render the page
+   * the user is looking at first, then repair the rest in the background.
+   */
+  async refreshRendering(pageNumber: number = 1): Promise<void> {
+    const document_ = this.document;
+    if (!document_ || this.pages.length === 0) return;
+
+    this.cancelZoomDebounce();
+    ++this.renderGeneration;
+    for (const page of this.pages) page.renderedScale = null;
+
+    const targetPage = Math.max(1, Math.min(this.pages.length, pageNumber));
+    await this.renderPageNow(targetPage);
+    if (document_ === this.document) this.startBackgroundRender();
   }
 
   setPageRotation(pageIndex: number, storedRotation: number): void {
@@ -205,7 +225,7 @@ export class PdfViewer {
     page.renderedScale = null;
     page.wrapper.style.width = `${page.baseWidth * this.scale}px`;
     page.wrapper.style.height = `${page.baseHeight * this.scale}px`;
-    this.renderingQueue = this.renderingQueue.then(() =>
+    void this.enqueueRender(() =>
       renderPdfPage(document_, pageIndex + 1, page, this.scale, generation, () => this.renderGeneration),
     );
   }
@@ -240,6 +260,13 @@ export class PdfViewer {
   private async renderAll(): Promise<void> {
     const generation = ++this.renderGeneration;
     await this.renderPages(generation);
+  }
+
+  /** A failed PDF.js render must not permanently poison every later queue entry. */
+  private enqueueRender(work: () => Promise<void>): Promise<void> {
+    const run = this.renderingQueue.catch(() => undefined).then(work);
+    this.renderingQueue = run.catch(() => undefined);
+    return run;
   }
 
   private cancelZoomDebounce(): void {

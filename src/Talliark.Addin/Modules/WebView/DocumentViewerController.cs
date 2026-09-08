@@ -865,8 +865,25 @@ namespace Talliark.Addin.Modules.WebView
             }
             _viewerShown = true;
             RefreshDataIfReady();
+            SendViewerSurfaceShown();
             if (_contentReady)
                 RevealWebView();
+        }
+
+        private void SendViewerSurfaceShown()
+        {
+            if (_disposed || !_webViewReady) return;
+
+            try
+            {
+                _webView.CoreWebView2.PostWebMessageAsString(
+                    HostMessageSerializer.BuildViewerSurfaceShown());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[Talliark] SendViewerSurfaceShown failed: {ex.Message}");
+            }
         }
 
         internal void SendLinkedRectanglesToWebView()
