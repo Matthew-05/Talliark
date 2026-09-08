@@ -71,6 +71,31 @@ test("incremental search returns later exact matches before earlier partial matc
   assert.equal(partialBatch.matches[0]?.exactMatch, false);
 });
 
+test("incremental search reuses page matches when a result-heavy page spans batches", () => {
+  const entries = entriesFromText("11 11 11");
+  const searchIndex = buildSearchPageIndexFromEntries(entries);
+  const cache = {
+    has: () => true,
+    getPageIndices: () => [0],
+    get: () => entries,
+    getSearchIndex: () => searchIndex,
+  };
+  let pageSearches = 0;
+  const valuesCache = {
+    logicalValuesOnPage: () => {
+      pageSearches++;
+      return [];
+    },
+  };
+  const session = new PdfTextSearcher(cache as never, valuesCache as never).createSession("11", [
+    { id: "pdf-1", name: "Invoice", folderId: null } as never,
+  ]);
+
+  assert.equal(session.nextBatch(1, 1).matches.length, 1);
+  assert.equal(session.nextBatch(1, 1).matches.length, 1);
+  assert.equal(pageSearches, 1, "the second batch should reuse computed matches instead of searching again");
+});
+
 test("magnitude aliases match both calculated and displayed values", () => {
   const entries = entriesFromText("$1");
   const cache = {

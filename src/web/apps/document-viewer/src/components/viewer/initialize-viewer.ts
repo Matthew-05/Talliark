@@ -47,23 +47,11 @@ import type {
 import type { PdfEntry } from "../../types/index.js";
 import type { PdfViewer } from "./pdf-viewer.js";
 
-const INITIAL_SEARCH_RESULT_LIMIT = 150;
 const SEARCH_RESULT_BATCH_SIZE = 50;
-const SEARCH_PAGE_BATCH_SIZE = 12;
+const SEARCH_PAGE_BATCH_SIZE = 24;
+const SEARCH_TIME_BUDGET_MS = 8;
 const SEARCH_RESULTS_PANEL_LIMIT = 500;
 const SEARCH_BATCH_DELAY_MS = 20;
-
-function prioritizePdfEntries(entries: PdfEntry[], preferredPdfId: string | null): PdfEntry[] {
-  if (!preferredPdfId) return entries;
-
-  const preferred = entries.find((entry) => entry.id === preferredPdfId);
-  if (!preferred) return entries;
-
-  return [
-    preferred,
-    ...entries.filter((entry) => entry.id !== preferredPdfId),
-  ];
-}
 
 interface TalliarkDebugApi {
   toggleCharBboxes: () => boolean;
@@ -423,6 +411,9 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   let activeSearchSession: ReturnType<PdfTextSearcher["createSession"]> | null = null;
   let searchHasMore = false;
   let searchBatchTimer: ReturnType<typeof setTimeout> | null = null;
+  let publishedSearchResultCount = -1;
+  let publishedSearchHasMore = false;
+  let publishedSearchCanLoadMore = false;
 
   const clearSearchBatchTimer = (): void => {
     if (searchBatchTimer === null) return;
@@ -435,6 +426,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     const entry = selector.getEntry(activePdfId);
 
     const visiblePageIndices = getVisiblePageIndices();
+    const visiblePageSet = new Set(visiblePageIndices);
 
     // Cell-click text is staged rather than submitted. Search only the visible
     // pages so selection changes stay cheap and never populate the cross-document
@@ -451,7 +443,9 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     const matches = new Map<string, SearchMatch>();
 
     for (const match of highlightSearchResults) {
-      if (match.pdfId === activePdfId) matches.set(match.id, match);
+      if (match.pdfId === activePdfId && visiblePageSet.has(match.pageIndex)) {
+        matches.set(match.id, match);
+      }
     }
 
     if (entry) {
@@ -495,12 +489,17 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   };
 
   const publishSearchResults = (): void => {
-    search.setResults(
-      lastSearchResults,
-      searchHasMore,
-      searchHasMore && lastSearchResults.length < SEARCH_RESULTS_PANEL_LIMIT,
-    );
-    applyActivePdfHighlights();
+    const canLoadMore = searchHasMore && lastSearchResults.length < SEARCH_RESULTS_PANEL_LIMIT;
+    if (
+      lastSearchResults.length !== publishedSearchResultCount
+      || searchHasMore !== publishedSearchHasMore
+      || canLoadMore !== publishedSearchCanLoadMore
+    ) {
+      search.setResults(lastSearchResults, searchHasMore, canLoadMore);
+      publishedSearchResultCount = lastSearchResults.length;
+      publishedSearchHasMore = searchHasMore;
+      publishedSearchCanLoadMore = canLoadMore;
+    }
   };
 
   const loadSearchBatch = (
@@ -510,7 +509,11 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   ): void => {
     if (generation !== searchGeneration || !activeSearchSession) return;
 
-    const batch = activeSearchSession.nextBatch(limit, SEARCH_PAGE_BATCH_SIZE);
+    const batch = activeSearchSession.nextBatch(
+      limit,
+      SEARCH_PAGE_BATCH_SIZE,
+      SEARCH_TIME_BUDGET_MS,
+    );
     if (generation !== searchGeneration) return;
 
     if (batch.matches.length > 0) {
@@ -539,6 +542,9 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     focusedMatch = null;
     activeSearchSession = null;
     searchHasMore = false;
+    publishedSearchResultCount = -1;
+    publishedSearchHasMore = false;
+    publishedSearchCanLoadMore = false;
 
     if (!query) {
       search.clearResults();
@@ -550,11 +556,41 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
 
     lastSearchResults = [];
     highlightSearchResults = [];
+    matchRenderer.clearMatches();
+
+    const filteredEntries = selector.getFilteredEntries();
+    const activePdfId = viewer.getActivePdfId();
+    const activeEntry = activePdfId
+      ? filteredEntries.find((entry) => entry.id === activePdfId)
+      : undefined;
+
+    // Complete the document the user is looking at in one pass. The remaining
+    // documents use short, time-budgeted slices below, so these results stay
+    // fully available and clickable throughout the workbook-wide scan.
+    const activePdfResults = activeEntry ? searcher.search(query, [activeEntry]) : [];
+    highlightSearchResults = activePdfResults;
+    lastSearchResults = activePdfResults.slice(0, SEARCH_RESULTS_PANEL_LIMIT);
+
+    const backgroundEntries = activeEntry
+      ? filteredEntries.filter((entry) => entry.id !== activeEntry.id)
+      : filteredEntries;
     activeSearchSession = searcher.createSession(
       query,
-      prioritizePdfEntries(selector.getFilteredEntries(), viewer.getActivePdfId()),
+      backgroundEntries,
     );
-    loadSearchBatch(generation, INITIAL_SEARCH_RESULT_LIMIT, true);
+    searchHasMore = activeSearchSession.hasMore
+      || highlightSearchResults.length > lastSearchResults.length;
+    publishSearchResults();
+    // Visible-page highlights are independent of the workbook-wide scan. Draw
+    // them once now, then refresh only when the visible page set changes.
+    applyActivePdfHighlights();
+
+    if (activeSearchSession.hasMore) {
+      searchBatchTimer = setTimeout(() => {
+        searchBatchTimer = null;
+        loadSearchBatch(generation, SEARCH_RESULT_BATCH_SIZE, true);
+      }, SEARCH_BATCH_DELAY_MS);
+    }
   };
 
   // The filter narrows the document list and cross-document search alike. The

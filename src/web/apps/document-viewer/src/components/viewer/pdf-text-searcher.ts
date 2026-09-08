@@ -73,6 +73,7 @@ export class PdfTextSearchSession {
   private readonly _pages: SearchPageRef[];
   private _pageCursor = 0;
   private _matchCursor = 0;
+  private _currentPageMatches: SearchMatch[] | null = null;
   private _complete = false;
   private _priority: "exact" | "partial" = "exact";
 
@@ -99,24 +100,41 @@ export class PdfTextSearchSession {
         this._pages.push({ entry, pageIndex });
       }
     }
+
+    if (this._pages.length === 0) this._complete = true;
   }
 
   private readonly _valuesCache: ValuesCache | undefined;
 
-  nextBatch(limit: number, pageBudget = 12): SearchBatch {
+  get hasMore(): boolean {
+    return !this._complete;
+  }
+
+  nextBatch(
+    limit: number,
+    pageBudget = 12,
+    timeBudgetMs = Number.POSITIVE_INFINITY,
+  ): SearchBatch {
     if (this._complete || limit <= 0) {
       return { matches: [], complete: this._complete, hasMore: !this._complete };
     }
 
     const matches: SearchMatch[] = [];
     let pagesScanned = 0;
+    const startedAt = performance.now();
 
-    while (matches.length < limit && pagesScanned < pageBudget && !this._complete) {
+    while (
+      matches.length < limit
+      && pagesScanned < pageBudget
+      && !this._complete
+      && (pagesScanned === 0 || performance.now() - startedAt < timeBudgetMs)
+    ) {
       if (this._pageCursor >= this._pages.length) {
         if (this._priority === "exact") {
           this._priority = "partial";
           this._pageCursor = 0;
           this._matchCursor = 0;
+          this._currentPageMatches = null;
           continue;
         }
 
@@ -131,17 +149,21 @@ export class PdfTextSearchSession {
       if (!entries || entries.length === 0 || !searchIndex) {
         this._pageCursor++;
         this._matchCursor = 0;
+        this._currentPageMatches = null;
         pagesScanned++;
         continue;
       }
 
-      const pageMatches = searchPageIncludingMagnitudeAliases(
-        this._cache,
-        this._valuesCache,
-        page.entry,
-        page.pageIndex,
-        this._normalizedQuery,
-      ).filter((match) => match.exactMatch === (this._priority === "exact"));
+      if (this._currentPageMatches === null) {
+        this._currentPageMatches = searchPageIncludingMagnitudeAliases(
+          this._cache,
+          this._valuesCache,
+          page.entry,
+          page.pageIndex,
+          this._normalizedQuery,
+        ).filter((match) => match.exactMatch === (this._priority === "exact"));
+      }
+      const pageMatches = this._currentPageMatches;
 
       const initialResultCount = matches.length;
       for (let i = this._matchCursor; i < pageMatches.length && matches.length < limit; i++) {
@@ -156,6 +178,7 @@ export class PdfTextSearchSession {
 
       this._pageCursor++;
       this._matchCursor = 0;
+      this._currentPageMatches = null;
       pagesScanned++;
     }
 
