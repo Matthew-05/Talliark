@@ -199,7 +199,6 @@ def evaluate(
     elif pitches:
         features.spacing = 0.8
 
-    features.header = 1.0 if header_rows else 0.0
     # Two rows and no header band is not a repeated structure: it is a pair of
     # aligned lines, which is what a signature block or an address is. A ruled
     # grid says otherwise, because someone drew the cells.
@@ -213,6 +212,19 @@ def evaluate(
         if h_rule.spans(v_rule.position, slack=0.006) and v_rule.spans(h_rule.position, slack=0.006)
     )
     features.ruling = min(1.0, intersections / 6.0)
+
+    # An inferred all-word first row is not independent evidence of a table: the
+    # first synchronized line of parallel prose has exactly that shape. Credit a
+    # header only when measured values occur in the body or drawn intersections
+    # establish cells. Word-only catalogues remain eligible on their repetition,
+    # spacing and alignment rather than receiving a free header bonus.
+    body_has_values = any(
+        token.is_value and not token.is_marker
+        for row in body
+        for line in row.lines
+        for token in line.tokens
+    )
+    features.header = 1.0 if header_rows and (body_has_values or features.ruling > 0) else 0.0
 
     # Agreement: rules that land where the whitespace vote already put a boundary,
     # or that band rows the row assembly already found.
@@ -264,34 +276,38 @@ def evaluate(
             first_column_markers += 1
     features.marker_first_column = first_column_markers / counted if counted else 0.0
 
-    if grid.column_count == 2 and features.ruling < 0.5:
-        # Two columns of running text are a page layout, not a table. An inferred
-        # header cannot waive this test: the first synchronized prose line is
-        # itself liable to be misread as an all-word header. A coherent ruled
-        # grid can waive it because the cells then exist independently of text
-        # alignment. Both sides have to be prose for the penalty to apply:
-        # a list of subsidiaries against their jurisdictions has a long left cell
-        # and a one-word right cell, and reading that as prose lost a real table.
-        wordy = 0
-        for row in body:
-            per_column = [0, 0]
-            values = 0
-            for line in row.lines:
-                for token in line.tokens:
-                    index = column_index(boundaries, token.center)
-                    if token.kind in ("word", "ordinal") and index < 2:
-                        per_column[index] += 1
-                    elif token.is_value and not token.is_marker:
-                        values += 1
-            # Years and small counts occur naturally inside prose. Their mere
-            # presence does not turn two editorial columns into table records.
-            if values <= 2 and min(per_column) >= 4:
-                wordy += 1
-        ratio = wordy / len(body) if body else 0.0
-        # Once most rows are parallel prose, treat the layout as the categorical
-        # negative it is. A proportional score left long pages just above the
-        # acceptance threshold when one short paragraph tail diluted the ratio.
-        features.prose_pair = 1.0 if ratio >= 0.60 else ratio
+    if features.ruling < 0.5:
+        # Parallel running text is a page layout, not a table. Test every adjacent
+        # column pair: OCR and provisional boundaries can split the same two
+        # editorial columns into three or more grid columns. Include inferred
+        # header rows because the first prose line is itself often mistaken for
+        # an all-word header. A coherent ruled grid can waive the ambiguity
+        # because its cells exist independently of text alignment.
+        pair_ratios: list[float] = []
+        for left_index in range(grid.column_count - 1):
+            wordy = 0
+            for row in rows:
+                per_column = [0, 0]
+                values = 0
+                for line in row.lines:
+                    for token in line.tokens:
+                        index = column_index(boundaries, token.center)
+                        if index not in (left_index, left_index + 1):
+                            continue
+                        if token.kind in ("word", "ordinal"):
+                            per_column[index - left_index] += 1
+                        elif token.is_value and not token.is_marker:
+                            values += 1
+                # Years and small counts occur naturally inside prose. Their
+                # presence does not turn two editorial columns into table cells.
+                if values <= 2 and min(per_column) >= 4:
+                    wordy += 1
+            pair_ratios.append(wordy / len(rows))
+        ratio = max(pair_ratios, default=0.0)
+        # Half the fitted rows carrying synchronized prose is enough to establish
+        # a page layout. Below that point retain proportional evidence rather than
+        # making one long record a categorical veto.
+        features.prose_pair = 1.0 if ratio >= 0.50 else ratio
 
     if candidate.bounds["width"] < 0.30 and features.marker_first_column > 0.5:
         features.narrow_marker = 1.0

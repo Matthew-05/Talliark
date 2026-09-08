@@ -12,6 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from PIL import Image, ImageOps
 import math
+from statistics import median
 
 
 @dataclass
@@ -54,6 +55,10 @@ _MAX_RULE_THICKNESS_PT = 2.5
 _MIN_GRAPHIC_EXTENT = 0.04
 _MIN_IMAGE_WIDTH = 400
 _MIN_IMAGE_HEIGHT = 200
+_MIN_RASTER_RULE_CONTRAST = 18.0
+_MAX_RASTER_RULE_LUMA = 225.0
+_MIN_RASTER_VERTICAL_SPAN = 0.16
+_MIN_RASTER_HORIZONTAL_SPAN = 0.30
 
 
 def _contains_diagonal_series(image: Image.Image) -> bool:
@@ -166,37 +171,14 @@ def _line_centers(
     return centers
 
 
-def detect_ruled_grid(image: Image.Image) -> tuple[list[int], list[int]]:
-    """Return strong full-table vertical and horizontal line centers in pixels."""
-    gray = ImageOps.grayscale(image)
-    width, height = gray.size
-    if width < _MIN_IMAGE_WIDTH or height < _MIN_IMAGE_HEIGHT:
-        return [], []
-    for darkness in _GRID_DARKNESS_LEVELS:
-        dark = gray.point(lambda value, limit=darkness: 255 if value < limit else 0)
-        vertical_density = _pixel_values(dark.resize((width, 1), Image.Resampling.BOX))
-        horizontal_density = _pixel_values(dark.resize((1, height), Image.Resampling.BOX))
-        x_lines = _line_centers(
-            vertical_density,
-            round(255 * 0.70),
-            merge_distance=max(1, round(width * 0.008)),
-        )
-        y_lines = _line_centers(
-            horizontal_density,
-            round(255 * 0.50),
-            merge_distance=max(1, round(height * 0.008)),
-        )
-        if len(x_lines) >= 3 and len(y_lines) >= 3:
-            return x_lines, y_lines
-        # A photographed or deskewed page can contain continuous rules that drift
-        # several pixels along their length. Detect them in local strips and cluster
-        # the strip coordinates; unlike a blur, this does not turn page edges and
-        # large text into full-length rules.
-        x_lines = _strip_projected_lines(dark, vertical=True)
-        y_lines = _strip_projected_lines(dark, vertical=False)
-        if len(x_lines) >= 3 and len(y_lines) >= 3:
-            return x_lines, y_lines
-    return [], []
+def detect_ruled_grid(image: Image.Image, *, dpi: int = 150) -> tuple[list[int], list[int]]:
+    """Return validated raster-rule centers in pixels."""
+    width, height = image.size
+    segments = detect_ruled_grid_segments(image, dpi=dpi)
+    return (
+        [round(rule.position * width) for rule in segments if rule.axis == "vertical"],
+        [round(rule.position * height) for rule in segments if rule.axis == "horizontal"],
+    )
 
 
 def _strip_projected_lines(dark: Image.Image, *, vertical: bool) -> list[int]:
@@ -448,18 +430,24 @@ def _measure_raster_extents(
 ) -> list[RulingSegment]:
     width, height = dark.size
     axis_size = height if vertical else width
+    cross_size = width if vertical else height
     tolerance = max(2, round(axis_size * 0.02))
+    search_radius = max(2, round(cross_size * 0.018))
     segments: list[RulingSegment] = []
     for center in centers:
-        if vertical:
-            low = max(0, center - 1)
-            high = min(width, center + 2)
-            strip = dark.crop((low, 0, high, height)).resize((1, height), Image.Resampling.BOX)
-        else:
-            low = max(0, center - 1)
-            high = min(height, center + 2)
-            strip = dark.crop((0, low, width, high)).resize((width, 1), Image.Resampling.BOX)
-        values = _pixel_values(strip)
+        values = [
+            255
+            if _nearest_dark_run(
+                dark,
+                along,
+                center,
+                search_radius,
+                vertical=vertical,
+            )
+            is not None
+            else 0
+            for along in range(axis_size)
+        ]
         start, end = _run_extent(values, _densest(values), 128, tolerance)
         coverage = sum(1 for value in values[start : end + 1] if value >= 128)
         span = max(1, end - start + 1)
@@ -475,6 +463,158 @@ def _measure_raster_extents(
             )
         )
     return segments
+
+
+def _nearest_dark_run(
+    dark: Image.Image,
+    along: int,
+    center: int,
+    radius: int,
+    *,
+    vertical: bool,
+) -> tuple[int, int] | None:
+    """Nearest ink run on one scanline inside a drifting-rule corridor."""
+    width, height = dark.size
+    cross_size = width if vertical else height
+    axis_size = height if vertical else width
+    if not (0 <= along < axis_size):
+        return None
+    low = max(0, center - radius)
+    high = min(cross_size, center + radius + 1)
+    pixels = dark.load()
+    runs: list[tuple[int, int]] = []
+    start = None
+    for cross in range(low, high):
+        value = pixels[cross, along] if vertical else pixels[along, cross]
+        if value >= 128:
+            if start is None:
+                start = cross
+        elif start is not None:
+            runs.append((start, cross))
+            start = None
+    if start is not None:
+        runs.append((start, high))
+    return min(
+        runs,
+        key=lambda run: abs((run[0] + run[1]) / 2 - center),
+        default=None,
+    )
+
+
+def _validate_raster_rule(
+    gray: Image.Image,
+    dark: Image.Image,
+    rule: RulingSegment,
+    *,
+    dpi: int,
+) -> RulingSegment | None:
+    """Reject a projected photo band unless it is a thin contrasted rule."""
+    vertical = rule.axis == "vertical"
+    cross_size = gray.width if vertical else gray.height
+    along_size = gray.height if vertical else gray.width
+    along_start = max(0, min(along_size - 1, round(rule.start * along_size)))
+    along_end = max(along_start + 1, min(along_size, round(rule.end * along_size)))
+    minimum_span = (
+        _MIN_RASTER_VERTICAL_SPAN if vertical else _MIN_RASTER_HORIZONTAL_SPAN
+    )
+    if (along_end - along_start) / along_size < minimum_span:
+        return None
+
+    maximum_thickness = max(2, math.ceil(_MAX_RULE_THICKNESS_PT * dpi / 72.0))
+    center = max(0, min(cross_size - 1, round(rule.position * cross_size)))
+    search_radius = max(2, round(cross_size * 0.018))
+    sample_step = max(1, (along_end - along_start) // 128)
+    gray_pixels = gray.load()
+    thicknesses: list[int] = []
+    core_lumas: list[float] = []
+    contrasts: list[float] = []
+    sample_count = 0
+    for along in range(along_start, along_end, sample_step):
+        sample_count += 1
+        run = _nearest_dark_run(
+            dark, along, center, search_radius, vertical=vertical
+        )
+        if run is None:
+            continue
+        core_start, core_end = run
+        thickness = core_end - core_start
+        thicknesses.append(thickness)
+        core_values = [
+            gray_pixels[cross, along] if vertical else gray_pixels[along, cross]
+            for cross in range(core_start, core_end)
+        ]
+        core_luma = sum(core_values) / len(core_values)
+        core_lumas.append(core_luma)
+        sample_width = max(2, thickness)
+        gap = max(2, math.ceil(thickness / 2))
+        neighbours: list[float] = []
+        before_end = core_start - gap
+        before_start = max(0, before_end - sample_width)
+        if before_end > before_start:
+            values = [
+                gray_pixels[cross, along] if vertical else gray_pixels[along, cross]
+                for cross in range(before_start, before_end)
+            ]
+            neighbours.append(sum(values) / len(values))
+        after_start = core_end + gap
+        after_end = min(cross_size, after_start + sample_width)
+        if after_end > after_start:
+            values = [
+                gray_pixels[cross, along] if vertical else gray_pixels[along, cross]
+                for cross in range(after_start, after_end)
+            ]
+            neighbours.append(sum(values) / len(values))
+        if neighbours:
+            # A nearby annotation or doubled scan stroke can darken one side of
+            # an otherwise valid rule. The line still has a paper-side contrast;
+            # a low-contrast photographic band has neither.
+            contrasts.append(max(neighbours) - core_luma)
+
+    if not thicknesses or len(thicknesses) / max(1, sample_count) < 0.55:
+        return None
+    upper_quartile_thickness = sorted(thicknesses)[int((len(thicknesses) - 1) * 0.75)]
+    if upper_quartile_thickness > maximum_thickness:
+        return None
+    core_luma = median(core_lumas)
+    local_contrast = median(contrasts) if contrasts else 0.0
+    if core_luma > _MAX_RASTER_RULE_LUMA or local_contrast < _MIN_RASTER_RULE_CONTRAST:
+        return None
+
+    rule.strength = len(thicknesses) / max(1, sample_count)
+    rule.thickness = median(thicknesses) / cross_size
+    return rule
+
+
+def _coherent_raster_grid(
+    vertical: list[RulingSegment], horizontal: list[RulingSegment]
+) -> tuple[list[RulingSegment], list[RulingSegment]]:
+    """Keep only rules participating in a connected cell-like lattice."""
+    previous = None
+    while previous != (len(vertical), len(horizontal)):
+        previous = (len(vertical), len(horizontal))
+        vertical = [
+            rule
+            for rule in vertical
+            if sum(
+                1
+                for cross in horizontal
+                if rule.spans(cross.position, slack=0.004)
+                and cross.spans(rule.position, slack=0.004)
+            )
+            >= 2
+        ]
+        horizontal = [
+            rule
+            for rule in horizontal
+            if sum(
+                1
+                for cross in vertical
+                if rule.spans(cross.position, slack=0.004)
+                and cross.spans(rule.position, slack=0.004)
+            )
+            >= 2
+        ]
+    return vertical, horizontal
 
 
 def _densest(values: list[int]) -> int:
@@ -494,8 +634,8 @@ def _densest(values: list[int]) -> int:
     return best_start + best_length // 2
 
 
-def detect_ruled_grid_segments(image: Image.Image) -> list[RulingSegment]:
-    """Raster rules with extents, using the same darkness sweep as the grid pass."""
+def detect_ruled_grid_segments(image: Image.Image, *, dpi: int = 150) -> list[RulingSegment]:
+    """Validated raster rules with their individually measured extents."""
     gray = ImageOps.grayscale(image)
     width, height = gray.size
     if width < _MIN_IMAGE_WIDTH or height < _MIN_IMAGE_HEIGHT:
@@ -514,25 +654,21 @@ def detect_ruled_grid_segments(image: Image.Image) -> list[RulingSegment]:
             x_lines = _strip_projected_lines(dark, vertical=True)
             y_lines = _strip_projected_lines(dark, vertical=False)
         if len(x_lines) >= 3 and len(y_lines) >= 3:
-            # Reaching this point means the projection pass found a coherent
-            # grid in both directions. Measure the individual rules when that
-            # preserves their shared envelope, but do not let anti-aliasing or
-            # text crossing a one-pixel sampling strip fragment the grid into
-            # unrelated components. This is especially common in scanned PDFs:
-            # the same ruled cell border drifts a pixel or two down the page.
-            vertical = _measure_raster_extents(dark, x_lines, vertical=True)
-            horizontal = _measure_raster_extents(dark, y_lines, vertical=False)
-            grid_top = min(y_lines) / height
-            grid_bottom = (max(y_lines) + 1) / height
-            grid_left = min(x_lines) / width
-            grid_right = (max(x_lines) + 1) / width
-            for rule in vertical:
-                rule.start = grid_top
-                rule.end = grid_bottom
-            for rule in horizontal:
-                rule.start = grid_left
-                rule.end = grid_right
-            return vertical + horizontal
+            vertical = [
+                validated
+                for rule in _measure_raster_extents(dark, x_lines, vertical=True)
+                if (validated := _validate_raster_rule(gray, dark, rule, dpi=dpi))
+                is not None
+            ]
+            horizontal = [
+                validated
+                for rule in _measure_raster_extents(dark, y_lines, vertical=False)
+                if (validated := _validate_raster_rule(gray, dark, rule, dpi=dpi))
+                is not None
+            ]
+            vertical, horizontal = _coherent_raster_grid(vertical, horizontal)
+            if len(vertical) >= 3 and len(horizontal) >= 3:
+                return vertical + horizontal
     return []
 
 
@@ -548,7 +684,7 @@ def detect_page_ruling_segments(page, *, dpi: int = 150) -> PageRulings:
         pixmap = page.get_pixmap(dpi=dpi, alpha=False)
         image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
         rulings.graphics.extend(_raster_chart_boxes(page, image))
-        for segment in detect_ruled_grid_segments(image):
+        for segment in detect_ruled_grid_segments(image, dpi=dpi):
             if segment.axis == "vertical":
                 rulings.vertical.append(segment)
             else:
@@ -647,7 +783,7 @@ def detect_page_rulings(page, *, dpi: int = 150) -> tuple[list[float], list[floa
     try:
         pixmap = page.get_pixmap(dpi=dpi, alpha=False)
         image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
-        x_lines, y_lines = detect_ruled_grid(image)
+        x_lines, y_lines = detect_ruled_grid(image, dpi=dpi)
         vertical.extend(value / pixmap.width for value in x_lines)
         horizontal.extend(value / pixmap.height for value in y_lines)
     except Exception:  # Raster evidence is opportunistic; vector evidence remains useful.

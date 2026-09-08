@@ -14,6 +14,7 @@ from engines.table.rulings import (
     _vector_ruling_segments,
     _vector_rulings,
     detect_ruled_grid,
+    detect_ruled_grid_segments,
 )
 
 
@@ -26,6 +27,44 @@ class RulingTests(unittest.TestCase):
         for y in (20, 100, 180, 280):
             draw.line((0, y, 499, y), fill=0, width=2)
         self.assertEqual(detect_ruled_grid(image), ([30, 220, 470], [20, 100, 180, 280]))
+
+    def test_raster_rules_keep_their_individual_extents(self) -> None:
+        image = Image.new("L", (500, 300), 255)
+        draw = ImageDraw.Draw(image)
+        draw.line((30, 20, 30, 280), fill=0, width=2)
+        draw.line((470, 20, 470, 280), fill=0, width=2)
+        draw.line((250, 100, 250, 280), fill=0, width=2)
+        for y in (20, 100, 180, 280):
+            draw.line((30, y, 470, y), fill=0, width=2)
+
+        segments = detect_ruled_grid_segments(image)
+        middle = min(
+            (rule for rule in segments if rule.axis == "vertical"),
+            key=lambda rule: abs(rule.position - 0.5),
+        )
+
+        self.assertGreater(middle.start, 0.25)
+        self.assertGreater(middle.end, 0.90)
+
+    def test_thick_raster_bands_are_not_rules(self) -> None:
+        image = Image.new("L", (500, 300), 245)
+        draw = ImageDraw.Draw(image)
+        for x in (40, 250, 460):
+            draw.line((x, 0, x, 299), fill=40, width=18)
+        for y in (30, 150, 270):
+            draw.line((0, y, 499, y), fill=40, width=18)
+
+        self.assertEqual(detect_ruled_grid_segments(image), [])
+
+    def test_low_contrast_raster_bands_are_not_rules(self) -> None:
+        image = Image.new("L", (500, 300), 225)
+        draw = ImageDraw.Draw(image)
+        for x in (40, 250, 460):
+            draw.line((x, 0, x, 299), fill=215, width=2)
+        for y in (30, 150, 270):
+            draw.line((0, y, 499, y), fill=215, width=2)
+
+        self.assertEqual(detect_ruled_grid_segments(image), [])
 
     def test_rotated_page_rulings_are_reported_in_displayed_space(self) -> None:
         class FakeRect:

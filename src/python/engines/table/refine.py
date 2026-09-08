@@ -16,7 +16,7 @@ from engines.table.candidates import (
     make_bounds,
 )
 from engines.table.grid import GridHypothesis, build_logical_rows, fit_grid
-from engines.table.headers import _PERIOD, detect_header_cells
+from engines.table.headers import _PERIOD, _is_value_cell, detect_header_cells
 from engines.table.layout import LogicalRow, PageLayout, VisualLine
 
 
@@ -254,6 +254,66 @@ def _split_is_marked(grid: GridHypothesis, index: int, layout: PageLayout) -> bo
     return _looks_like_header_band(grid.rows[index])
 
 
+def _value_columns(values: list[str]) -> frozenset[int]:
+    """Columns containing measurements in one already-fitted row."""
+    return frozenset(
+        index for index, value in enumerate(values) if value and _is_value_cell(value)
+    )
+
+
+def _leading_preamble_split(
+    grid: GridHypothesis, layout: PageLayout, *, ruled: bool
+) -> int | None:
+    """Trim document furniture above a complete internal table header.
+
+    Invoice mastheads and continuation labels can sit close enough to a table to
+    enter the same whitespace band.  A split is safe only when the later row is
+    a nearly complete word header, a visible break precedes it, and at least two
+    following rows repeat a multi-value body schema.  Header groups that span
+    fitted columns are left for ``strip_spanning_labels`` so their period and
+    coverage metadata are not lost.
+    """
+    if grid.column_count < 3 or len(grid.rows) < 4:
+        return None
+    matrix = grid.cell_matrix()
+    for index in range(1, len(grid.rows) - 2):
+        if not _split_is_marked(grid, index, layout):
+            continue
+        # Only a group directly attached to this header qualifies it. Earlier
+        # document furniture can cross provisional boundaries simply because
+        # those boundaries were inferred from the table below (for example the
+        # large word "INVOICE" centred over two amount columns).
+        if _group_segments(grid.rows[index - 1], grid):
+            continue
+
+        header = detect_header_cells(
+            matrix[index:], grid.column_count, ruled=ruled
+        )
+        if header is None or int(header["rowCount"]) != 1:
+            continue
+        values = matrix[index]
+        filled = [value for value in values if value]
+        if (
+            not values[0]
+            or len(filled) < max(3, grid.column_count - 1)
+            or not all(any(character.isalpha() for character in value) for value in filled)
+            or any(_is_value_cell(value) for value in filled)
+        ):
+            continue
+
+        # The rows above the header must not already establish a value table.
+        if any(len(_value_columns(row)) >= 2 for row in matrix[:index]):
+            continue
+        signatures: dict[frozenset[int], int] = {}
+        for row in matrix[index + 1 : index + 6]:
+            signature = _value_columns(row)
+            if len(signature) >= 2:
+                signatures[signature] = signatures.get(signature, 0) + 1
+        if signatures and max(signatures.values()) >= 2:
+            return index
+    return None
+
+
 def _schema_split(grid: GridHypothesis, layout: PageLayout) -> int | None:
     """The row where one column schema gives way to another and stays changed.
 
@@ -330,19 +390,85 @@ def _prose_split(grid: GridHypothesis, layout: PageLayout) -> int | None:
     return None
 
 
+def _scoped_rule_evidence(
+    candidate: TableCandidate, bounds: dict, lines: list[VisualLine]
+) -> tuple[str | None, list, list]:
+    """Rule evidence that physically reaches one fitted or split region."""
+    left = bounds["x"]
+    right = left + bounds["width"]
+    top = bounds["y"]
+    bottom = top + bounds["height"]
+
+    def band_positions(rules, low: float, high: float) -> set[float]:
+        """Positions inside the ink plus the nearest border on either side."""
+        positions = {rule.position for rule in rules if low <= rule.position <= high}
+        before = [rule.position for rule in rules if rule.position < low]
+        after = [rule.position for rule in rules if rule.position > high]
+        if before:
+            positions.add(max(before))
+        if after:
+            positions.add(min(after))
+        return positions
+
+    vertical_positions = band_positions(candidate.vertical, left, right)
+    horizontal_positions = band_positions(candidate.horizontal, top, bottom)
+    vertical = [
+        rule
+        for rule in candidate.vertical
+        if rule.position in vertical_positions
+        and rule.end >= top
+        and rule.start <= bottom
+    ]
+    horizontal = [
+        rule
+        for rule in candidate.horizontal
+        if rule.position in horizontal_positions
+        and rule.end >= left
+        and rule.start <= right
+    ]
+    evidence = candidate.evidence
+    if evidence == "ruled":
+        intersections = sum(
+            1
+            for v_rule in vertical
+            for h_rule in horizontal
+            if h_rule.spans(v_rule.position, slack=0.006)
+            and v_rule.spans(h_rule.position, slack=0.006)
+        )
+        if len(vertical) < 2 or len(horizontal) < 2 or intersections < 4:
+            # A fragment split from a larger ruled object does not inherit that
+            # object's evidence. It may continue as a whitespace proposal when
+            # its own text repeats a cell-like segmentation; otherwise there is
+            # no local basis for a table candidate at all.
+            if sum(line.segment_count >= 2 for line in lines) < 2:
+                return None, [], []
+            evidence = "whitespace"
+            vertical = []
+            horizontal = []
+    elif evidence == "mixed" and len(vertical) < 2 and len(horizontal) < 2:
+        evidence = "whitespace"
+        vertical = []
+        horizontal = []
+    return evidence, vertical, horizontal
+
+
 def _sub_candidate(candidate: TableCandidate, lines, layout: PageLayout) -> TableCandidate | None:
     lines = [line for line in lines if line.tokens]
     if len(lines) < 2:
         return None
     top = min(line.y0 for line in lines) - layout.line_height * 0.4
     bottom = max(line.y1 for line in lines) + layout.line_height * 0.4
+    bounds = make_bounds(candidate.left, top, candidate.right, bottom)
+    evidence, vertical, horizontal = _scoped_rule_evidence(candidate, bounds, lines)
+    if evidence is None:
+        return None
     return TableCandidate(
         lines=lines,
-        bounds=make_bounds(candidate.left, top, candidate.right, bottom),
-        evidence=candidate.evidence,
+        bounds=bounds,
+        evidence=evidence,
         origin=candidate.origin,
-        vertical=[rule for rule in candidate.vertical if rule.end >= top and rule.start <= bottom],
-        horizontal=[rule for rule in candidate.horizontal if top <= rule.position <= bottom],
+        vertical=vertical,
+        horizontal=horizontal,
         graphics=candidate.graphics,
         sealed=True,
     )
@@ -364,6 +490,12 @@ def tighten(candidate: TableCandidate, grid: GridHypothesis, layout: PageLayout)
         left = min(left, min(grid.boundaries))
         right = max(right, max(grid.boundaries))
     candidate.bounds = make_bounds(left, top, right, bottom)
+    evidence, vertical, horizontal = _scoped_rule_evidence(
+        candidate, candidate.bounds, [line for row in grid.rows for line in row.lines]
+    )
+    candidate.evidence = evidence or "whitespace"
+    candidate.vertical = vertical
+    candidate.horizontal = horizontal
     grid.columns[0]["x0"] = candidate.bounds["x"]
     grid.columns[-1]["x1"] = candidate.bounds["x"] + candidate.bounds["width"]
 
@@ -377,6 +509,18 @@ def refine(
         candidate.rejection = "no-grid"
         return []
     if depth < _MAX_DEPTH:
+        split = _leading_preamble_split(
+            grid,
+            layout,
+            ruled=candidate.evidence in ("ruled", "mixed"),
+        )
+        if split is not None:
+            lines = [line for row in grid.rows[split:] for line in row.lines]
+            part = _sub_candidate(candidate, lines, layout)
+            if part is not None:
+                trimmed = refine(part, layout, depth + 1)
+                if trimmed:
+                    return trimmed
         split = _prose_split(grid, layout)
         if split is not None:
             above = [line for row in grid.rows[:split] for line in row.lines]

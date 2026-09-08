@@ -30,7 +30,10 @@ _MIN_SEGMENT_GAP = 0.012
 # number reads "10.1*" and a filing amount reads "1,234†". Without this the token
 # has no alphabetic character and no numeric shape, and falls through to "symbol" —
 # which then looks like a column of list markers.
-_NUMBER = re.compile(r"^[(\[]?[-+]?\d[\d, ']*(?:\.\d+)?[)\]]?[*†‡§¹²³]?$")
+_NUMBER = re.compile(
+    r"^[(\[]?(?:[-+]?[$€£¥₹]?|[$€£¥₹][-+]?)"
+    r"\d[\d, ']*(?:\.\d+)?[)\]]?[*†‡§¹²³]?$"
+)
 _PERCENT = re.compile(r"^[(\[]?[-+]?\d[\d,]*(?:\.\d+)?[)\]]?\s*%[*†‡§]?$")
 _CURRENCY = re.compile(r"^[$€£¥₹]+$")
 _PERIOD = re.compile(
@@ -287,7 +290,17 @@ class PageLayout:
             return False
         if line.segment_count == 2:
             gutter = max(end - start for start, end in line.gutters())
-            if gutter >= self.min_gutter * 3:
+            # A short island across a wide corridor is an index value, code or
+            # jurisdiction rather than the continuation of the sentence on the
+            # left. Two substantial islands are instead the two synchronized
+            # columns of an editorial page; refusing those here lets narrative
+            # flow into candidate generation as if it were a table.
+            right = line.segments[1]
+            short_right_island = (
+                len(right.tokens) <= 3
+                and right.x1 - right.x0 <= self.body_width * 0.25
+            )
+            if gutter >= self.min_gutter * 3 and short_right_island:
                 return False
         words = [token for token in line.tokens if token.kind in ("word", "ordinal")]
         if len(words) < 6:

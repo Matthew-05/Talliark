@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import unittest
 
-from engines.table.candidates import generate, whitespace_candidates
+from engines.table.candidates import TableCandidate, generate, whitespace_candidates
 from engines.table.grid import (
     GridHypothesis,
     build_logical_rows,
@@ -20,7 +20,7 @@ from engines.table.grid import (
 from engines.table.headers import detect_header_cells, period_in
 from engines.table.redesign import _period, _published_header
 from engines.table.layout import build_page_layout, classify
-from engines.table.refine import refine
+from engines.table.refine import _sub_candidate, refine
 from engines.table.rulings import PageRulings, RulingSegment, merge_parallel, ruling_components
 from engines.table.scoring import evaluate
 
@@ -79,6 +79,11 @@ class TokenTests(unittest.TestCase):
         # symbol and a whole exhibit index looked like a column of list markers.
         self.assertEqual(classify("10.1*"), "numeric")
 
+    def test_a_currency_symbol_attached_to_an_amount_is_a_value(self) -> None:
+        self.assertEqual(classify("$10,663.00"), "numeric")
+        self.assertEqual(classify("($10,663.00)"), "numeric")
+        self.assertEqual(classify("£-42"), "numeric")
+
     def test_words_are_split_on_the_space_between_them(self) -> None:
         # A proportional font sets the next glyph flush against the space it drew,
         # so the geometric gap between two words is frequently zero.
@@ -113,6 +118,20 @@ class ProseTests(unittest.TestCase):
             )
         )
         self.assertFalse(any(layout.is_block_prose(line) for line in layout.lines))
+
+    def test_two_substantial_columns_are_both_running_prose(self) -> None:
+        layout = build_page_layout(
+            page(
+                [
+                    (0.10, [(0.03, "Sustain pedal and program changes remain available"),
+                            (0.54, "Composition should never require complex technology")]),
+                    (0.14, [(0.03, "Editing a note takes only one simple gesture"),
+                            (0.54, "Musicians can keep their attention on the performance")]),
+                ]
+            )
+        )
+
+        self.assertTrue(all(layout.is_block_prose(line) for line in layout.lines))
 
     def test_prose_ends_a_candidate(self) -> None:
         rows = [
@@ -711,6 +730,123 @@ class LogicalRowTests(unittest.TestCase):
 
 
 class RefinementTests(unittest.TestCase):
+    def test_invoice_furniture_above_an_internal_header_is_trimmed(self) -> None:
+        rows = [
+            (0.100, [(0.05, "TALLIARK LABS"), (0.70, "INVOICE")]),
+            (0.130, [(0.05, "Synthetic document services"), (0.70, "TL-2026-0041")]),
+            (0.170, [(0.05, "Invoice TL-2026-0041 continued")]),
+            (0.210, [(0.05, "DESCRIPTION"), (0.55, "QTY"), (0.70, "RATE"), (0.84, "AMOUNT")]),
+            (0.240, [(0.05, "Invoice layout evaluation"), (0.55, "1"), (0.70, "$85.00"), (0.84, "$85.00")]),
+            (0.270, [(0.05, "Table boundary analysis"), (0.55, "2"), (0.70, "$60.00"), (0.84, "$120.00")]),
+            (0.300, [(0.05, "Geometry validation"), (0.55, "1"), (0.70, "$45.00"), (0.84, "$45.00")]),
+        ]
+        layout = build_page_layout(page(rows))
+        proposals = whitespace_candidates(layout)
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(len(proposals[0].lines), len(rows))
+        parts = refine(proposals[0], layout)
+
+        self.assertEqual(len(parts), 1)
+        _candidate, grid = parts[0]
+        matrix = grid.cell_matrix()
+        self.assertEqual(matrix[0], ["DESCRIPTION", "QTY", "RATE", "AMOUNT"])
+        self.assertFalse(any("TALLIARK" in value for row in matrix for value in row))
+        header = detect_header_cells(matrix, grid.column_count)
+        self.assertEqual(header["rowCount"], 1)
+
+    def test_a_split_fragment_does_not_inherit_rules_that_do_not_reach_it(self) -> None:
+        layout = build_page_layout(
+            page(
+                [
+                    (0.10, [(0.05, "Alpha description"), (0.60, "Current value")]),
+                    (0.14, [(0.05, "Beta description"), (0.60, "Prior value")]),
+                ]
+            )
+        )
+        candidate = TableCandidate(
+            lines=layout.lines,
+            bounds={"x": 0.04, "y": 0.08, "width": 0.90, "height": 0.70},
+            evidence="ruled",
+            vertical=[
+                RulingSegment("vertical", x, 0.08, 0.78, "raster")
+                for x in (0.04, 0.50, 0.94)
+            ],
+            horizontal=[
+                RulingSegment("horizontal", y, 0.04, 0.94, "raster")
+                for y in (0.30, 0.50, 0.78)
+            ],
+        )
+
+        fragment = _sub_candidate(candidate, layout.lines, layout)
+
+        self.assertIsNotNone(fragment)
+        self.assertEqual(fragment.evidence, "whitespace")
+        self.assertEqual(fragment.vertical, [])
+        self.assertEqual(fragment.horizontal, [])
+
+    def test_tightening_removes_rules_outside_the_fitted_rows(self) -> None:
+        layout = build_page_layout(
+            page(
+                [
+                    (0.10, [(0.05, "Alpha description"), (0.60, "Current value")]),
+                    (0.14, [(0.05, "Beta description"), (0.60, "Prior value")]),
+                    (0.18, [(0.05, "Gamma description"), (0.60, "Ending value")]),
+                ]
+            )
+        )
+        candidate = TableCandidate(
+            lines=layout.lines,
+            bounds={"x": 0.04, "y": 0.08, "width": 0.90, "height": 0.70},
+            evidence="ruled",
+            vertical=[
+                RulingSegment("vertical", x, 0.08, 0.78, "raster")
+                for x in (0.04, 0.50, 0.94)
+            ],
+            horizontal=[
+                RulingSegment("horizontal", y, 0.04, 0.94, "raster")
+                for y in (0.30, 0.50, 0.78)
+            ],
+        )
+
+        fitted = refine(candidate, layout)
+
+        self.assertEqual(len(fitted), 1)
+        refined, _grid = fitted[0]
+        self.assertEqual(refined.evidence, "whitespace")
+        self.assertEqual(refined.vertical, [])
+        self.assertEqual(refined.horizontal, [])
+
+    def test_tightening_keeps_rules_that_bracket_a_small_table(self) -> None:
+        layout = build_page_layout(
+            page(
+                [
+                    (0.10, [(0.08, "Account"), (0.65, "Amount")]),
+                    (0.16, [(0.08, "Cash"), (0.65, "100")]),
+                ]
+            )
+        )
+        candidate = TableCandidate(
+            lines=layout.lines,
+            bounds={"x": 0.05, "y": 0.08, "width": 0.85, "height": 0.10},
+            evidence="ruled",
+            vertical=[
+                RulingSegment("vertical", x, 0.08, 0.18, "raster")
+                for x in (0.05, 0.55, 0.90)
+            ],
+            horizontal=[
+                RulingSegment("horizontal", y, 0.05, 0.90, "raster")
+                for y in (0.08, 0.13, 0.18)
+            ],
+        )
+
+        fitted = refine(candidate, layout)
+
+        self.assertEqual(len(fitted), 1)
+        refined, grid = fitted[0]
+        self.assertEqual(refined.evidence, "ruled")
+        features = evaluate(refined, grid, layout, header_rows=1)
+        self.assertTrue(features.accepted())
+
     def test_a_new_period_band_after_a_gap_starts_a_new_table(self) -> None:
         rows = [
             (0.100, [(0.55, "2025"), (0.70, "2024"), (0.85, "2023")]),
@@ -759,8 +895,12 @@ class RefinementTests(unittest.TestCase):
 
 
 class ScoringTests(unittest.TestCase):
-    def _score(self, geometry: dict):
+    def _score(self, geometry: dict, *, ignore_prose: bool = False):
         layout = build_page_layout(geometry)
+        # Scoring is the safety net for narrative that upstream segmentation did
+        # not recognize (for example after noisy OCR invents another boundary).
+        if ignore_prose:
+            layout.prose_lines.clear()
         candidates = generate(layout, PageRulings())
         self.assertTrue(candidates)
         candidate, grid = refine(candidates[0], layout)[0]
@@ -791,7 +931,7 @@ class ScoringTests(unittest.TestCase):
             (0.10, [(0.05, "(6)"), (0.12, "Includes 25,000 shares and 21,629 DSUs.")]),
             (0.13, [(0.05, "(7)"), (0.12, "Includes 1,893 DSUs.")]),
         ]
-        features, _grid = self._score(page(rows))
+        features, _grid = self._score(page(rows), ignore_prose=True)
 
         self.assertEqual(features.header, 1.0)
         self.assertEqual(features.marker_first_column, 1.0)
@@ -841,11 +981,41 @@ class ScoringTests(unittest.TestCase):
             (0.196, [(0.05, "This discipline strengthened execution during the year"),
                      (0.55, "Our partners remain central to future work")]),
         ]
-        features, _grid = self._score(page(rows))
+        features, _grid = self._score(page(rows), ignore_prose=True)
 
-        self.assertEqual(features.header, 1.0)
+        self.assertEqual(features.header, 0.0)
         self.assertGreater(features.prose_pair, 0.5)
         self.assertFalse(features.accepted())
+
+    def test_parallel_prose_is_checked_across_every_adjacent_column_pair(self) -> None:
+        rows = [
+            (0.100, [(0.03, "Customer Service Priorities"),
+                     (0.37, "Operational Excellence Goals"),
+                     (0.70, "Looking Ahead This Year")]),
+            (0.124, [(0.03, "Teams resolved requests promptly"),
+                     (0.37, "Service quality improved again today"),
+                     (0.70, "Clients strengthened our future work")]),
+            (0.148, [(0.03, "Specialists gave customers clear answers"),
+                     (0.37, "Managers saw requirements more clearly"),
+                     (0.70, "New programs expanded available services")]),
+        ]
+        features, grid = self._score(page(rows), ignore_prose=True)
+
+        self.assertGreaterEqual(grid.column_count, 3)
+        self.assertEqual(features.prose_pair, 1.0)
+        self.assertFalse(features.accepted())
+
+    def test_an_uncorroborated_word_header_earns_no_header_credit(self) -> None:
+        rows = [
+            (0.100, [(0.05, "Editing"), (0.55, "Composition Without Compromise")]),
+            (0.130, [(0.05, "Erase a wrong note with one simple gesture"),
+                     (0.55, "Technology should never interrupt a musical idea")]),
+            (0.160, [(0.05, "Repeat the final bars for a gradual fadeout"),
+                     (0.55, "Every control remains close to the performer")]),
+        ]
+        features, _grid = self._score(page(rows), ignore_prose=True)
+
+        self.assertEqual(features.header, 0.0)
 
     def test_two_rows_without_a_header_are_not_a_table(self) -> None:
         # A signature block: two aligned lines is not a repeated structure.
