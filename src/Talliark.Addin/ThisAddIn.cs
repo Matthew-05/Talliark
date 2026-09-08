@@ -563,9 +563,7 @@ namespace Talliark.Addin
 
             HideTaskPaneFor(wb);
 
-            entry.Window.Show();
-
-            entry.Window.BringToFront();
+            ShowAndActivateWindow(entry.Window);
 
             entry.Window.NotifyViewerShown();
 
@@ -699,8 +697,7 @@ namespace Talliark.Addin
 
             WorkbookFileManagerEntry entry = EnsureFileManagerFor(workbook);
             entry.WasShown = true;
-            entry.Window.Show();
-            entry.Window.BringToFront();
+            ShowAndActivateWindow(entry.Window);
             entry.Window.RefreshDataIfReady();
 
         }
@@ -722,8 +719,7 @@ namespace Talliark.Addin
 
             WorkbookReconcileEntry entry = EnsureReconcileFor(workbook);
             entry.WasShown = true;
-            entry.Window.Show();
-            entry.Window.BringToFront();
+            ShowAndActivateWindow(entry.Window);
             entry.Window.RefreshDataIfReady();
         }
 
@@ -746,8 +742,21 @@ namespace Talliark.Addin
             // not loaded its UI yet and posts linker-app-ready itself once it does, so the
             // call is a no-op in that case rather than a second, competing hand-off.
             entry.Window.Reset();
-            entry.Window.Show();
-            entry.Window.BringToFront();
+            ShowAndActivateWindow(entry.Window);
+        }
+
+        /// <summary>
+        /// Shows an existing workbook window and restores it when its taskbar button was
+        /// minimized. Leaves normal and maximized windows in their current state.
+        /// </summary>
+        private static void ShowAndActivateWindow(Form window)
+        {
+            if (window.WindowState == FormWindowState.Minimized)
+                window.WindowState = FormWindowState.Normal;
+
+            window.Show();
+            window.BringToFront();
+            window.Activate();
         }
 
 
