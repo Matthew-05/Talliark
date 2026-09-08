@@ -1194,7 +1194,7 @@ namespace Talliark.Addin.Modules.WebView
                 using (var border = new Pen(borderColor, 2f))
                 using (var textBrush = new SolidBrush(_locked ? Color.FromArgb(92, 92, 112) : ForeColor))
                 using (var mutedBrush = new SolidBrush(Color.FromArgb(92, 92, 112)))
-                using (var titleFont = new Font(Font.FontFamily, 12f, FontStyle.Bold))
+                using (var titleFont = new Font(Font.FontFamily, 11f, FontStyle.Bold))
                 using (var bodyFont = new Font(Font.FontFamily, 11f, FontStyle.Regular))
                 {
                     border.DashStyle = DashStyle.Dash;
