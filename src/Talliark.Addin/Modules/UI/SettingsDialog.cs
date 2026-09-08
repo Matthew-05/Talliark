@@ -34,10 +34,21 @@ namespace Talliark.Addin.Modules.UI
         /// <summary>Height of the action bar holding the Close button.</summary>
         private const int FooterHeight = 56;
 
-        /// <summary>Least room the release history is worth showing in.</summary>
-        private const int MinimumUpdatesHeight = 140;
+        /// <summary>Where the release-history viewer starts inside the Updates card.</summary>
+        private const int UpdateHistoryTop = 90;
+
+        /// <summary>Least vertical room the release-history viewer is worth showing in.</summary>
+        private const int MinimumUpdateHistoryHeight = 280;
+
+        /// <summary>Smallest Updates card that preserves the history viewer's minimum.</summary>
+        private const int MinimumUpdatesHeight =
+            UpdateHistoryTop + MinimumUpdateHistoryHeight + CardPadding;
 
         private readonly ReleaseNotesControl _updateHistory;
+        private readonly Panel _content;
+        private readonly CardPanel _developmentCard;
+        private readonly CardPanel _updatesCard;
+        private bool _layingOutContent;
         private bool _updateHistoryRequested;
 
         internal SettingsDialog()
@@ -56,75 +67,105 @@ namespace Talliark.Addin.Modules.UI
             Font = DialogTheme.BodyFont;
             ForeColor = DialogTheme.Text;
 
-            int cardWidth = ClientSize.Width - (ContentMargin * 2);
-
-            Controls.Add(DialogTheme.CreateTitle("Settings", new Point(ContentMargin + 2, 20)));
-            Controls.Add(DialogTheme.CreateCaption(
-                $"Version {AppVersion.Current}", new Point(ContentMargin + 4, 51)));
-
-            int nextCardTop = 82;
-
-            CardPanel developmentCard = null;
-            if (showDevelopmentSection)
+            _content = new Panel
             {
-                developmentCard = BuildDevelopmentCard(
-                    new Point(ContentMargin, nextCardTop), cardWidth);
-                Controls.Add(developmentCard);
-                nextCardTop += developmentCard.Height + CardGap;
-            }
-
-            // The development card is as tall as its wrapped captions need, so the
-            // window's floor is computed from it rather than assumed. Without this a
-            // narrow window would wrap the captions into more lines than the fixed
-            // minimum height was ever sized for, and the updates card would slide
-            // under the footer.
-            int requiredClientHeight =
-                nextCardTop + MinimumUpdatesHeight + FooterHeight + ContentMargin;
-            if (requiredClientHeight > ClientSize.Height)
-            {
-                ClientSize = new Size(ClientSize.Width, requiredClientHeight);
-            }
-            int chromeHeight = Size.Height - ClientSize.Height;
-            MinimumSize = new Size(
-                MinimumSize.Width,
-                Math.Max(MinimumSize.Height, requiredClientHeight + chromeHeight));
-
-            // The updates card takes the remaining height so the release history
-            // grows with the window instead of leaving dead space below it.
-            int updatesHeight = Math.Max(
-                MinimumUpdatesHeight,
-                ClientSize.Height - FooterHeight - ContentMargin - nextCardTop);
-
-            CardPanel updatesCard = BuildUpdatesCard(
-                new Point(ContentMargin, nextCardTop),
-                new Size(cardWidth, updatesHeight),
-                out _updateHistory);
-            Controls.Add(updatesCard);
-
-            if (developmentCard != null)
-            {
-                // Wrapping makes the development card's height depend on the dialog's
-                // width, so the updates card below it cannot keep a fixed top.
-                developmentCard.SizeChanged += (sender, args) =>
-                {
-                    int top = developmentCard.Bottom + CardGap;
-                    updatesCard.Location = new Point(ContentMargin, top);
-                    updatesCard.Height = Math.Max(
-                        MinimumUpdatesHeight,
-                        ClientSize.Height - FooterHeight - ContentMargin - top);
-                };
-            }
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = DialogTheme.Canvas
+            };
+            Controls.Add(_content);
 
             Button closeBtn;
             Panel footer = BuildFooter(out closeBtn);
             Controls.Add(footer);
 
-            // Docking gives the footer its real width only once it has a parent, so the
-            // Close button is placed afterwards for its right anchor to hold on resize.
+            // Docking gives both regions their real bounds only once they have a
+            // parent. The footer stays fixed while the content above it scrolls.
+            PerformLayout();
+
             closeBtn.Location = new Point(
                 footer.ClientSize.Width - ContentMargin - closeBtn.Width, 13);
 
+            int cardWidth = _content.ClientSize.Width - (ContentMargin * 2);
+
+            _content.Controls.Add(DialogTheme.CreateTitle(
+                "Settings", new Point(ContentMargin + 2, 20)));
+            _content.Controls.Add(DialogTheme.CreateCaption(
+                $"Version {AppVersion.Current}", new Point(ContentMargin + 4, 51)));
+
+            int nextCardTop = 82;
+
+            _developmentCard = null;
+            if (showDevelopmentSection)
+            {
+                _developmentCard = BuildDevelopmentCard(
+                    new Point(ContentMargin, nextCardTop), cardWidth);
+                _content.Controls.Add(_developmentCard);
+                nextCardTop += _developmentCard.Height + CardGap;
+            }
+
+            // The updates card takes the remaining height so the release history
+            // grows with the viewport instead of leaving dead space below it. At a
+            // shorter height it keeps its useful minimum and the content panel
+            // supplies the scrollbar.
+            int updatesHeight = Math.Max(
+                MinimumUpdatesHeight,
+                _content.ClientSize.Height - ContentMargin - nextCardTop);
+
+            _updatesCard = BuildUpdatesCard(
+                new Point(ContentMargin, nextCardTop),
+                new Size(cardWidth, updatesHeight),
+                out _updateHistory);
+            _content.Controls.Add(_updatesCard);
+
+            if (_developmentCard != null)
+            {
+                // Wrapping makes the development card's height depend on the dialog's
+                // width, so the updates card below it cannot keep a fixed top.
+                _developmentCard.SizeChanged += (sender, args) => LayoutContent();
+            }
+
+            _content.SizeChanged += (sender, args) => LayoutContent();
+            LayoutContent();
+
             CancelButton = closeBtn;
+        }
+
+        /// <summary>
+        /// Fit the cards to the scrollable viewport and keep enough virtual height
+        /// for every card to remain reachable when the window is short.
+        /// </summary>
+        private void LayoutContent()
+        {
+            if (_layingOutContent || _content == null || _updatesCard == null) return;
+
+            _layingOutContent = true;
+            try
+            {
+                int cardWidth = Math.Max(
+                    1, _content.ClientSize.Width - (ContentMargin * 2));
+
+                int updatesTop = 82;
+                if (_developmentCard != null)
+                {
+                    _developmentCard.Width = cardWidth;
+                    updatesTop = _developmentCard.Bottom + CardGap;
+                }
+
+                _updatesCard.Location = new Point(ContentMargin, updatesTop);
+                _updatesCard.Size = new Size(
+                    cardWidth,
+                    Math.Max(
+                        MinimumUpdatesHeight,
+                        _content.ClientSize.Height - ContentMargin - updatesTop));
+
+                _content.AutoScrollMinSize = new Size(
+                    0, _updatesCard.Bottom + ContentMargin);
+            }
+            finally
+            {
+                _layingOutContent = false;
+            }
         }
 
         /// <summary>Developer-only card; shown in development and beta builds.</summary>
@@ -141,7 +182,7 @@ namespace Talliark.Addin.Modules.UI
             {
                 Location = location,
                 Size = new Size(width, DevelopmentRowsTop),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
 
             card.Controls.Add(DialogTheme.CreateSectionTitle(
@@ -289,8 +330,7 @@ namespace Talliark.Addin.Modules.UI
             {
                 Location = location,
                 Size = size,
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom
-                       | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
 
             card.Controls.Add(DialogTheme.CreateSectionTitle(
@@ -316,10 +356,11 @@ namespace Talliark.Addin.Modules.UI
             history = new ReleaseNotesControl
             {
                 BorderStyle = BorderStyle.None,
-                Location = new Point(CardPadding, 90),
+                Location = new Point(CardPadding, UpdateHistoryTop),
+                MinimumSize = new Size(0, MinimumUpdateHistoryHeight),
                 Size = new Size(
                     size.Width - (CardPadding * 2),
-                    size.Height - 90 - CardPadding),
+                    size.Height - UpdateHistoryTop - CardPadding),
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom
                        | AnchorStyles.Left | AnchorStyles.Right
             };
