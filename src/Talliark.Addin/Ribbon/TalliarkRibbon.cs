@@ -477,7 +477,7 @@ namespace Talliark.Addin.Ribbon
 
         public System.Drawing.Bitmap GetReconcileImage(IRibbonControl control)
         {
-            return LoadEmbeddedSvgAsIcon("icon-manage-files.svg");
+            return LoadEmbeddedSvgAsIcon("icon-reconcile.svg");
         }
 
         public System.Drawing.Bitmap GetLinkDocumentsImage(IRibbonControl control)

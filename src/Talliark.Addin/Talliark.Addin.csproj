@@ -337,6 +337,7 @@
     <EmbeddedResource Include="..\resources\icons\icon-import-clipboard.svg" />
     <EmbeddedResource Include="..\resources\icons\icon-import-folder.svg" />
     <EmbeddedResource Include="..\resources\icons\icon-manage-files.svg" />
+    <EmbeddedResource Include="..\resources\icons\icon-reconcile.svg" />
     <EmbeddedResource Include="..\resources\icons\icon-link-documents.svg" />
     <EmbeddedResource Include="..\resources\icons\icon-settings.svg" />
     <EmbeddedResource Include="..\resources\icons\icon-viewer.svg" />

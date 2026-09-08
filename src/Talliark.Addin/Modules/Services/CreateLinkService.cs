@@ -70,14 +70,12 @@ namespace Talliark.Addin.Modules.Services
                 }
             }
 
-            Excel.Range cell = startCell;
-            for (int col = 0; col < MaxSearchColumns; col++)
+            IList<LinkedRectangle> links = session.GetLinks();
+            Excel.Range cell = FindAvailableCell(startCell, links);
+            if (cell == null)
             {
-                object value = cell.Value2;
-                if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
-                    break;
-
-                cell = cell.get_Offset(0, 1);
+                Trace($"no available target cell found within {MaxSearchColumns} columns");
+                return (null, links);
             }
             Trace($"target cell={cell.Address} (moved={cell.Column != startCell.Column})");
 
@@ -96,11 +94,9 @@ namespace Talliark.Addin.Modules.Services
             string sheetName = ((Excel.Worksheet)cell.Worksheet).Name;
             string address   = cell.Address;
 
-            IList<LinkedRectangle> links;
             int trackIndex;
-            using (Time("GetLinks + NextTrackIndex"))
+            using (Time("NextTrackIndex"))
             {
-                links = session.GetLinks();
                 trackIndex = LinkCellTracker.NextTrackIndex(links);
             }
 
@@ -139,6 +135,47 @@ namespace Talliark.Addin.Modules.Services
             Trace("returning");
 
             return (linkedRect, session.GetLinks());
+        }
+
+        /// <summary>
+        /// Finds the first cell at or to the right of <paramref name="startCell"/> that has
+        /// neither Excel content nor an existing Talliark link binding.
+        /// </summary>
+        /// <remarks>
+        /// A Table link is bound to its top-left cell even when that table cell is empty.
+        /// Looking only at <c>Value2</c> therefore mistakes the anchor for an available cell
+        /// and lets the next interactive link overwrite the table binding. Reading
+        /// <c>Formula</c> also preserves formulas whose displayed result is an empty string.
+        /// </remarks>
+        private static Excel.Range FindAvailableCell(
+            Excel.Range startCell,
+            IList<LinkedRectangle> links)
+        {
+            var worksheet = (Excel.Worksheet)startCell.Worksheet;
+            int candidateCount = Math.Min(
+                MaxSearchColumns,
+                worksheet.Columns.Count - startCell.Column + 1);
+            Excel.Range lastCandidate = startCell.get_Offset(0, candidateCount - 1);
+            Excel.Range searchRange = worksheet.Range[startCell, lastCandidate];
+
+            var linkedColumns = new HashSet<int>(
+                LinkCellResolver.ResolveLinksInSelection(links, searchRange)
+                    .Select(entry => entry.Cell.Column));
+
+            Excel.Range candidate = startCell;
+            for (int offset = 0; offset < candidateCount; offset++)
+            {
+                object formula = candidate.Formula;
+                bool hasContent = formula != null
+                    && !string.IsNullOrWhiteSpace(formula.ToString());
+                if (!hasContent && !linkedColumns.Contains(candidate.Column))
+                    return candidate;
+
+                if (offset + 1 < candidateCount)
+                    candidate = candidate.get_Offset(0, 1);
+            }
+
+            return null;
         }
 
         private (LinkedRectangle LinkedRect, IList<LinkedRectangle> AllRects) CreateTableLink(
