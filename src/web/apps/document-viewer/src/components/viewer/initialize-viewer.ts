@@ -21,6 +21,7 @@ import { createSearchNavigator } from "./search-navigator.js";
 import { TableCopyModal } from "../table-copy-modal/table-copy-modal.js";
 import { TextContentCache } from "../../services/text-content-cache.js";
 import { TableStructureCache } from "../../services/table-structure-cache.js";
+import { TableNoticeDismissals } from "../../services/table-notice-dismissals.js";
 import { ValuesCache } from "../../services/values-cache.js";
 import { ValuesOverlay } from "./values-overlay.js";
 import { getSpanLinkTarget } from "./span-link-bounds.js";
@@ -292,14 +293,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     return { ...entry, table };
   };
 
-  /**
-   * Remaining count at which the notice was last put away, per document.
-   *
-   * Re-detection that finds more tables than the user dismissed is news worth
-   * repeating; working through the ones they already saw is not, so a count
-   * that only falls leaves the notice dismissed.
-   */
-  const _noticeDismissedAt = new Map<string, number>();
+  const noticeDismissals = new TableNoticeDismissals();
 
   /**
    * Tables linked in this viewer but not yet echoed back by the host.
@@ -345,7 +339,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     });
     tableNotice.setCount(remaining);
     tableNotice.setVisible(
-      !_tableModelEnabled && remaining > (_noticeDismissedAt.get(pdfId) ?? 0),
+      !_tableModelEnabled && noticeDismissals.shouldShow(pdfId, remaining),
     );
   };
 
@@ -371,7 +365,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   // what it had to say, and turning them off again should not bring it back.
   const putNoticeAway = (): void => {
     const pdfId = viewer.getActivePdfId();
-    if (pdfId) _noticeDismissedAt.set(pdfId, _remainingTables);
+    if (pdfId) noticeDismissals.dismiss(pdfId, _remainingTables);
   };
 
   tableNotice.onShow(() => {
