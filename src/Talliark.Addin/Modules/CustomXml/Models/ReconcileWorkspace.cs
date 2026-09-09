@@ -8,13 +8,19 @@ namespace Talliark.Addin.Modules.CustomXml.Models
     {
         public const uint CurrentVersion = 1;
         public uint Version { get; set; } = CurrentVersion;
+        public string ProjectName { get; set; }
         public IList<ReconcileDocument> Documents { get; set; } = new List<ReconcileDocument>();
 
         public ReconcileDocument Primary => Documents?.FirstOrDefault(
             d => string.Equals(d.Role, ReconcileRoles.Primary, StringComparison.Ordinal));
 
+        public ReconcileDocument Comparison1 => Documents?.FirstOrDefault(
+            d => string.Equals(d.Role, ReconcileRoles.Comparison1, StringComparison.Ordinal));
+
         public void Validate()
         {
+            if (ProjectName != null && (string.IsNullOrWhiteSpace(ProjectName) || ProjectName.Trim().Length > 120))
+                throw new InvalidOperationException("A Reconcile project name must be between 1 and 120 characters.");
             var documents = Documents ?? new List<ReconcileDocument>();
             if (documents.Count > 3) throw new InvalidOperationException("A Reconcile workspace supports at most three document slots.");
             if (documents.Count(d => d.Role == ReconcileRoles.Primary) > 1)

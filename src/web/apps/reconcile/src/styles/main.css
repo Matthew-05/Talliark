@@ -2,7 +2,7 @@
 @import "@talliark/shared/pdf-viewer.css";
 @import "./layout.css";
 @import "./buttons.css";
-@import "./splash.css";
+@import "./setup-wizard.css";
 @import "./document-list.css";
 @import "./scan-progress.css";
 @import "./result-view.css";

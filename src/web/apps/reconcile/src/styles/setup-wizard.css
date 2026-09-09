@@ -1,0 +1,305 @@
+.setup-wizard {
+  width: min(760px, 100%);
+  margin: auto;
+  padding: 28px 0 40px;
+  color: var(--color-text);
+}
+
+.setup-wizard__header {
+  margin-bottom: 24px;
+}
+
+.setup-wizard__eyebrow,
+.setup-panel__number {
+  margin-bottom: 7px;
+  color: var(--color-accent-hover);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.setup-wizard__header h1 {
+  margin-bottom: 8px;
+  font-size: 28px;
+  font-weight: 680;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+}
+
+.setup-wizard__header p,
+.setup-panel > p {
+  color: var(--color-text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.setup-progress {
+  display: grid;
+  margin: 0 0 18px;
+  padding: 0 12px;
+  grid-template-columns: repeat(3, 1fr);
+  list-style: none;
+}
+
+.setup-progress li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.setup-progress li:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  top: 16px;
+  left: 36px;
+  right: 8px;
+  height: 1px;
+  background: var(--color-border);
+  content: "";
+}
+
+.setup-progress li span {
+  z-index: 1;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg);
+  font-weight: 700;
+}
+
+.setup-progress li.is-current,
+.setup-progress li.is-complete {
+  color: var(--color-text);
+}
+
+.setup-progress li.is-current span {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(var(--color-accent-rgb), .12);
+}
+
+.setup-progress li.is-complete span {
+  border-color: rgba(var(--color-accent-rgb), .35);
+  background: rgba(var(--color-accent-rgb), .1);
+  color: var(--color-accent-hover);
+}
+
+.setup-panel {
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgba(26, 26, 40, .07);
+}
+
+.setup-panel h2 {
+  margin-bottom: 7px;
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.statement-selection {
+  display: grid;
+  margin-top: 22px;
+  padding: 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg);
+}
+
+.statement-selection.is-selected {
+  border-style: solid;
+  border-color: rgba(var(--color-accent-rgb), .45);
+  background: rgba(var(--color-accent-rgb), .055);
+}
+
+.statement-selection__icon {
+  display: grid;
+  width: 42px;
+  height: 48px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--color-text);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+
+.statement-selection div:nth-child(2),
+.future-period div,
+.setup-placeholder {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statement-selection strong {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statement-selection span,
+.future-period span,
+.setup-placeholder span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.imported-picker {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.imported-picker label,
+.project-name-field > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.imported-picker > div {
+  display: flex;
+  gap: 8px;
+}
+
+.imported-picker select,
+.project-name-field input {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.imported-picker select {
+  flex: 1;
+  padding: 8px 10px;
+}
+
+.imported-picker__clear {
+  align-self: center;
+  padding: 4px 5px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.imported-picker__clear:hover {
+  color: var(--color-text);
+}
+
+.imported-picker__clear:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.future-period,
+.setup-placeholder {
+  display: flex;
+  margin-top: 18px;
+  padding: 14px 16px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.future-period__badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  font-size: 12px !important;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.project-name-field {
+  display: block;
+  margin-top: 22px;
+}
+
+.project-name-field input {
+  width: 100%;
+  padding: 11px 12px;
+  font-size: 16px;
+}
+
+.project-name-field input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb), .12);
+}
+
+.setup-summary {
+  display: grid;
+  margin-top: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.setup-summary > div {
+  display: flex;
+  min-width: 0;
+  padding: 12px 14px;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 7px;
+  background: var(--color-bg);
+}
+
+.setup-summary span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.setup-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-panel__footer {
+  display: flex;
+  margin-top: 24px;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.setup-panel__footer .button--quiet:first-child {
+  margin-right: auto;
+}
+
+@media (max-width: 660px) {
+  .setup-wizard { padding-top: 8px; }
+  .setup-wizard__header h1 { font-size: 23px; }
+  .setup-progress { padding: 0; }
+  .setup-progress li { gap: 6px; }
+  .setup-progress li strong { font-size: 12px; }
+  .setup-panel { padding: 20px; }
+  .statement-selection { grid-template-columns: auto minmax(0, 1fr); }
+  .statement-selection .button { grid-column: 1 / -1; }
+  .setup-summary { grid-template-columns: 1fr; }
+}

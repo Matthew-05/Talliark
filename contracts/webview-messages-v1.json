@@ -1106,21 +1106,28 @@
       ]
     },
 
-    "ImportReconcilePrimaryMessage": {
-      "description": "Opens the shared import/convert flow and replaces the workbook's Reconcile primary with an independent snapshot.",
-      "type": "object", "required": ["type"], "additionalProperties": false,
-      "properties": { "type": { "const": "import-reconcile-primary" } }
-    },
-    "ImportReconcilePrimaryClipboardMessage": {
-      "description": "Imports the first file path on the Windows clipboard through the shared import/convert flow into an independent Reconcile primary snapshot.",
-      "type": "object", "required": ["type"], "additionalProperties": false,
-      "properties": { "type": { "const": "import-reconcile-primary-clipboard" } }
+    "ReconcileDocumentRole": {
+      "type": "string",
+      "enum": ["primary", "comparison-1", "comparison-2"],
+      "description": "The statement's place in the Reconcile workspace. The setup wizard currently fills primary and comparison-1; comparison-2 is reserved for a later period."
     },
 
-    "CopyReconcilePrimaryMessage": {
-      "description": "Copies one ordinary imported PDF into a new independent Reconcile document/version snapshot. sourcePdfId is intake-only and is never persisted.",
-      "type": "object", "required": ["type", "sourcePdfId"], "additionalProperties": false,
-      "properties": { "type": { "const": "copy-reconcile-primary" }, "sourcePdfId": { "type": "string", "minLength": 1 } }
+    "ImportReconcileDocumentMessage": {
+      "description": "Opens the shared import/convert flow and replaces one Reconcile document slot with an independent snapshot.",
+      "type": "object", "required": ["type", "role"], "additionalProperties": false,
+      "properties": { "type": { "const": "import-reconcile-document" }, "role": { "$ref": "#/definitions/ReconcileDocumentRole" } }
+    },
+
+    "CopyReconcileDocumentMessage": {
+      "description": "Copies one ordinary imported PDF into a Reconcile document slot as a new independent snapshot. sourcePdfId is intake-only and is never persisted.",
+      "type": "object", "required": ["type", "role", "sourcePdfId"], "additionalProperties": false,
+      "properties": { "type": { "const": "copy-reconcile-document" }, "role": { "$ref": "#/definitions/ReconcileDocumentRole" }, "sourcePdfId": { "type": "string", "minLength": 1 } }
+    },
+
+    "CompleteReconcileSetupMessage": {
+      "description": "Names the Reconcile project and starts the initial scan of its current statement. Both current and prior statements must already be present.",
+      "type": "object", "required": ["type", "projectName"], "additionalProperties": false,
+      "properties": { "type": { "const": "complete-reconcile-setup" }, "projectName": { "type": "string", "minLength": 1, "maxLength": 120 } }
     },
 
     "ReconcileReadyMessage": {
@@ -1142,11 +1149,12 @@
     "ReconcileDocumentPayload": {
       "description": "One document in the workbook as the Reconcile home lists it: what it is, and what reconcile data the workbook holds for it. The counts travel with the list so the home can render without loading a sum tree per document -- a clean scan reads '14 totals verified, 0 exceptions', which is what makes it trustworthy instead of indistinguishable from a scan that never ran.",
       "type": "object",
-      "required": ["id", "versionId", "name", "staleness"],
+      "required": ["id", "versionId", "role", "name", "staleness"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "description": "GUID of the Reconcile-owned document." },
         "versionId": { "type": "string", "description": "GUID of its current Reconcile-owned version." },
+        "role": { "$ref": "#/definitions/ReconcileDocumentRole" },
         "name": { "type": "string", "description": "Display name." },
         "folderId": { "type": "string", "description": "GUID of the owning folder, absent when uncategorised." },
         "pageCount": { "type": "integer", "minimum": 0 },
@@ -1171,19 +1179,20 @@
     },
 
     "ReconcileDataLoadedMessage": {
-      "description": "Sent by the host in response to ReconcileReadyMessage, and again whenever the workbook's documents or their stored results change. An empty documents array is what puts the app on its 'add or select a document' splash; a non-empty one puts it on the home.",
+      "description": "Sent by the host in response to ReconcileReadyMessage, and again whenever the workspace changes. The app shows setup until the project is named and both required statement roles are filled.",
       "type": "object",
       "required": ["type", "documents"],
       "additionalProperties": false,
       "properties": {
         "type": { "const": "reconcile-data-loaded" },
+        "projectName": { "type": "string", "description": "User-facing name of a completed Reconcile project. Absent while setup is incomplete." },
         "documents": { "type": "array", "items": { "$ref": "#/definitions/ReconcileDocumentPayload" } },
         "sources": { "type": "array", "description": "Ordinary imported documents offered only as one-time copy sources.", "items": { "type": "object", "required": ["id", "name"], "additionalProperties": false, "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } },
         "scanning": { "type": "string", "description": "GUID of the document a scan is already running for, so an app that mounts mid-scan shows progress rather than an idle home. Absent when no scan is running." }
       },
       "examples": [
         { "type": "reconcile-data-loaded", "documents": [] },
-        { "type": "reconcile-data-loaded", "documents": [ { "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "name": "apple 10k.pdf", "pageCount": 84, "staleness": "current", "scannedAt": "2026-09-06T18:04:11Z", "summary": { "tablesExamined": 61, "totalsNominated": 14, "confirmed": 14, "breaks": 0, "unresolved": 0 } } ] }
+        { "type": "reconcile-data-loaded", "projectName": "FY26 statements", "documents": [ { "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "versionId": "67c36b64-5f9a-4b42-878f-95b077a5168d", "role": "primary", "name": "apple 10k.pdf", "pageCount": 84, "staleness": "current", "scannedAt": "2026-09-06T18:04:11Z", "summary": { "tablesExamined": 61, "totalsNominated": 14, "confirmed": 14, "breaks": 0, "unresolved": 0 } } ] }
       ]
     },
 
@@ -1494,9 +1503,9 @@
     { "$ref": "#/definitions/PageRotationsUpdatedMessage" },
 
     { "$ref": "#/definitions/ReconcileReadyMessage" },
-    { "$ref": "#/definitions/ImportReconcilePrimaryMessage" },
-    { "$ref": "#/definitions/ImportReconcilePrimaryClipboardMessage" },
-    { "$ref": "#/definitions/CopyReconcilePrimaryMessage" },
+    { "$ref": "#/definitions/ImportReconcileDocumentMessage" },
+    { "$ref": "#/definitions/CopyReconcileDocumentMessage" },
+    { "$ref": "#/definitions/CompleteReconcileSetupMessage" },
     { "$ref": "#/definitions/ReconcileDataLoadedMessage" },
     { "$ref": "#/definitions/RunReconcileScanMessage" },
     { "$ref": "#/definitions/CancelReconcileScanMessage" },

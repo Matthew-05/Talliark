@@ -38,14 +38,16 @@ currentness against that same snapshot; the Reconcile
 detector version also includes the financial-table version because the sister is
 a private implementation dependency rather than a separately stored artifact.
 
-One dedicated workbook Custom XML part owns the workspace. Its current model has
-one primary slot and reserves `comparison-1` and `comparison-2`; each slot has a
-document identity and one current version identity. Importing or copying creates
-new identities and duplicates bytes rather than retaining an ordinary-document
-reference. A successful scan atomically replaces the primary version's analysis
-artifacts and result. Failure or cancellation performs no storage write, so an
-earlier successful result remains intact. Comparison analysis and version-history
-UI are intentionally not implemented.
+One dedicated workbook Custom XML part owns the named project. Setup fills the
+`primary` slot with the current statement and `comparison-1` with the prior-year
+statement; `comparison-2` remains reserved for another prior period. Each slot
+has a document identity and one current version identity. Importing or copying
+creates new identities and duplicates bytes rather than retaining an
+ordinary-document reference. Completing setup scans the primary only. A
+successful scan atomically replaces that version's analysis artifacts and
+result. Failure or cancellation performs no storage write, so an earlier
+successful result remains intact. Comparison analysis and version-history UI
+are intentionally not implemented.
 
 ## 3. Types
 

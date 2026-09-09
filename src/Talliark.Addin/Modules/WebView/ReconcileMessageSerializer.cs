@@ -10,13 +10,15 @@ namespace Talliark.Addin.Modules.WebView
         public static string BuildDataLoaded(
             IList<ReconcileDocumentInfo> documents,
             IList<PdfMetadata> sources,
-            string scanningPdfId)
+            string scanningPdfId,
+            string projectName)
         {
             var root = new Dictionary<string, object>
             {
                 ["type"] = "reconcile-data-loaded",
                 ["documents"] = BuildDocuments(documents),
             };
+            if (!string.IsNullOrWhiteSpace(projectName)) root["projectName"] = projectName;
             if (sources != null) root["sources"] = BuildSources(sources);
             if (!string.IsNullOrEmpty(scanningPdfId)) root["scanning"] = scanningPdfId;
             return Serialize(root);
@@ -71,6 +73,7 @@ namespace Talliark.Addin.Modules.WebView
                 {
                     ["id"] = document.Id,
                     ["versionId"] = document.VersionId,
+                    ["role"] = document.Role,
                     ["name"] = document.Name,
                     ["staleness"] = document.Staleness,
                 };

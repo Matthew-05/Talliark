@@ -179,12 +179,13 @@ Reconcile.
 Two consequences worth stating before anything is built:
 
 - **Reconcile is a workbook-scoped workspace, not an ordinary document cache.**
-  It owns one primary document and its current version in a dedicated Custom XML
-  part. Import or copy duplicates the PDF bytes and assigns Reconcile document
-  and version ids. Ordinary rename, deletion, OCR, and settings changes cannot
-  change that snapshot. The concrete storage reserves two comparison roles and
-  one current version per role; comparison analysis and version history are not
-  exposed yet.
+  A named project owns a current statement in its primary slot and a prior-year
+  statement in its first comparison slot, each with one current version, in a
+  dedicated Custom XML part. Import or copy duplicates the PDF bytes and assigns
+  Reconcile document and version ids. Ordinary rename, deletion, OCR, and
+  settings changes cannot change those snapshots. The second comparison role is
+  reserved for another prior period. Only the current statement is analysed;
+  comparison analysis and version history are not exposed yet.
 - **Published table structure is experimental during ordinary OCR.** The
   user-scoped setting defaults off. Table-cell recovery stays unconditional
   because it improves source text geometry; only general table publication and

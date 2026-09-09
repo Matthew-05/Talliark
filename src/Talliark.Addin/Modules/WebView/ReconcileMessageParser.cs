@@ -23,5 +23,21 @@ namespace Talliark.Addin.Modules.WebView
                 && item is string id && !string.IsNullOrWhiteSpace(id)) return id;
             throw new FormatException("Reconcile message missing 'sourcePdfId'.");
         }
+
+        public static string ParseRole(string json)
+        {
+            var value = WebMessageParser.Serializer.Deserialize<Dictionary<string, object>>(json);
+            if (value != null && value.TryGetValue("role", out object item)
+                && item is string role && Talliark.Addin.Modules.CustomXml.Models.ReconcileRoles.IsValid(role)) return role;
+            throw new FormatException("Reconcile message missing a valid 'role'.");
+        }
+
+        public static string ParseProjectName(string json)
+        {
+            var value = WebMessageParser.Serializer.Deserialize<Dictionary<string, object>>(json);
+            if (value != null && value.TryGetValue("projectName", out object item)
+                && item is string name && !string.IsNullOrWhiteSpace(name)) return name;
+            throw new FormatException("Reconcile message missing 'projectName'.");
+        }
     }
 }

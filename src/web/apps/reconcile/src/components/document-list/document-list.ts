@@ -17,14 +17,13 @@
  * means the scan found nothing it could check, which is a statement about the
  * scan.
  */
-import type { ReconcileDocument, ReconcileImportSource, ReconcileSummary } from "../../types/index.js";
+import type { ReconcileDocument, ReconcileDocumentRole, ReconcileImportSource, ReconcileSummary } from "../../types/index.js";
 
 export interface DocumentListCallbacks {
   onScan(pdfId: string): void;
   onOpen(pdfId: string): void;
-  onImport(): void;
-  onClipboard(): void;
-  onCopy(sourcePdfId: string): void;
+  onImport(role: ReconcileDocumentRole): void;
+  onCopy(role: ReconcileDocumentRole, sourcePdfId: string): void;
 }
 
 /** What a stored scan came to, in the sentence the home prints for it. */
@@ -60,6 +59,7 @@ export class DocumentList {
   private documents: ReconcileDocument[] = [];
   private scanningId: string | null = null;
   private sources: ReconcileImportSource[] = [];
+  private projectName = "Reconcile";
   private readonly callbacks: DocumentListCallbacks;
 
   constructor(parent: HTMLElement, callbacks: DocumentListCallbacks) {
@@ -69,7 +69,8 @@ export class DocumentList {
 
     const heading = document.createElement("h1");
     heading.className = "document-list__title";
-    heading.textContent = "Reconcile";
+    heading.textContent = this.projectName;
+    heading.dataset.projectName = "";
 
     this.body = document.createElement("div");
     this.body.className = "document-list__body";
@@ -92,6 +93,11 @@ export class DocumentList {
     this.documents = documents;
     this.render();
   }
+  setProjectName(projectName: string): void {
+    this.projectName = projectName || "Reconcile";
+    const heading = this.element.querySelector<HTMLElement>("[data-project-name]");
+    if (heading) heading.textContent = this.projectName;
+  }
   setSources(sources: ReconcileImportSource[]): void { this.sources = sources; this.render(); }
 
   private render(): void {
@@ -104,20 +110,20 @@ export class DocumentList {
       replace.className = "document-row__actions";
       const button = document.createElement("button");
       button.type = "button"; button.className = "button button--secondary";
-      button.textContent = "Replace primary…"; button.disabled = this.scanningId !== null;
-      button.addEventListener("click", this.callbacks.onImport);
-      const clipboard = document.createElement("button");
-      clipboard.type = "button"; clipboard.className = "button button--secondary";
-      clipboard.textContent = "Replace from clipboard"; clipboard.disabled = this.scanningId !== null;
-      clipboard.addEventListener("click", this.callbacks.onClipboard);
+      button.textContent = "Replace current…"; button.disabled = this.scanningId !== null;
+      button.addEventListener("click", () => this.callbacks.onImport("primary"));
+      const prior = document.createElement("button");
+      prior.type = "button"; prior.className = "button button--secondary";
+      prior.textContent = "Replace prior…"; prior.disabled = this.scanningId !== null;
+      prior.addEventListener("click", () => this.callbacks.onImport("comparison-1"));
       const select = document.createElement("select");
       select.append(new Option("Copy replacement from imported documents…", ""),
         ...this.sources.map((source) => new Option(source.name, source.id)));
       const copy = document.createElement("button");
-      copy.type = "button"; copy.className = "button button--secondary"; copy.textContent = "Replace with copy";
+      copy.type = "button"; copy.className = "button button--secondary"; copy.textContent = "Use as current";
       copy.disabled = this.scanningId !== null;
-      copy.addEventListener("click", () => { if (select.value) this.callbacks.onCopy(select.value); });
-      replace.append(button, clipboard, select, copy);
+      copy.addEventListener("click", () => { if (select.value) this.callbacks.onCopy("primary", select.value); });
+      replace.append(button, prior, select, copy);
       this.body.appendChild(replace);
     }
   }
@@ -131,6 +137,10 @@ export class DocumentList {
     name.className = "document-row__name";
     name.textContent = entry.name;
 
+    const role = document.createElement("div");
+    role.className = "document-row__role";
+    role.textContent = entry.role === "primary" ? "Current statement" : "Prior statement";
+
     const status = document.createElement("div");
     status.className = "document-row__status";
     status.textContent = this.statusText(entry);
@@ -138,7 +148,7 @@ export class DocumentList {
     const actions = document.createElement("div");
     actions.className = "document-row__actions";
 
-    if (entry.summary && entry.staleness !== "none") {
+    if (entry.role === "primary" && entry.summary && entry.staleness !== "none") {
       const open = document.createElement("button");
       open.type = "button";
       open.className = "button button--secondary";
@@ -147,21 +157,22 @@ export class DocumentList {
       actions.appendChild(open);
     }
 
-    const scan = document.createElement("button");
-    scan.type = "button";
-    scan.className = "button button--primary";
-    // Only an explicit re-scan replaces a result, so the verb changes but the
-    // action does not: nothing recomputes on its own.
-    scan.textContent = entry.staleness === "none" ? "Scan" : "Re-scan";
-    scan.disabled = this.scanningId !== null;
-    scan.addEventListener("click", () => this.callbacks.onScan(entry.id));
-    actions.appendChild(scan);
+    if (entry.role === "primary") {
+      const scan = document.createElement("button");
+      scan.type = "button";
+      scan.className = "button button--primary";
+      scan.textContent = entry.staleness === "none" ? "Scan" : "Re-scan";
+      scan.disabled = this.scanningId !== null;
+      scan.addEventListener("click", () => this.callbacks.onScan(entry.id));
+      actions.appendChild(scan);
+    }
 
-    row.append(name, status, actions);
+    row.append(role, name, status, actions);
     return row;
   }
 
   private statusText(entry: ReconcileDocument): string {
+    if (entry.role !== "primary") return "Comparison period · analysis coming later";
     if (entry.staleness === "none" || !entry.summary) return "Not scanned";
     const sentence = summarySentence(entry.summary);
     // A stale result is labelled stale and still shown. It is not recomputed

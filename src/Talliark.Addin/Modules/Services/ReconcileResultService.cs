@@ -24,9 +24,8 @@ namespace Talliark.Addin.Modules.Services
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
             ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
-            return workspace.Primary == null
-                ? new List<ReconcileDocumentInfo>()
-                : new List<ReconcileDocumentInfo> { ReadDocument(workspace.Primary) };
+            return (workspace.Documents ?? new List<ReconcileDocument>())
+                .Select(ReadDocument).ToList();
         }
 
         public ReconcileStoredResult LoadResult(Excel.Workbook workbook, string pdfId)
@@ -54,6 +53,7 @@ namespace Talliark.Addin.Modules.Services
             {
                 Id = document.Id,
                 VersionId = parts.Id,
+                Role = document.Role,
                 Name = document.DisplayName ?? string.Empty,
                 Staleness = "none",
             };
@@ -296,6 +296,7 @@ namespace Talliark.Addin.Modules.Services
     {
         public string Id { get; set; }
         public string Name { get; set; }
+        public string Role { get; set; }
         public string VersionId { get; set; }
         public string FolderId { get; set; }
         public int? PageCount { get; set; }

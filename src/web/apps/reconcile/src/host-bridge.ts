@@ -13,12 +13,14 @@ import type {
   ScanStatus,
   Staleness,
   ReconcileImportSource,
+  ReconcileDocumentRole,
 } from "./types/index.js";
 
 // ── Inbound (host → web) ─────────────────────────────────────────────────────
 
 interface ReconcileDataLoadedMessage {
   type: "reconcile-data-loaded";
+  projectName?: string;
   documents: ReconcileDocument[];
   sources?: ReconcileImportSource[];
   /** Set when a scan is already running as this app mounts. */
@@ -72,6 +74,7 @@ export interface HostHandlers {
     documents: ReconcileDocument[],
     sources: ReconcileImportSource[],
     scanning: string | null,
+    projectName: string,
   ): void;
   onScanStatus(pdfId: string, status: ScanStatus, progress: ScanProgress): void;
   onResultLoaded?(
@@ -104,6 +107,7 @@ export function initHostBridge(handlers: HostHandlers): void {
         msg.documents ?? [],
         msg.sources ?? [],
         msg.scanning ?? null,
+        msg.projectName ?? "",
       );
     } else if (msg.type === "reconcile-scan-status") {
       handlers.onScanStatus(msg.pdfId, msg.status, {
@@ -152,8 +156,12 @@ export function sendRequestResult(pdfId: string): void {
   send({ type: "request-reconcile-result", pdfId });
 }
 
-export function sendImportPrimary(): void { send({ type: "import-reconcile-primary" }); }
-export function sendImportPrimaryFromClipboard(): void { send({ type: "import-reconcile-primary-clipboard" }); }
-export function sendCopyPrimary(sourcePdfId: string): void {
-  send({ type: "copy-reconcile-primary", sourcePdfId });
+export function sendImportDocument(role: ReconcileDocumentRole): void {
+  send({ type: "import-reconcile-document", role });
+}
+export function sendCopyDocument(role: ReconcileDocumentRole, sourcePdfId: string): void {
+  send({ type: "copy-reconcile-document", role, sourcePdfId });
+}
+export function sendCompleteSetup(projectName: string): void {
+  send({ type: "complete-reconcile-setup", projectName });
 }

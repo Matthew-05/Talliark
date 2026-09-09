@@ -13,6 +13,9 @@
       <xs:enumeration value="comparison-2" />
     </xs:restriction>
   </xs:simpleType>
+  <xs:simpleType name="ProjectName">
+    <xs:restriction base="xs:string"><xs:minLength value="1" /><xs:maxLength value="120" /></xs:restriction>
+  </xs:simpleType>
   <xs:complexType name="PageRotationType">
     <xs:attribute name="index" type="xs:nonNegativeInteger" use="required" />
     <xs:attribute name="rotation" use="required">
@@ -47,6 +50,9 @@
       <xs:element name="Documents" minOccurs="0"><xs:complexType><xs:sequence>
         <xs:element name="Document" type="DocumentType" minOccurs="0" maxOccurs="3" />
       </xs:sequence></xs:complexType></xs:element>
-    </xs:sequence><xs:attribute name="version" type="xs:positiveInteger" use="required" /></xs:complexType>
+    </xs:sequence>
+      <xs:attribute name="version" type="xs:positiveInteger" use="required" />
+      <xs:attribute name="projectName" type="ProjectName" use="optional" />
+    </xs:complexType>
   </xs:element>
 </xs:schema>

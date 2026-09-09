@@ -16,6 +16,7 @@
  * telling the reviewer something it does not know.
  */
 export type Staleness = "current" | "stale" | "none";
+export type ReconcileDocumentRole = "primary" | "comparison-1" | "comparison-2";
 
 /** The counts a stored reconcile-v1 model's summary carries, copied verbatim. */
 export interface ReconcileSummary {
@@ -29,6 +30,7 @@ export interface ReconcileSummary {
 export interface ReconcileDocument {
   readonly id: string;
   readonly versionId: string;
+  readonly role: ReconcileDocumentRole;
   readonly name: string;
   readonly folderId?: string | undefined;
   readonly pageCount?: number | undefined;

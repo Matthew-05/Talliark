@@ -38,6 +38,8 @@ namespace Talliark.Addin.Modules.CustomXml.Serialization
             }
             var root = new XElement(ns + "ReconcileWorkspace",
                 new XAttribute("version", workspace.Version), documents);
+            if (!string.IsNullOrWhiteSpace(workspace.ProjectName))
+                root.Add(new XAttribute("projectName", workspace.ProjectName.Trim()));
             return new XDocument(new XDeclaration("1.0", "utf-8", null), root).ToString(SaveOptions.DisableFormatting);
         }
 
@@ -50,6 +52,7 @@ namespace Talliark.Addin.Modules.CustomXml.Serialization
             var workspace = new ReconcileWorkspace
             {
                 Version = ParseUInt(root.Attribute("version")?.Value, ReconcileWorkspace.CurrentVersion),
+                ProjectName = (string)root.Attribute("projectName"),
                 Documents = new List<ReconcileDocument>()
             };
             foreach (XElement element in root.Element(ns + "Documents")?.Elements(ns + "Document") ?? Enumerable.Empty<XElement>())
