@@ -98,14 +98,18 @@ below the acceptance threshold is not published.
    coverage; and deduplicates overlapping proposals.
 6. `headers.py` recognizes period bands, stacked titles and complete all-word
    headers from the fitted cell matrix.
-7. `scoring.py` measures alignment, repetition, typing, spacing, headers, numeric
-   content, rulings, graphics and negative layouts. Every adjacent column pair is
-   checked for predominantly running prose, including inferred header rows, so an
-   extra provisional boundary cannot bypass the penalty. An inferred header earns
-   positive credit only when body values or rule intersections corroborate it. A
-   coherent ruled grid can override the prose ambiguity.
+7. `scoring.py` first requires an affirmative table credential: a coherent cell
+   lattice, a repeated value-dominant column, or a compact repeated categorical
+   schema. Only then does it measure alignment, repetition, typing, spacing,
+   headers, numeric content, rulings, graphics and negative layouts. This keeps
+   regular margins and line spacing from proving that narrative text is a table
+   merely because no negative heuristic recognized it. Every adjacent column pair
+   is checked for predominantly running prose, including inferred header rows, so
+   an extra provisional boundary cannot bypass the penalty. An inferred header
+   earns positive credit only when body values or rule intersections corroborate
+   it. A coherent ruled grid can override the prose ambiguity.
 8. `redesign.py` maps retained header-group coverage onto the final columns and
-   publishes accepted candidates as `table-detector-7`.
+   publishes accepted candidates as `table-detector-8`.
 9. `handoff.py` isolates accepted tables for downstream analysis and fingerprints
    the source geometry. It makes no detection or financial interpretation
    decision.
@@ -115,6 +119,7 @@ below the acceptance threshold is not published.
 | Setting | Value | Reason and effect |
 | --- | ---: | --- |
 | Acceptance confidence | `0.50` | Separates small but repeated tables from aligned lists and prose negatives. |
+| Table credential | ruling `>= 0.50`, repeated value column `>= 0.50`, or compact categorical schema `>= 2/3` | Acceptance requires positive evidence of cells before confidence is considered. Repeated value cells must be value-dominant and occur at least twice; categorical schemas need at least three matching rows and at most four tokens per occupied cell. |
 | Prose words per side | `4` | Requires sentence-like content in both columns; a short jurisdiction or code column remains table evidence. |
 | Prose numeric allowance | `2` | Years and small counts occur inside prose and must not disable the prose test. |
 | Dominant prose share | `0.50` in any adjacent column pair | Half the fitted rows, including a would-be header, establish a synchronized editorial layout; smaller shares retain a proportional penalty. |
@@ -150,6 +155,12 @@ rulings (`0.08`), numeric content (`0.10`), rule/grid agreement (`0.05`) and siz
 marker layouts (`0.30`), chart graphics (`0.50`), empty grids (`0.25`), irregular
 density (`0.20`), unstable schemas (`0.30`) and unrepeated two-line blocks
 (`0.35`).
+
+Those weights cannot establish a table by themselves. They rank a candidate only
+after the credential gate succeeds, so regular narrative layout cannot accumulate
+its way to acceptance. The categorical credential is deliberately conservative:
+long word-only cells without rulings or repeated value columns remain ambiguous
+and are declined even when their margins align perfectly.
 
 ## 6. Failure modes
 

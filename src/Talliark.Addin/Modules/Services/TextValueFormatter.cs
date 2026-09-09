@@ -15,7 +15,8 @@ namespace Talliark.Addin.Modules.Services
         /// parenthetical numbers to negatives, converts percentages ("1.15%") to their
         /// decimal fraction (0.0115) as Excel expects for percent-formatted cells, and
         /// strips numeric thousand-separator commas. Returns a <see cref="double"/> when
-        /// the entire trimmed text is a date or number; otherwise returns normalized text.
+        /// the entire trimmed text is a date or number; otherwise returns normalized
+        /// literal text that Excel cannot reinterpret as a formula.
         /// </summary>
         public static object FormatAuto(string text)
         {
@@ -26,7 +27,31 @@ namespace Talliark.Addin.Modules.Services
             if (number != null)
                 return number.Value;
 
-            return NormalizeAutoTextContent(text);
+            return FormatLiteralText(NormalizeAutoTextContent(text));
+        }
+
+        /// <summary>
+        /// Makes extracted document text safe to assign through Excel's <c>Value2</c>
+        /// property. Excel interprets text beginning with <c>=</c>, <c>+</c>, <c>-</c>
+        /// or <c>@</c> as a formula even when it came from a PDF. Prefixing an apostrophe
+        /// is Excel's native literal-text escape; it is not displayed in the cell or
+        /// returned by <c>Value2</c>.
+        /// </summary>
+        public static string FormatLiteralText(string text)
+        {
+            string value = text ?? string.Empty;
+            int firstContent = 0;
+            while (firstContent < value.Length && char.IsWhiteSpace(value[firstContent]))
+                firstContent++;
+
+            if (firstContent < value.Length
+                && (value[firstContent] == '='
+                    || value[firstContent] == '+'
+                    || value[firstContent] == '-'
+                    || value[firstContent] == '@'))
+                return "'" + value;
+
+            return value;
         }
 
         private static string NormalizeAutoTextContent(string text)

@@ -423,7 +423,7 @@ namespace Talliark.Addin.Modules.Services
             switch (linkType)
             {
                 case LinkType.Raw:
-                    cell.Value2 = text;
+                    cell.Value2 = TextValueFormatter.FormatLiteralText(text);
                     break;
 
                 case LinkType.Sum:
@@ -435,7 +435,7 @@ namespace Talliark.Addin.Modules.Services
                         cell.Calculate();
                     }
                     else
-                        cell.Value2 = text; // fallback: no numbers found, write raw
+                        cell.Value2 = TextValueFormatter.FormatLiteralText(text);
                     break;
 
                 default: // Auto

@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from statistics import mean, pstdev
 
-from engines.table.layout import PageLayout, LogicalRow
+from engines.table.layout import LogicalRow, PageLayout, TextToken
 from engines.table.grid import GridHypothesis, column_index
 
 
@@ -49,6 +49,8 @@ _PENALTY_WEIGHTS = {
     "unrepeated": 0.35,
 }
 
+_CREDENTIAL_FEATURES = ("value_column", "categorical_schema")
+
 
 @dataclass
 class CandidateFeatures:
@@ -73,6 +75,13 @@ class CandidateFeatures:
     density_irregularity: float = 0.0
     schema_instability: float = 0.0
     unrepeated: float = 0.0
+    # Acceptance credentials are not score weights. They answer the prior
+    # question "what positive evidence says this is a table at all?" before the
+    # confidence score ranks the quality of that table. Without this gate,
+    # regular spacing, aligned margins and repeated word types can make a block
+    # of prose score highly merely because no penalty recognized it.
+    value_column: float = 0.0
+    categorical_schema: float = 0.0
 
     def raw(self) -> float:
         positive = sum(weight * getattr(self, name) for name, weight in _POSITIVE_WEIGHTS.items())
@@ -85,12 +94,25 @@ class CandidateFeatures:
         return round(1.0 / (1.0 + math.exp(-(self.raw() - 0.42) * 7.0)), 4)
 
     def accepted(self) -> bool:
-        return self.confidence() >= ACCEPT_THRESHOLD
+        return self.has_table_credential() and self.confidence() >= ACCEPT_THRESHOLD
+
+    def has_table_credential(self) -> bool:
+        """Does independent evidence establish cells rather than text flow?"""
+        return (
+            self.ruling >= 0.50
+            or self.value_column >= 0.50
+            or self.categorical_schema >= 2 / 3
+        )
 
     def as_dict(self) -> dict:
+        names = (
+            list(_POSITIVE_WEIGHTS)
+            + list(_PENALTY_WEIGHTS)
+            + list(_CREDENTIAL_FEATURES)
+        )
         return {
             name: round(float(getattr(self, name)), 4)
-            for name in list(_POSITIVE_WEIGHTS) + list(_PENALTY_WEIGHTS)
+            for name in names
         }
 
     def weakest(self) -> str:
@@ -102,12 +124,28 @@ class CandidateFeatures:
         )
         name, weight = ranked[0]
         if weight * getattr(self, name) < 0.05:
-            return "insufficient-evidence"
+            return (
+                "insufficient-table-evidence"
+                if not self.has_table_credential()
+                else "insufficient-evidence"
+            )
         return name.replace("_", "-")
 
 
 def _value_signature(row: LogicalRow) -> frozenset[int]:
     return frozenset(index for index in row.occupied if index != 0)
+
+
+def _tokens_by_column(
+    row: LogicalRow,
+    boundaries: list[float],
+    column_count: int,
+) -> list[list[TextToken]]:
+    columns: list[list[TextToken]] = [[] for _ in range(column_count)]
+    for line in row.lines:
+        for token in line.tokens:
+            columns[column_index(boundaries, token.center)].append(token)
+    return columns
 
 
 def _graphics_coverage(bounds: dict, graphics: list[tuple[float, float, float, float]]) -> float:
@@ -169,6 +207,41 @@ def evaluate(
 
     features.multi_column = sum(1 for row in rows if len(row.occupied) >= 2) / len(rows)
     features.size = min(1.0, max(0.0, (len(rows) - 2) / 4.0))
+
+    # A confidence score only ranks candidates after something affirmative has
+    # established a cell structure. Repeated value-dominant cells are one such
+    # credential. A compact categorical matrix is the other: this preserves
+    # word-only catalogues (company/country, code/description) while refusing
+    # sentence fragments aligned by page composition or noisy extraction.
+    body_columns = [
+        _tokens_by_column(row, boundaries, grid.column_count)
+        for row in body
+    ]
+    repeated_value_ratios: list[float] = []
+    for index in range(grid.column_count):
+        value_cells = 0
+        for columns in body_columns:
+            meaningful = [token for token in columns[index] if not token.is_marker]
+            values = sum(1 for token in meaningful if token.is_value)
+            words = sum(1 for token in meaningful if token.kind in ("word", "ordinal"))
+            if values and values >= words:
+                value_cells += 1
+        if value_cells >= 2 and body:
+            repeated_value_ratios.append(value_cells / len(body))
+    features.value_column = max(repeated_value_ratios, default=0.0)
+
+    compact_signatures: list[tuple[int, ...]] = []
+    for columns in body_columns:
+        occupied = tuple(index for index, tokens in enumerate(columns) if tokens)
+        if len(occupied) < 2:
+            continue
+        if all(len(columns[index]) <= 4 for index in occupied):
+            compact_signatures.append(occupied)
+    if len(compact_signatures) >= 3 and body:
+        dominant = max(set(compact_signatures), key=compact_signatures.count)
+        repeated = compact_signatures.count(dominant)
+        if repeated >= 3:
+            features.categorical_schema = repeated / len(body)
 
     # Column typing: how consistently each value column holds one kind of thing.
     stabilities: list[float] = []

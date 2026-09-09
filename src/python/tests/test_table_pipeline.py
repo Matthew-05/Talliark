@@ -987,6 +987,47 @@ class ScoringTests(unittest.TestCase):
         self.assertGreater(features.prose_pair, 0.5)
         self.assertFalse(features.accepted())
 
+    def test_asymmetric_narrative_columns_have_no_table_credential(self) -> None:
+        # A PDF can extract each prose line as a long run plus a short island.
+        # The old additive score treated regular leading, aligned edges and four
+        # repeated rows as enough evidence even though neither side contains a
+        # value column or compact categorical cells.
+        rows = [
+            (0.100, [(0.05, "The company serves customers across the national market"),
+                     (0.82, "today")]),
+            (0.120, [(0.05, "Our platform supports clients through every operating cycle"),
+                     (0.82, "efficiently")]),
+            (0.140, [(0.05, "These services help organizations meet their sustainability goals"),
+                     (0.82, "consistently")]),
+            (0.160, [(0.05, "Management expects demand to remain strong across regions"),
+                     (0.82, "overall")]),
+        ]
+        features, _grid = self._score(page(rows))
+
+        self.assertGreater(features.confidence(), 0.5)
+        self.assertFalse(features.has_table_credential())
+        self.assertFalse(features.accepted())
+        self.assertEqual(features.weakest(), "insufficient-table-evidence")
+
+    def test_a_compact_word_only_catalogue_has_a_table_credential(self) -> None:
+        rows = [
+            (0.10 + index * 0.02, [(0.05, name), (0.80, place)])
+            for index, (name, place) in enumerate(
+                [
+                    ("Apple Asia Limited", "Hong Kong"),
+                    ("Apple Canada Inc.", "Canada"),
+                    ("Apple India Private Limited", "India"),
+                    ("Apple Japan, Inc.", "Japan"),
+                    ("Apple Operations Limited", "Ireland"),
+                ]
+            )
+        ]
+        features, _grid = self._score(page(rows))
+
+        self.assertGreaterEqual(features.categorical_schema, 2 / 3)
+        self.assertTrue(features.has_table_credential())
+        self.assertTrue(features.accepted())
+
     def test_parallel_prose_is_checked_across_every_adjacent_column_pair(self) -> None:
         rows = [
             (0.100, [(0.03, "Customer Service Priorities"),

@@ -40,10 +40,10 @@ namespace Talliark.Addin.Modules.Services
             new Regex(@"^\(([\d,]+(?:\.\d+)?)" + MagnitudePattern + @"?\)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _wholePercent =
-            new Regex(@"^([\d,]+(?:\.\d+)?)%$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            new Regex(@"^([+\-]?[\d,]+(?:\.\d+)?)%$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _wholePlain =
-            new Regex(@"^([\d,]+(?:\.\d+)?)" + MagnitudePattern + @"?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            new Regex(@"^([+\-]?[\d,]+(?:\.\d+)?)" + MagnitudePattern + @"?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _anyParentheticalPercent =
             new Regex(@"\(([\d,]+(?:\.\d+)?)%\)", RegexOptions.Compiled);
@@ -200,8 +200,8 @@ namespace Talliark.Addin.Modules.Services
             string normalized = Regex.Replace(text.Trim(), @"\s+", "");
             return Regex.Replace(
                 normalized,
-                @"^(\()?(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|CNY|INR|KRW|[$€£¥₹₩])",
-                "$1",
+                @"^(\()?([+\-]?)(?:USD|EUR|GBP|JPY|CAD|AUD|CHF|CNY|INR|KRW|[$€£¥₹₩])",
+                "$1$2",
                 RegexOptions.IgnoreCase);
         }
     }
