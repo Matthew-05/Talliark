@@ -12,7 +12,6 @@ import type {
 } from "../../types/index.js";
 
 export interface ResultViewCallbacks {
-  onBack(): void;
   onRescan(pdfId: string): void;
 }
 
@@ -61,7 +60,6 @@ export class ResultView {
 
   private renderWorkspace(entry: ReconcileDocument, content?: HTMLElement): void {
     const shell = new ResultsShell(entry, {
-      onBack: () => this.callbacks.onBack(),
       onRescan: (pdfId) => this.callbacks.onRescan(pdfId),
       onModeChanged: (mode) => this.showMode(mode),
     });

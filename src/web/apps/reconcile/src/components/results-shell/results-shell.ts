@@ -3,7 +3,6 @@ import type { ReconcileDocument } from "../../types/index.js";
 export type ReviewMode = "mathematical" | "intra-document" | "inter-document";
 
 export interface ResultsShellCallbacks {
-  onBack(): void;
   onRescan(pdfId: string): void;
   onModeChanged(mode: ReviewMode): void;
 }
@@ -29,18 +28,15 @@ export class ResultsShell {
     topbar.className = "results-shell__topbar";
     const identity = document.createElement("div");
     identity.className = "results-shell__identity";
-    const back = document.createElement("button");
-    back.type = "button";
-    back.className = "results-shell__back";
-    back.textContent = "← Documents";
-    back.addEventListener("click", callbacks.onBack);
     const title = document.createElement("strong");
     title.className = "results-shell__title";
     title.textContent = entry.name;
     const badge = document.createElement("span");
     badge.className = `status-badge status-badge--${entry.staleness}`;
-    badge.textContent = entry.staleness === "stale" ? "Stale" : "Current";
-    identity.append(back, title, badge);
+    badge.textContent = entry.staleness === "stale"
+      ? "Stale"
+      : entry.staleness === "none" ? "Not scanned" : "Current";
+    identity.append(title, badge);
 
     const actions = document.createElement("div");
     actions.className = "results-shell__actions";

@@ -20,30 +20,85 @@ namespace Talliark.Addin.Modules.Services
     /// </summary>
     internal sealed class ReconcileResultService
     {
-        public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
+public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
             ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
-            return (workspace.Documents ?? new List<ReconcileDocument>())
-                .Select(ReadDocument).ToList();
+            var result = new List<ReconcileDocumentInfo>();
+            if (workspace.Primary != null) result.Add(ReadDocument(workspace.Primary));
+            foreach (ReconcileComparison comparison in workspace.Comparisons ?? new List<ReconcileComparison>())
+                result.Add(ReadComparison(comparison));
+            return result;
         }
 
         public ReconcileStoredResult LoadResult(Excel.Workbook workbook, string pdfId)
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
-            ReconcileDocument document = store.LoadReconcileWorkspace().Documents.FirstOrDefault(d =>
-                string.Equals(d.Id, pdfId, StringComparison.Ordinal));
-            if (document?.Version == null)
+            ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+            ReconcileDocument document = workspace.Primary != null
+                && string.Equals(workspace.Primary.Id, pdfId, StringComparison.Ordinal)
+                ? workspace.Primary : null;
+            if (document?.Version != null)
+            {
+                ReconcileDocumentInfo info = ReadDocument(document);
+                return new ReconcileStoredResult
+                {
+                    PdfId = pdfId,
+                    PdfBase64 = document.Version.Base64,
+                    PageRotations = document.Version.PageRotations,
+                    ReconcileBase64 = document.Version.ReconcileBase64,
+                    Staleness = info.Staleness,
+                };
+            }
+
+            ReconcileComparison comparison = workspace.Comparisons
+                .FirstOrDefault(c => string.Equals(c.Id, pdfId, StringComparison.Ordinal));
+            if (comparison == null)
                 return new ReconcileStoredResult { PdfId = pdfId, Staleness = "none" };
-            ReconcileDocumentInfo info = ReadDocument(document);
+            ReconcileDocumentInfo comparisonInfo = ReadComparison(comparison);
             return new ReconcileStoredResult
             {
                 PdfId = pdfId,
-                PdfBase64 = document.Version.Base64,
-                PageRotations = document.Version.PageRotations,
-                ReconcileBase64 = document.Version.ReconcileBase64,
-                Staleness = info.Staleness,
+                PdfBase64 = comparison.PdfBase64,
+                PageRotations = comparison.PageRotations,
+                ReconcileBase64 = comparison.ReconcileBase64,
+                Staleness = comparisonInfo.Staleness,
             };
+        }
+
+        private static ReconcileDocumentInfo ReadComparison(ReconcileComparison comparison)
+        {
+            // A comparison slot is an unversioned snapshot: its scan is current
+            // from the instant it is stored, and nothing can make it stale.
+            var info = new ReconcileDocumentInfo
+            {
+                Id = comparison.Id,
+                Role = comparison.Role,
+                Name = comparison.DisplayName ?? string.Empty,
+                Staleness = "none",
+            };
+
+            Dictionary<string, object> geometry = DecodeObject(comparison.GeometryBase64);
+            info.PageCount = CountArray(geometry, "pages");
+
+            Dictionary<string, object> model = DecodeObject(comparison.ReconcileBase64);
+            if (model == null) return info;
+
+            Dictionary<string, object> source = GetObject(model, "source");
+            Dictionary<string, object> summary = GetObject(model, "summary");
+            if (summary == null) return info;
+            string scannedAt = GetString(source, "scannedAt");
+            info.ScannedAt = string.IsNullOrEmpty(scannedAt) ? GetString(summary, "scannedAt") : scannedAt;
+            info.Summary = new ReconcileSummaryInfo
+            {
+                TablesExamined = GetInt(summary, "tablesExamined"),
+                TotalsNominated = GetInt(summary, "totalsNominated"),
+                Confirmed = GetInt(summary, "confirmed"),
+                Breaks = GetInt(summary, "breaks"),
+                Unresolved = GetInt(summary, "unresolved"),
+            };
+            info.Staleness = "current";
+            return info;
         }
 
         private static ReconcileDocumentInfo ReadDocument(ReconcileDocument document)

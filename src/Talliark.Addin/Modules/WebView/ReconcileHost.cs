@@ -165,11 +165,16 @@ namespace Talliark.Addin.Modules.WebView
         private bool ConfirmReplace(string role)
         {
             ReconcileWorkspace workspace = new TalliarkCustomXmlPartStore(_workbook).LoadReconcileWorkspace();
-            ReconcileDocument existing = workspace.Documents.FirstOrDefault(d => d.Role == role);
-            if (existing == null) return true;
+            bool existing = role == ReconcileRoles.Primary
+                ? workspace.Primary != null
+                : workspace.Comparisons?.Any(c => c.Role == role) == true;
+            if (!existing) return true;
             string label = role == ReconcileRoles.Primary ? "current" : "prior";
+            string scope = role == ReconcileRoles.Primary
+                ? "The existing snapshot and its stored result will be replaced."
+                : "The existing snapshot and its stored result will be replaced.";
             return MessageBox.Show(this,
-                $"Replace the {label} financial statement?\n\nThe existing snapshot{(role == ReconcileRoles.Primary ? " and its stored result" : "")} will be replaced.",
+                $"Replace the {label} financial statement?\n\n{scope}",
                 "Replace financial statement", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2) == DialogResult.OK;
         }

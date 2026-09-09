@@ -29,7 +29,11 @@ export interface ReconcileSummary {
 
 export interface ReconcileDocument {
   readonly id: string;
-  readonly versionId: string;
+  /**
+   * Present only on the primary, which is the only versioned slot.
+   * Comparison slots are unversioned snapshots.
+   */
+  readonly versionId?: string | undefined;
   readonly role: ReconcileDocumentRole;
   readonly name: string;
   readonly folderId?: string | undefined;

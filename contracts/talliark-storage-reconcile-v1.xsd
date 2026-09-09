@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Workbook-scoped Reconcile workspace. Exactly one part uses the stable
      urn:talliark:schemas:storage:1:reconcile namespace. The concrete shape is
-     explicit even though its five PDF artifact fields share one C# base model. -->
+     explicit even though its five PDF artifact fields share one C# base model.
+
+     The primary slot is the only versioned slot: it carries a current version
+     with PDF bytes and the analysis artifacts a scan stores beside them.
+     Comparison slots are unversioned prior-period snapshots and re-adding a
+     statement for a period replaces that slot's snapshot wholesale rather than
+     creating a version. A scan of a comparison stores the same analysis
+     artifacts on the slot: those artifacts are current from the instant they
+     are stored, because there is nothing for them to go stale against. -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            targetNamespace="urn:talliark:schemas:storage:1:reconcile"
            xmlns="urn:talliark:schemas:storage:1:reconcile"
            elementFormDefault="qualified">
-  <xs:simpleType name="DocumentRole">
+  <xs:simpleType name="ComparisonRole">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="primary" />
       <xs:enumeration value="comparison-1" />
       <xs:enumeration value="comparison-2" />
     </xs:restriction>
@@ -24,11 +31,14 @@
       </xs:restriction></xs:simpleType>
     </xs:attribute>
   </xs:complexType>
+  <xs:complexType name="PageRotationsType">
+    <xs:sequence>
+      <xs:element name="Page" type="PageRotationType" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
   <xs:complexType name="DocumentVersionType">
     <xs:sequence>
-      <xs:element name="PageRotations" minOccurs="0"><xs:complexType><xs:sequence>
-        <xs:element name="Page" type="PageRotationType" minOccurs="0" maxOccurs="unbounded" />
-      </xs:sequence></xs:complexType></xs:element>
+      <xs:element name="PageRotations" type="PageRotationsType" minOccurs="0" />
       <xs:element name="Base64" type="xs:string" />
       <xs:element name="GeometryBase64" type="xs:string" minOccurs="0" />
       <xs:element name="TableStructureBase64" type="xs:string" minOccurs="0" />
@@ -39,16 +49,31 @@
     <xs:attribute name="id" type="xs:string" use="required" />
     <xs:attribute name="importedAt" type="xs:dateTime" use="required" />
   </xs:complexType>
-  <xs:complexType name="DocumentType">
+  <xs:complexType name="PrimaryType">
     <xs:sequence><xs:element name="Version" type="DocumentVersionType" /></xs:sequence>
     <xs:attribute name="id" type="xs:string" use="required" />
-    <xs:attribute name="role" type="DocumentRole" use="required" />
     <xs:attribute name="displayName" type="xs:string" use="required" />
+  </xs:complexType>
+  <xs:complexType name="ComparisonType">
+    <xs:sequence>
+      <xs:element name="PageRotations" type="PageRotationsType" minOccurs="0" />
+      <xs:element name="Base64" type="xs:string" />
+      <xs:element name="GeometryBase64" type="xs:string" minOccurs="0" />
+      <xs:element name="TableStructureBase64" type="xs:string" minOccurs="0" />
+      <xs:element name="DocumentValuesBase64" type="xs:string" minOccurs="0" />
+      <xs:element name="FinancialStructureBase64" type="xs:string" minOccurs="0" />
+      <xs:element name="ReconcileBase64" type="xs:string" minOccurs="0" />
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:string" use="required" />
+    <xs:attribute name="role" type="ComparisonRole" use="required" />
+    <xs:attribute name="displayName" type="xs:string" use="required" />
+    <xs:attribute name="importedAt" type="xs:dateTime" use="required" />
   </xs:complexType>
   <xs:element name="ReconcileWorkspace">
     <xs:complexType><xs:sequence>
-      <xs:element name="Documents" minOccurs="0"><xs:complexType><xs:sequence>
-        <xs:element name="Document" type="DocumentType" minOccurs="0" maxOccurs="3" />
+      <xs:element name="Primary" type="PrimaryType" minOccurs="0" />
+      <xs:element name="Comparisons" minOccurs="0"><xs:complexType><xs:sequence>
+        <xs:element name="Comparison" type="ComparisonType" minOccurs="0" maxOccurs="2" />
       </xs:sequence></xs:complexType></xs:element>
     </xs:sequence>
       <xs:attribute name="version" type="xs:positiveInteger" use="required" />

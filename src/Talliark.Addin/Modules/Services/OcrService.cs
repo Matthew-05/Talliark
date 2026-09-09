@@ -569,22 +569,38 @@ namespace Talliark.Addin.Modules.Services
         private static void SaveReconcileResult(
             Excel.Workbook workbook, OcrJobEntry job, OcrWorkerResult result)
         {
-            var store = new CustomXml.TalliarkCustomXmlPartStore(workbook);
-            ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
-            ReconcileDocument document = workspace.Documents.FirstOrDefault(d =>
-                string.Equals(d.Id, job.DocumentId, StringComparison.Ordinal));
-            if (document?.Version == null
-                || !string.Equals(document.Version.Id, job.VersionId, StringComparison.Ordinal))
+var store = new CustomXml.TalliarkCustomXmlPartStore(workbook);
+ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+            ReconcileDocument document = workspace.Primary != null
+                && string.Equals(workspace.Primary.Id, job.DocumentId, StringComparison.Ordinal)
+                ? workspace.Primary : null;
+            if (document?.Version != null
+                && string.Equals(document.Version.Id, job.VersionId, StringComparison.Ordinal))
+            {
+                // Build the complete replacement in memory and publish it with the
+                // store's add-before-delete atomic replacement. The original PDF and
+                // import metadata remain the independent snapshot imported by the user.
+                document.Version.GeometryBase64 = result.GeometryBase64 ?? string.Empty;
+                document.Version.TableStructureBase64 = result.TableStructureBase64 ?? string.Empty;
+                document.Version.DocumentValuesBase64 = result.DocumentValuesBase64 ?? string.Empty;
+                document.Version.FinancialStructureBase64 = result.FinancialStructureBase64 ?? string.Empty;
+                document.Version.ReconcileBase64 = result.ReconcileBase64 ?? string.Empty;
+                store.SaveReconcileWorkspace(workspace);
+                return;
+            }
+
+            // A comparison slot is unversioned: the scan belongs to the slot
+            // itself, and re-adding the statement replaces the whole slot.
+            ReconcileComparison comparison = workspace.Comparisons
+                .FirstOrDefault(c => string.Equals(c.Id, job.DocumentId, StringComparison.Ordinal));
+            if (comparison == null)
                 throw new InvalidOperationException("The Reconcile statement was replaced while its scan was running.");
 
-            // Build the complete replacement in memory and publish it with the
-            // store's add-before-delete atomic replacement. The original PDF and
-            // import metadata remain the independent snapshot imported by the user.
-            document.Version.GeometryBase64 = result.GeometryBase64 ?? string.Empty;
-            document.Version.TableStructureBase64 = result.TableStructureBase64 ?? string.Empty;
-            document.Version.DocumentValuesBase64 = result.DocumentValuesBase64 ?? string.Empty;
-            document.Version.FinancialStructureBase64 = result.FinancialStructureBase64 ?? string.Empty;
-            document.Version.ReconcileBase64 = result.ReconcileBase64 ?? string.Empty;
+            comparison.GeometryBase64 = result.GeometryBase64 ?? string.Empty;
+            comparison.TableStructureBase64 = result.TableStructureBase64 ?? string.Empty;
+            comparison.DocumentValuesBase64 = result.DocumentValuesBase64 ?? string.Empty;
+            comparison.FinancialStructureBase64 = result.FinancialStructureBase64 ?? string.Empty;
+            comparison.ReconcileBase64 = result.ReconcileBase64 ?? string.Empty;
             store.SaveReconcileWorkspace(workspace);
         }
 
@@ -704,11 +720,34 @@ namespace Talliark.Addin.Modules.Services
             {
                 ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
                 var reconcileJobs = new List<OcrJobEntry>();
-                foreach (string id in pdfIds)
+foreach (string id in pdfIds)
                 {
-                    ReconcileDocument document = workspace.Documents.FirstOrDefault(d =>
-                        string.Equals(d.Id, id, StringComparison.Ordinal));
-                    if (document?.Version == null) continue;
+                    ReconcileDocument document = workspace.Primary != null
+                        && string.Equals(workspace.Primary.Id, id, StringComparison.Ordinal)
+                        ? workspace.Primary : null;
+                    if (document?.Version == null)
+                    {
+                        // A comparison slot has no version identity: the job's
+                        // version id is its own slot id, and the scan result
+                        // lands back on the slot.
+                        ReconcileComparison comparison = workspace.Comparisons
+                            .FirstOrDefault(c => string.Equals(c.Id, id, StringComparison.Ordinal));
+                        if (comparison == null) continue;
+                        reconcileJobs.Add(new OcrJobEntry
+                        {
+                            PdfId = comparison.Id,
+                            DocumentId = comparison.Id,
+                            VersionId = comparison.Id,
+                            Name = comparison.DisplayName ?? string.Empty,
+                            Base64 = comparison.PdfBase64 ?? string.Empty,
+                            InputBytes = Base64DecodedLength(comparison.PdfBase64),
+                            Mode = "full",
+                            OriginalStatus = PdfStatus.None,
+                            Analysis = true,
+                            DetectTables = true,
+                        });
+                        continue;
+                    }
                     reconcileJobs.Add(new OcrJobEntry
                     {
                         PdfId = document.Id,

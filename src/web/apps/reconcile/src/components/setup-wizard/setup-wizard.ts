@@ -10,10 +10,20 @@ export interface SetupWizardCallbacks {
   onComplete(projectName: string): void;
 }
 
+/** The minimum step setup needs before it is complete, from the documents. */
 export function requiredSetupStep(documents: ReconcileDocument[]): number {
   if (!documents.some((document_) => document_.role === "primary")) return 1;
   if (!documents.some((document_) => document_.role === "comparison-1")) return 2;
   return 3;
+}
+
+/** The result the app should land on, or null while setup is incomplete. */
+export function completedPrimary(
+  documents: ReconcileDocument[],
+  projectName: string,
+): ReconcileDocument | null {
+  if (!projectName.trim()) return null;
+  return documents.find((entry) => entry.role === "primary") ?? null;
 }
 
 export class SetupWizard {
@@ -37,8 +47,9 @@ export class SetupWizard {
   update(documents: ReconcileDocument[], sources: ReconcileImportSource[], projectName: string): void {
     this.documents = documents;
     this.sources = sources;
-    const required = requiredSetupStep(documents);
-    if (this.step < required || required < 3) this.step = required;
+    // Stepping between steps is always explicit: only a step's own Continue,
+    // Skip or Back button moves the wizard, never the workbook state. A freshly
+    // added statement completes that step in place and waits for the click.
     if (!this.nameEdited) this.projectName = projectName;
     this.render();
   }
@@ -54,7 +65,7 @@ export class SetupWizard {
     header.innerHTML = `
       <div class="setup-wizard__eyebrow">New Reconcile project</div>
       <h1>Set up your statement review</h1>
-      <p>Add the two statements that define this review. Reconcile keeps its own snapshots in the workbook.</p>
+      <p>Add the statements that define this review. Reconcile keeps its own snapshots in the workbook.</p>
     `;
     this.element.append(header, this.progress());
     if (this.step === 1) this.element.append(this.documentStep("primary"));
@@ -87,7 +98,7 @@ export class SetupWizard {
     panel.innerHTML = `
       <div class="setup-panel__number">Step ${current ? 1 : 2} of 3</div>
       <h2>${current ? "Select the current financial statement" : "Select the prior-year financial statement"}</h2>
-      <p>${current ? "Choose the statement you want Reconcile to check." : "This statement will be the comparison period for the project."}</p>
+      <p>${current ? "Choose the statement you want Reconcile to check." : "Optional — this will be the comparison period for the project. You can skip it for a single-statement review, or add it later."}</p>
     `;
 
     const selection = document.createElement("div");
@@ -125,6 +136,12 @@ export class SetupWizard {
       back.textContent = "Back";
       back.addEventListener("click", () => { this.step = 1; this.render(); });
       footer.append(back);
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.className = "button button--quiet";
+      skip.textContent = "Skip";
+      skip.addEventListener("click", () => { this.step = 3; this.render(); });
+      footer.append(skip);
     }
     const next = document.createElement("button");
     next.type = "button";
@@ -177,7 +194,7 @@ export class SetupWizard {
 
   private detailsStep(): HTMLElement {
     const current = this.documents.find((document_) => document_.role === "primary")!;
-    const prior = this.documents.find((document_) => document_.role === "comparison-1")!;
+    const prior = this.documents.find((document_) => document_.role === "comparison-1");
     const panel = document.createElement("div");
     panel.className = "setup-panel";
     panel.innerHTML = `
@@ -202,7 +219,7 @@ export class SetupWizard {
 
     const summary = document.createElement("div");
     summary.className = "setup-summary";
-    summary.append(this.summaryRow("Current statement", current.name), this.summaryRow("Prior statement", prior.name));
+    summary.append(this.summaryRow("Current statement", current.name), this.summaryRow("Prior statement", prior ? prior.name : "Not selected"));
 
     const placeholder = document.createElement("div");
     placeholder.className = "setup-placeholder";

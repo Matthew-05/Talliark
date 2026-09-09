@@ -149,8 +149,8 @@ export function sendCancelScan(): void {
 /**
  * Asks for one document's stored sum tree.
  *
- * The list the home renders carries only counts, so the tree is fetched when a
- * document is opened rather than with every list.
+ * The workspace snapshot carries only counts, so the full tree is fetched only
+ * when the completed project opens its result.
  */
 export function sendRequestResult(pdfId: string): void {
   send({ type: "request-reconcile-result", pdfId });

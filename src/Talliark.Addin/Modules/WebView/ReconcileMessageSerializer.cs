@@ -72,11 +72,11 @@ namespace Talliark.Addin.Modules.WebView
                 var item = new Dictionary<string, object>
                 {
                     ["id"] = document.Id,
-                    ["versionId"] = document.VersionId,
                     ["role"] = document.Role,
                     ["name"] = document.Name,
                     ["staleness"] = document.Staleness,
                 };
+                if (!string.IsNullOrEmpty(document.VersionId)) item["versionId"] = document.VersionId;
                 if (!string.IsNullOrEmpty(document.FolderId)) item["folderId"] = document.FolderId;
                 if (document.PageCount.HasValue) item["pageCount"] = document.PageCount.Value;
                 if (!string.IsNullOrEmpty(document.ScannedAt)) item["scannedAt"] = document.ScannedAt;

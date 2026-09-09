@@ -1109,7 +1109,7 @@
     "ReconcileDocumentRole": {
       "type": "string",
       "enum": ["primary", "comparison-1", "comparison-2"],
-      "description": "The statement's place in the Reconcile workspace. The setup wizard currently fills primary and comparison-1; comparison-2 is reserved for a later period."
+      "description": "The statement's place in the Reconcile workspace. The primary slot is the versioned current statement; comparison-1 is an optional unversioned prior-year snapshot; comparison-2 is reserved for a later period."
     },
 
     "ImportReconcileDocumentMessage": {
@@ -1125,7 +1125,7 @@
     },
 
     "CompleteReconcileSetupMessage": {
-      "description": "Names the Reconcile project and starts the initial scan of its current statement. Both current and prior statements must already be present.",
+      "description": "Names the Reconcile project and starts the initial scan of its current statement. The current statement must already be present; the prior statement is optional.",
       "type": "object", "required": ["type", "projectName"], "additionalProperties": false,
       "properties": { "type": { "const": "complete-reconcile-setup" }, "projectName": { "type": "string", "minLength": 1, "maxLength": 120 } }
     },
@@ -1147,13 +1147,13 @@
     },
 
     "ReconcileDocumentPayload": {
-      "description": "One document in the workbook as the Reconcile home lists it: what it is, and what reconcile data the workbook holds for it. The counts travel with the list so the home can render without loading a sum tree per document -- a clean scan reads '14 totals verified, 0 exceptions', which is what makes it trustworthy instead of indistinguishable from a scan that never ran.",
+      "description": "One document in the workbook as the Reconcile home lists it: what it is, and what reconcile data the workbook holds for it. The counts travel with the list so the home can render without loading a sum tree per document -- a clean scan reads '14 totals verified, 0 exceptions', which is what makes it trustworthy instead of indistinguishable from a scan that never ran. Only the primary carries a version; a comparison slot is an unversioned snapshot, and once a scan has stored artifacts on it those artifacts are current from that instant, because there is nothing they can go stale against.",
       "type": "object",
-      "required": ["id", "versionId", "role", "name", "staleness"],
+      "required": ["id", "role", "name", "staleness"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "description": "GUID of the Reconcile-owned document." },
-        "versionId": { "type": "string", "description": "GUID of its current Reconcile-owned version." },
+        "versionId": { "type": "string", "description": "GUID of the current Reconcile-owned version. Present only on the primary, which is the only versioned slot." },
         "role": { "$ref": "#/definitions/ReconcileDocumentRole" },
         "name": { "type": "string", "description": "Display name." },
         "folderId": { "type": "string", "description": "GUID of the owning folder, absent when uncategorised." },
@@ -1179,7 +1179,7 @@
     },
 
     "ReconcileDataLoadedMessage": {
-      "description": "Sent by the host in response to ReconcileReadyMessage, and again whenever the workspace changes. The app shows setup until the project is named and both required statement roles are filled.",
+      "description": "Sent by the host in response to ReconcileReadyMessage, and again whenever the workspace changes. The app shows setup until the project is named and the current statement is in place.",
       "type": "object",
       "required": ["type", "documents"],
       "additionalProperties": false,

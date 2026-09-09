@@ -170,7 +170,7 @@ Reconcile.
 
 | | Cache build | Reconcile scan |
 |---|---|---|
-| Trigger | ordinary OCR | user runs Reconcile for the workspace primary |
+| Trigger | ordinary OCR | user runs Reconcile for the workspace primary or a comparison slot |
 | Budget | soft — **a minute for a whole document is fine, ten minutes is not** | generous; the user is waiting on a deliberate action |
 | Runs on | every document | financial statements only |
 | Produces | `document-values-v1`, `financial-structure-v1`, and experimental `table-structure-v1` when enabled | a complete independent snapshot: geometry, tables, values, financial structure, private financial-table blocks, then `reconcile-v1` |
@@ -179,13 +179,20 @@ Reconcile.
 Two consequences worth stating before anything is built:
 
 - **Reconcile is a workbook-scoped workspace, not an ordinary document cache.**
-  A named project owns a current statement in its primary slot and a prior-year
-  statement in its first comparison slot, each with one current version, in a
-  dedicated Custom XML part. Import or copy duplicates the PDF bytes and assigns
-  Reconcile document and version ids. Ordinary rename, deletion, OCR, and
-  settings changes cannot change those snapshots. The second comparison role is
-  reserved for another prior period. Only the current statement is analysed;
-  comparison analysis and version history are not exposed yet.
+  A named project owns a current statement in its primary slot and an optional
+  prior-year statement in its first comparison slot, in a dedicated Custom XML
+  part. Only the primary is versioned: it carries a document identity and one
+  current version identity with its analysis artifacts, and re-importing it
+  creates a fresh version. Comparison slots are unversioned snapshots and
+  re-adding a statement for a period replaces
+  that slot's snapshot wholesale rather than adding a version. Import or copy
+  duplicates the PDF bytes and assigns Reconcile document (and, for the
+  primary, version) ids. Ordinary rename, deletion, OCR, and settings changes
+  cannot change the snapshots. The second comparison role is reserved for
+  another prior period. A comparison can be scanned like the primary: the scan
+  stores the same analysis artifacts on the slot, and because the slot is
+  unversioned those artifacts are current from the instant they are stored.
+  Version history is not exposed yet.
 - **Published table structure is experimental during ordinary OCR.** The
   user-scoped setting defaults off. Table-cell recovery stays unconditional
   because it improves source text geometry; only general table publication and

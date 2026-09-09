@@ -1,10 +1,10 @@
 /**
  * The Reconcile window.
  *
- * Per-workbook, one document at a time. The app lists the workbook's documents,
- * starts and watches a scan, and opens the stored result as the starting point
- * for a document review. The review workspace keeps its findings beside the
- * source PDF and leaves room for the later consistency views.
+ * Per-workbook, one primary document at a time. An incomplete workspace opens
+ * in setup; a completed workspace opens its stored result as the starting point
+ * for review. The review workspace keeps its findings beside the source PDF and
+ * leaves room for the later consistency views.
  */
 import {
   initHostBridge,
@@ -15,9 +15,8 @@ import {
   sendCopyDocument,
   sendCompleteSetup,
 } from "./host-bridge.js";
-import { DocumentList } from "./components/document-list/document-list.js";
 import { ScanProgressPanel } from "./components/scan-progress/scan-progress.js";
-import { SetupWizard } from "./components/setup-wizard/setup-wizard.js";
+import { completedPrimary, SetupWizard } from "./components/setup-wizard/setup-wizard.js";
 import { ResultView } from "./components/result-view/result-view.js";
 import { decodeReconcileResult } from "./services/reconcile-result-decoder.js";
 import type { ReconcileDocument, ReconcileDocumentRole, ReconcileImportSource, ScanProgress, ScanStatus } from "./types/index.js";
@@ -39,23 +38,6 @@ export function mountApp(root: HTMLElement): void {
     onComplete: sendCompleteSetup,
   });
 
-  const documentList = new DocumentList(root, {
-    onScan(pdfId: string) {
-      // A scan never starts on its own. This is the only path that begins one.
-      scanningId = pdfId;
-      sendRunScan(pdfId);
-      render();
-    },
-    onOpen(pdfId: string) {
-      selectedId = pdfId;
-      const entry = documents.find((document_) => document_.id === pdfId);
-      if (entry) resultView.showLoading(entry);
-      sendRequestResult(pdfId);
-      render();
-    },
-    ...intake,
-  });
-
   const scanProgress = new ScanProgressPanel(root, {
     onCancel() {
       sendCancelScan();
@@ -63,10 +45,6 @@ export function mountApp(root: HTMLElement): void {
   });
 
   const resultView = new ResultView(root, {
-    onBack() {
-      selectedId = null;
-      render();
-    },
     onRescan(pdfId: string) {
       scanningId = pdfId;
       sendRunScan(pdfId);
@@ -79,16 +57,11 @@ export function mountApp(root: HTMLElement): void {
   }
 
   function render(): void {
-    // Setup remains visible until both required snapshots and the project name
-    // exist. A scan in flight adds progress above the project home.
-    const setupComplete = projectName.length > 0
-      && documents.some((entry) => entry.role === "primary")
-      && documents.some((entry) => entry.role === "comparison-1");
-    const showingResult = selectedId !== null && setupComplete;
+    // There is no project home between setup and review. Once setup has been
+    // completed, the primary statement's result is the app's landing screen.
+    const setupComplete = completedPrimary(documents, projectName) !== null;
     setupWizard.setVisible(!setupComplete);
-    documentList.setVisible(setupComplete && !showingResult);
-    resultView.setVisible(showingResult);
-    documentList.setScanning(scanningId);
+    resultView.setVisible(setupComplete);
     scanProgress.setVisible(scanningId !== null);
   }
 
@@ -96,15 +69,21 @@ export function mountApp(root: HTMLElement): void {
     onDataLoaded(loaded, sources: ReconcileImportSource[], scanning, loadedProjectName) {
       documents = loaded;
       projectName = loadedProjectName;
-      documentList.update(documents);
-      documentList.setProjectName(projectName);
-      documentList.setSources(sources);
       setupWizard.update(documents, sources, projectName);
       // The host is the authority on whether a scan is running, so an app that
       // mounts mid-scan picks it up rather than showing an idle home.
       scanningId = scanning;
-      if (selectedId !== null && !documents.some((entry) => entry.id === selectedId)) {
+      const primary = completedPrimary(documents, projectName);
+      if (!primary) {
         selectedId = null;
+      } else if (selectedId !== primary.id) {
+        selectedId = primary.id;
+        if (primary.summary && primary.staleness !== "none") {
+          resultView.showLoading(primary);
+          sendRequestResult(primary.id);
+        } else {
+          resultView.showError(primary, "No stored scan result is available for this document. Re-scan to create one.");
+        }
       }
       render();
     },

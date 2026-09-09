@@ -38,16 +38,26 @@ currentness against that same snapshot; the Reconcile
 detector version also includes the financial-table version because the sister is
 a private implementation dependency rather than a separately stored artifact.
 
-One dedicated workbook Custom XML part owns the named project. Setup fills the
-`primary` slot with the current statement and `comparison-1` with the prior-year
-statement; `comparison-2` remains reserved for another prior period. Each slot
-has a document identity and one current version identity. Importing or copying
-creates new identities and duplicates bytes rather than retaining an
-ordinary-document reference. Completing setup scans the primary only. A
-successful scan atomically replaces that version's analysis artifacts and
+One dedicated workbook Custom XML part owns the named project. The `primary`
+slot holds the current statement and is the only versioned slot: it carries a
+document identity and one current version identity, and a scan's geometry,
+table, value, financial and Reconcile models are stored against that version,
+with currentness checked against its detector versions and geometry. Each
+comparison slot (`comparison-1`, and `comparison-2` reserved for another prior
+period) holds an unversioned prior-period snapshot, and re-adding a statement
+for a period replaces that slot's snapshot wholesale rather than creating a
+version. A comparison can be scanned like the primary: the same OCR analysis
+job stores the same five artifacts on the slot, and because the slot is
+unversioned the stored scan is current from the instant it lands — there is
+nothing for it to go stale against. Importing or copying duplicates bytes
+rather than retaining an ordinary-document reference. Completing setup scans
+the primary only; a comparison is scanned on demand from its row in the home
+list, and replacing a scanned comparison warns that its stored result will be
+replaced with it. A
+successful scan atomically replaces that slot's analysis artifacts and
 result. Failure or cancellation performs no storage write, so an earlier
-successful result remains intact. Comparison analysis and version-history UI
-are intentionally not implemented.
+successful result remains intact. Version-history UI is intentionally not
+implemented.
 
 ## 3. Types
 
