@@ -170,13 +170,27 @@ Reconcile.
 
 | | Cache build | Reconcile scan |
 |---|---|---|
-| Trigger | viewer opens a document | user opens Reconcile for a document |
+| Trigger | ordinary OCR | user runs Reconcile for the workspace primary |
 | Budget | soft — **a minute for a whole document is fine, ten minutes is not** | generous; the user is waiting on a deliberate action |
 | Runs on | every document | financial statements only |
-| Produces | `table-structure-v1`, `document-values-v1`, `financial-structure-v1` | private financial-table blocks, then `reconcile-v1` |
+| Produces | `document-values-v1`, `financial-structure-v1`, and experimental `table-structure-v1` when enabled | a complete independent snapshot: geometry, tables, values, financial structure, private financial-table blocks, then `reconcile-v1` |
 | Contains | document-neutral table geometry, value recognition, ordinal apparatus, note and item recognition, catalogue assembly | financial table interpretation, statement classification, reconciliation, tagging, checks, exception dispositions |
 
 Two consequences worth stating before anything is built:
+
+- **Reconcile is a workbook-scoped workspace, not an ordinary document cache.**
+  It owns one primary document and its current version in a dedicated Custom XML
+  part. Import or copy duplicates the PDF bytes and assigns Reconcile document
+  and version ids. Ordinary rename, deletion, OCR, and settings changes cannot
+  change that snapshot. The concrete storage reserves two comparison roles and
+  one current version per role; comparison analysis and version history are not
+  exposed yet.
+- **Published table structure is experimental during ordinary OCR.** The
+  user-scoped setting defaults off. Table-cell recovery stays unconditional
+  because it improves source text geometry; only general table publication and
+  detector-driven viewer controls, notices, suggestions, snapping, and metadata
+  enrichment are gated. Manual table rectangles and grids never consult the gate.
+  Reconcile always forces general table detection on inside its own one-job scan.
 
 - **The soft ceiling is a guardrail, not a design constraint.**
   `docs/internal/engines/values/value-precision.md` records table detection at 5.5s on the 80-page 10-K,

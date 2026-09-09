@@ -54,6 +54,7 @@ def detect_reconcile(
     geometry: dict,
     *,
     document_id: str,
+    version_id: str = "",
     values: dict | None = None,
     financial: dict | None = None,
     tables: dict | None = None,
@@ -132,6 +133,7 @@ def detect_reconcile(
         "detectorVersion": DETECTOR_VERSION,
         "source": _source(
             document_id=document_id,
+            version_id=version_id or document_id,
             geometry=geometry,
             tables=table_model,
             values=values,
@@ -683,6 +685,7 @@ def _unresolved_reasons(published: list[dict]) -> dict[str, int]:
 def _source(
     *,
     document_id: str,
+    version_id: str,
     geometry: dict,
     tables: dict,
     values: dict | None,
@@ -697,6 +700,7 @@ def _source(
     """
     source = {
         "documentId": document_id,
+        "versionId": version_id,
         "pageCount": len(geometry.get("pages", [])),
         "geometryFingerprint": geometry_fingerprint(geometry),
         "tableDetectorVersion": tables.get("detectorVersion", ""),

@@ -8,11 +8,11 @@
  * receives facts, and never touches a file path or reaches for Python.
  */
 import type {
-  FolderEntry,
   ReconcileDocument,
   ScanProgress,
   ScanStatus,
   Staleness,
+  ReconcileImportSource,
 } from "./types/index.js";
 
 // ── Inbound (host → web) ─────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ import type {
 interface ReconcileDataLoadedMessage {
   type: "reconcile-data-loaded";
   documents: ReconcileDocument[];
-  folders?: FolderEntry[];
+  sources?: ReconcileImportSource[];
   /** Set when a scan is already running as this app mounts. */
   scanning?: string;
 }
@@ -70,7 +70,7 @@ function send(msg: object): void {
 export interface HostHandlers {
   onDataLoaded(
     documents: ReconcileDocument[],
-    folders: FolderEntry[],
+    sources: ReconcileImportSource[],
     scanning: string | null,
   ): void;
   onScanStatus(pdfId: string, status: ScanStatus, progress: ScanProgress): void;
@@ -102,7 +102,7 @@ export function initHostBridge(handlers: HostHandlers): void {
     if (msg.type === "reconcile-data-loaded") {
       handlers.onDataLoaded(
         msg.documents ?? [],
-        msg.folders ?? [],
+        msg.sources ?? [],
         msg.scanning ?? null,
       );
     } else if (msg.type === "reconcile-scan-status") {
@@ -150,4 +150,10 @@ export function sendCancelScan(): void {
  */
 export function sendRequestResult(pdfId: string): void {
   send({ type: "request-reconcile-result", pdfId });
+}
+
+export function sendImportPrimary(): void { send({ type: "import-reconcile-primary" }); }
+export function sendImportPrimaryFromClipboard(): void { send({ type: "import-reconcile-primary-clipboard" }); }
+export function sendCopyPrimary(sourcePdfId: string): void {
+  send({ type: "copy-reconcile-primary", sourcePdfId });
 }

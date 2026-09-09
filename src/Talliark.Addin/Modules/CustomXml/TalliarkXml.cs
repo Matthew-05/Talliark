@@ -16,6 +16,9 @@ namespace Talliark.Addin.Modules.CustomXml
 
         public const string LinksRootElementName = "TalliarkLinks";
 
+        public const string ReconcileNamespaceUri = "urn:talliark:schemas:storage:1:reconcile";
+        public static readonly XNamespace ReconcileNs = ReconcileNamespaceUri;
+
         public const uint SchemaVersion = 1;
 
         public const string FoldersElementName = "Folders";

@@ -17,7 +17,9 @@ class OcrJob:
     # a command, so the whole pipeline stays one job id, one progress stream and
     # one cancellation.
     analysis: bool = False
+    detect_tables: bool = False
     document_id: str = ""
+    version_id: str = ""
 
     @staticmethod
     def from_dict(d: dict) -> "OcrJob":
@@ -30,7 +32,9 @@ class OcrJob:
             pdf_base64=d["pdf_base64"],
             mode=mode,
             analysis=bool(d.get("analysis", False)),
+            detect_tables=bool(d.get("detect_tables", False)),
             document_id=str(d.get("document_id", "")),
+            version_id=str(d.get("version_id", "")),
         )
 
 

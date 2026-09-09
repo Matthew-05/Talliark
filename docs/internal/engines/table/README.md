@@ -15,6 +15,15 @@ normalized bounds, columns, logical rows, header bands, confidence and supportin
 evidence. It is document-neutral: financial statements, invoices, forms, scanned
 pages and spreadsheet screenshots all travel through the same detector.
 
+Ordinary OCR invokes publication only when the user-scoped Experimental Table
+Detection setting is enabled; it defaults off. Reconcile invokes the same engine
+unconditionally and stores the result in its workbook-scoped snapshot. This gate
+does not cover ruled-table cell OCR recovery: recovery is core text-quality work
+that can improve geometry and values even when no table model is published. In
+the viewer, the same setting hides detector controls, notices and suggestions and
+disables detector snapping/enrichment. Manual table links and their visual grid
+editing remain available.
+
 It does not interpret a row as a subtotal, a dash as accounting zero, or a
 column as a fiscal period. The on-demand financial-table sister engine reads the
 general artifact as corroboration and owns those meanings.

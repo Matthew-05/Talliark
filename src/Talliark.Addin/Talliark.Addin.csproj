@@ -213,6 +213,7 @@
     <Compile Include="Modules\CustomXml\Models\TableGrid.cs" />
     <Compile Include="Modules\CustomXml\Models\PdfDocument.cs" />
     <Compile Include="Modules\CustomXml\Models\PdfBinaryParts.cs" />
+    <Compile Include="Modules\CustomXml\Models\ReconcileWorkspace.cs" />
     <Compile Include="Modules\CustomXml\Models\PdfFolder.cs" />
     <Compile Include="Modules\CustomXml\Models\PdfMetadata.cs" />
     <Compile Include="Modules\CustomXml\Models\PdfRectangle.cs" />
@@ -220,9 +221,11 @@
     <Compile Include="Modules\CustomXml\Serialization\TalliarkContentSerializer.cs" />
     <Compile Include="Modules\CustomXml\Serialization\TalliarkLinksSerializer.cs" />
     <Compile Include="Modules\CustomXml\Serialization\TalliarkPdfBinarySerializer.cs" />
+    <Compile Include="Modules\CustomXml\Serialization\TalliarkReconcileSerializer.cs" />
     <Compile Include="Modules\CustomXml\WorkbookStorageSession.cs" />
     <Compile Include="Modules\TalliarkLog.cs" />
     <Compile Include="Modules\Infrastructure\DevSettings.cs" />
+    <Compile Include="Modules\Infrastructure\ExperimentalSettings.cs" />
     <Compile Include="Modules\Infrastructure\ExcelUndoKeyHook.cs" />
     <Compile Include="Modules\Infrastructure\PythonWorkerSession.cs" />
     <Compile Include="Modules\Infrastructure\ProgressStages.cs" />
@@ -253,6 +256,7 @@
     <Compile Include="Modules\Services\OcrService.cs" />
     <Compile Include="Modules\Services\OcrStatusDetail.cs" />
     <Compile Include="Modules\Services\ReconcileResultService.cs" />
+    <Compile Include="Modules\Services\ReconcileWorkspaceService.cs" />
     <Compile Include="Modules\Services\PdfImportService.cs" />
     <Compile Include="Modules\Services\PdfStatus.cs" />
     <Compile Include="Modules\Services\PdfTextLayerDetector.cs" />

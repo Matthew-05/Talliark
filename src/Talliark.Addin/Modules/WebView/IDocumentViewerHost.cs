@@ -32,5 +32,6 @@ namespace Talliark.Addin.Modules.WebView
         void SendLinkRectanglesRemoved(System.Collections.Generic.IList<string> ids);
 
         void SendCharBboxesVisible(bool visible);
+        void SendTableDetectionEnabled(bool enabled);
     }
 }

@@ -50,6 +50,14 @@ namespace Talliark.Addin.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ExperimentalTableDetection {
+            get { return ((bool)(this["ExperimentalTableDetection"])); }
+            set { this["ExperimentalTableDetection"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool ShowValues {
             get {
                 return ((bool)(this["ShowValues"]));

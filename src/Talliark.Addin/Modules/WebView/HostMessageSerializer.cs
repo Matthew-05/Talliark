@@ -277,6 +277,13 @@ namespace Talliark.Addin.Modules.WebView
                 : "{\"type\":\"set-char-bboxes-visible\",\"visible\":false}";
         }
 
+        public static string BuildSetTableDetectionEnabled(bool enabled)
+        {
+            return enabled
+                ? "{\"type\":\"set-table-detection-enabled\",\"enabled\":true}"
+                : "{\"type\":\"set-table-detection-enabled\",\"enabled\":false}";
+        }
+
         public static string BuildSetValuesVisible(bool visible)
         {
             return visible

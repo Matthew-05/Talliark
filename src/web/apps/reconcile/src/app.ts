@@ -11,13 +11,16 @@ import {
   sendCancelScan,
   sendRequestResult,
   sendRunScan,
+  sendImportPrimary,
+  sendImportPrimaryFromClipboard,
+  sendCopyPrimary,
 } from "./host-bridge.js";
 import { DocumentList } from "./components/document-list/document-list.js";
 import { ScanProgressPanel } from "./components/scan-progress/scan-progress.js";
 import { Splash } from "./components/splash/splash.js";
 import { ResultView } from "./components/result-view/result-view.js";
 import { decodeReconcileResult } from "./services/reconcile-result-decoder.js";
-import type { ReconcileDocument, ScanProgress, ScanStatus } from "./types/index.js";
+import type { ReconcileDocument, ReconcileImportSource, ScanProgress, ScanStatus } from "./types/index.js";
 
 export function mountApp(root: HTMLElement): void {
   root.className = "reconcile";
@@ -26,7 +29,8 @@ export function mountApp(root: HTMLElement): void {
   let scanningId: string | null = null;
   let selectedId: string | null = null;
 
-  const splash = new Splash(root);
+  const intake = { onImport: sendImportPrimary, onClipboard: sendImportPrimaryFromClipboard, onCopy: sendCopyPrimary };
+  const splash = new Splash(root, intake);
 
   const documentList = new DocumentList(root, {
     onScan(pdfId: string) {
@@ -42,6 +46,7 @@ export function mountApp(root: HTMLElement): void {
       sendRequestResult(pdfId);
       render();
     },
+    ...intake,
   });
 
   const scanProgress = new ScanProgressPanel(root, {
@@ -80,9 +85,11 @@ export function mountApp(root: HTMLElement): void {
   }
 
   initHostBridge({
-    onDataLoaded(loaded, _folders, scanning) {
+    onDataLoaded(loaded, sources: ReconcileImportSource[], scanning) {
       documents = loaded;
       documentList.update(documents);
+      documentList.setSources(sources);
+      splash.setSources(sources);
       // The host is the authority on whether a scan is running, so an app that
       // mounts mid-scan picks it up rather than showing an idle home.
       scanningId = scanning;

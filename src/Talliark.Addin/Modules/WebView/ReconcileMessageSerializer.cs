@@ -9,7 +9,7 @@ namespace Talliark.Addin.Modules.WebView
     {
         public static string BuildDataLoaded(
             IList<ReconcileDocumentInfo> documents,
-            IList<PdfFolder> folders,
+            IList<PdfMetadata> sources,
             string scanningPdfId)
         {
             var root = new Dictionary<string, object>
@@ -17,7 +17,7 @@ namespace Talliark.Addin.Modules.WebView
                 ["type"] = "reconcile-data-loaded",
                 ["documents"] = BuildDocuments(documents),
             };
-            if (folders != null) root["folders"] = BuildFolders(folders);
+            if (sources != null) root["sources"] = BuildSources(sources);
             if (!string.IsNullOrEmpty(scanningPdfId)) root["scanning"] = scanningPdfId;
             return Serialize(root);
         }
@@ -70,6 +70,7 @@ namespace Talliark.Addin.Modules.WebView
                 var item = new Dictionary<string, object>
                 {
                     ["id"] = document.Id,
+                    ["versionId"] = document.VersionId,
                     ["name"] = document.Name,
                     ["staleness"] = document.Staleness,
                 };
@@ -92,11 +93,11 @@ namespace Talliark.Addin.Modules.WebView
             return output;
         }
 
-        private static object BuildFolders(IList<PdfFolder> folders)
+        private static object BuildSources(IList<PdfMetadata> sources)
         {
             var output = new List<Dictionary<string, object>>();
-            foreach (PdfFolder folder in folders)
-                output.Add(new Dictionary<string, object> { ["id"] = folder.Id, ["name"] = folder.Name });
+            foreach (PdfMetadata source in sources)
+                output.Add(new Dictionary<string, object> { ["id"] = source.Id, ["name"] = source.Name });
             return output;
         }
 

@@ -22,13 +22,15 @@
         "command":    { "const": "ocr",   "description": "Operation to perform." },
         "pdf_base64": { "type": "string", "description": "Base-64 encoded input PDF bytes." },
         "mode":       { "$ref": "#/definitions/OcrMode", "default": "full" },
-        "analysis":   { "type": "boolean", "default": false, "description": "Run the Reconcile scan at the end of the pipeline and return reconcile_base64. The scan is never a background pass: this flag is set only because a user chose to run one. It adds an unbudgeted re-run of table detection and the Reconcile engines to the same job, under one job id, one progress stream and one cancellation -- a separate command would have duplicated the whole pipeline's orchestration to add a stage at the end of it." },
-        "document_id": { "type": "string", "description": "GUID of the PdfDocument this job is for, echoed into reconcile-v1's source.documentId so a stored result knows which document it was produced from. Required when analysis is true and ignored otherwise." }
+        "analysis":   { "type": "boolean", "default": false, "description": "Run the Reconcile scan at the end of the pipeline. Reconcile always forces table detection regardless of detect_tables." },
+        "detect_tables": { "type": "boolean", "default": false, "description": "Publish general table-structure-v1 during ordinary OCR. Reconcile forces the effective value to true. Table-cell OCR recovery is independent and always runs." },
+        "document_id": { "type": "string", "description": "GUID of the Reconcile-owned document. Required when analysis is true and ignored otherwise." },
+        "version_id": { "type": "string", "description": "GUID of the Reconcile-owned document version. Required when analysis is true and ignored otherwise." }
       },
       "examples": [
         { "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "command": "ocr", "pdf_base64": "JVBERi0xLjQ=", "mode": "full" },
         { "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "command": "ocr", "pdf_base64": "JVBERi0xLjQ=", "mode": "geometry-only" },
-        { "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "command": "ocr", "pdf_base64": "JVBERi0xLjQ=", "mode": "full", "analysis": true, "document_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7" }
+        { "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "command": "ocr", "pdf_base64": "JVBERi0xLjQ=", "mode": "full", "analysis": true, "document_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "version_id": "8d3b395e-2e3f-4998-ae7f-e620893dc151" }
       ]
     },
 

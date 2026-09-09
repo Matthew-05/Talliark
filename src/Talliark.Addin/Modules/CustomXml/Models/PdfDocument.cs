@@ -56,12 +56,6 @@ namespace Talliark.Addin.Modules.CustomXml.Models
         public string FinancialStructureBase64 { get; set; }
 
         /// <summary>
-        /// Gzip-compressed reconcile-v1 JSON, base64-encoded. Replaced only by an
-        /// explicit successful Reconcile scan; cache rebuilds retain it as stale.
-        /// </summary>
-        public string ReconcileBase64 { get; set; }
-
-        /// <summary>
         /// Per-page clockwise rotation in degrees (0, 90, 180, 270).
         /// Only non-zero pages are stored. Null or empty means all pages at 0°.
         /// </summary>

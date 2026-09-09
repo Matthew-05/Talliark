@@ -108,7 +108,6 @@ namespace Talliark.Addin.Modules.CustomXml
                 TableStructureBase64 = parts.TableStructureBase64,
                 DocumentValuesBase64 = parts.DocumentValuesBase64,
                 FinancialStructureBase64 = parts.FinancialStructureBase64,
-                ReconcileBase64 = parts.ReconcileBase64,
                 PageRotations  = metadata.PageRotations,
             };
             return true;
@@ -129,7 +128,6 @@ namespace Talliark.Addin.Modules.CustomXml
                     TableStructureBase64 = parts.TableStructureBase64,
                     DocumentValuesBase64 = parts.DocumentValuesBase64,
                 FinancialStructureBase64 = parts.FinancialStructureBase64,
-                    ReconcileBase64 = parts.ReconcileBase64,
                     PageRotations  = m.PageRotations,
                 });
             }
@@ -153,9 +151,30 @@ namespace Talliark.Addin.Modules.CustomXml
                 TableStructureBase64 = pdf.TableStructureBase64,
                 DocumentValuesBase64 = pdf.DocumentValuesBase64,
                 FinancialStructureBase64 = pdf.FinancialStructureBase64,
-                ReconcileBase64 = pdf.ReconcileBase64,
             });
         }
+
+        // ── Workbook-scoped Reconcile workspace ──────────────────────────────────
+
+        public ReconcileWorkspace LoadReconcileWorkspace()
+        {
+            Office.CustomXMLPart part = FindPartByNamespace(TalliarkXml.ReconcileNamespaceUri);
+            if (part == null || string.IsNullOrWhiteSpace(part.XML)) return new ReconcileWorkspace();
+            try { return TalliarkReconcileSerializer.FromXml(part.XML); }
+            catch (System.Xml.XmlException ex)
+            {
+                throw new InvalidOperationException("Talliark Reconcile custom XML part contains invalid XML.", ex);
+            }
+        }
+
+        public void SaveReconcileWorkspace(ReconcileWorkspace workspace)
+        {
+            if (workspace == null) throw new ArgumentNullException(nameof(workspace));
+            string xml = TalliarkReconcileSerializer.ToXml(workspace);
+            ReplacePart(TalliarkXml.ReconcileNamespaceUri, xml);
+        }
+
+        public void DeleteReconcileWorkspace() => DeletePart(TalliarkXml.ReconcileNamespaceUri);
 
         // ── Metadata-only helpers ─────────────────────────────────────────────
 
@@ -346,6 +365,7 @@ namespace Talliark.Addin.Modules.CustomXml
 
             DeletePart(TalliarkXml.ContentNamespaceUri);
             DeletePart(TalliarkXml.LinksNamespaceUri);
+            DeleteReconcileWorkspace();
         }
 
         // ── Private COM helpers ───────────────────────────────────────────────

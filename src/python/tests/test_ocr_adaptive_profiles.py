@@ -480,6 +480,18 @@ class ProtocolModelTests(unittest.TestCase):
         )
 
         self.assertEqual(job.mode, "full")
+        self.assertFalse(job.detect_tables)
+
+    def test_table_detection_is_explicit_and_reconcile_identity_has_a_version(self) -> None:
+        job = OcrJob.from_dict({
+            "job_id": "job-2", "command": "ocr", "pdf_base64": "JVBERg==",
+            "detect_tables": True, "analysis": True,
+            "document_id": "reconcile-document", "version_id": "reconcile-version",
+        })
+        self.assertTrue(job.detect_tables)
+        self.assertTrue(job.analysis)
+        self.assertEqual(job.document_id, "reconcile-document")
+        self.assertEqual(job.version_id, "reconcile-version")
 
 if __name__ == "__main__":
     unittest.main()

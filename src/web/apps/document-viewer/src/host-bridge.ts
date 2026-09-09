@@ -27,6 +27,7 @@ export interface HostMessageHandlers {
   onLinkSelectionChanged?: (entries: LinkSelectionEntry[]) => void;
   onSetSearchQuery?: (query: string) => void;
   onSetCharBboxesVisible?: (visible: boolean) => void;
+  onSetTableDetectionEnabled?: (enabled: boolean) => void;
   onSetValuesVisible?: (visible: boolean) => void;
   onSetReferencesVisible?: (visible: boolean) => void;
   onSetStructureVisible?: (visible: boolean) => void;
@@ -226,6 +227,10 @@ interface SetCharBboxesVisibleMessage {
   type: "set-char-bboxes-visible";
   visible: boolean;
 }
+interface SetTableDetectionEnabledMessage {
+  type: "set-table-detection-enabled";
+  enabled: boolean;
+}
 
 interface SetValuesVisibleMessage {
   type: "set-values-visible";
@@ -271,6 +276,7 @@ function handleMessage(raw: unknown, handlers: HostMessageHandlers): void {
     onLinkSelectionChanged,
     onSetSearchQuery,
     onSetCharBboxesVisible,
+    onSetTableDetectionEnabled,
     onSetValuesVisible,
     onSetReferencesVisible,
     onSetStructureVisible,
@@ -385,6 +391,12 @@ function handleMessage(raw: unknown, handlers: HostMessageHandlers): void {
       if (!onSetCharBboxesVisible) return;
       const msg = parsed as SetCharBboxesVisibleMessage;
       onSetCharBboxesVisible(msg.visible === true);
+      return;
+    }
+
+    if (type === "set-table-detection-enabled") {
+      const msg = parsed as SetTableDetectionEnabledMessage;
+      onSetTableDetectionEnabled?.(msg.enabled === true);
       return;
     }
 

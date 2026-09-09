@@ -106,7 +106,7 @@ namespace Talliark.Addin.Modules.Services
 
         public void UpdatePdfAfterOcr(Excel.Workbook workbook, string id, string newBase64,
             string geometryBase64, string tableStructureBase64, string documentValuesBase64,
-            string financialStructureBase64, string reconcileBase64 = null)
+            string financialStructureBase64)
         {
             if (workbook == null) throw new ArgumentNullException(nameof(workbook));
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("id must be non-empty.", nameof(id));
@@ -118,8 +118,6 @@ namespace Talliark.Addin.Modules.Services
             if (!store.TryGetMetadata(id, out PdfMetadata existing))
                 throw new InvalidOperationException("PDF not found: " + id);
 
-            store.TryLoadPdfBinary(id, out PdfBinaryParts priorParts);
-
             store.SavePdfBinary(id, new PdfBinaryParts
             {
                 Base64 = newBase64,
@@ -127,7 +125,6 @@ namespace Talliark.Addin.Modules.Services
                 TableStructureBase64 = tableStructureBase64,
                 DocumentValuesBase64 = documentValuesBase64,
                 FinancialStructureBase64 = financialStructureBase64,
-                ReconcileBase64 = reconcileBase64 ?? priorParts.ReconcileBase64,
             });
 
             var updated = new PdfMetadata(existing.Id, existing.Name, existing.FolderId, existing.DateAdded, existing.FileSizeBytes)
@@ -139,7 +136,7 @@ namespace Talliark.Addin.Modules.Services
 
         public void UpdatePdfGeometry(Excel.Workbook workbook, string id, string geometryBase64,
             string tableStructureBase64, string documentValuesBase64,
-            string financialStructureBase64, string reconcileBase64 = null)
+            string financialStructureBase64)
         {
             if (workbook == null) throw new ArgumentNullException(nameof(workbook));
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("id must be non-empty.", nameof(id));
@@ -158,7 +155,6 @@ namespace Talliark.Addin.Modules.Services
                 TableStructureBase64 = tableStructureBase64,
                 DocumentValuesBase64 = documentValuesBase64,
                 FinancialStructureBase64 = financialStructureBase64,
-                ReconcileBase64 = reconcileBase64 ?? binaryParts.ReconcileBase64,
             });
 
             var updated = new PdfMetadata(existing.Id, existing.Name, existing.FolderId, existing.DateAdded, existing.FileSizeBytes)

@@ -47,6 +47,8 @@ namespace Talliark.Addin.Modules.WebView
 
         public void SendCharBboxesVisible(bool visible) =>
             _controller.SendCharBboxesVisible(visible);
+        public void SendTableDetectionEnabled(bool enabled) =>
+            _controller.SendTableDetectionEnabled(enabled);
 
         public void SendValuesVisible(bool visible) =>
             _controller.SendValuesVisible(visible);

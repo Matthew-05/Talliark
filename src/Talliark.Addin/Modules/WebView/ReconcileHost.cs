@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,6 +8,8 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Talliark.Addin.Modules.CustomXml;
 using Talliark.Addin.Modules.Services;
+using Talliark.Addin.Modules.Services.Conversion;
+using Talliark.Addin.Modules.UI;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace Talliark.Addin.Modules.WebView
@@ -17,6 +20,7 @@ namespace Talliark.Addin.Modules.WebView
         private readonly Excel.Workbook _workbook;
         private readonly WebView2 _webView = new WebView2();
         private readonly ReconcileResultService _results = new ReconcileResultService();
+        private readonly ReconcileWorkspaceService _workspaceService = new ReconcileWorkspaceService();
         private readonly OcrService _ocrService;
         private WebViewStartupSurface _startup;
         private string _scanningPdfId;
@@ -85,6 +89,15 @@ namespace Talliark.Addin.Modules.WebView
                     case "request-reconcile-result":
                         SendResult(ReconcileMessageParser.ParsePdfId(raw));
                         break;
+                    case "import-reconcile-primary":
+                        _ = ImportPrimaryAsync();
+                        break;
+                    case "import-reconcile-primary-clipboard":
+                        _ = ImportPrimaryFromClipboardAsync();
+                        break;
+                    case "copy-reconcile-primary":
+                        CopyPrimary(ReconcileMessageParser.ParseSourcePdfId(raw));
+                        break;
                 }
             }
             catch (Exception ex)
@@ -111,8 +124,6 @@ namespace Talliark.Addin.Modules.WebView
                             && webStatus != "error")
                             return;
                         Post(ReconcileMessageSerializer.BuildScanStatus(id, webStatus, detail));
-                        if (webStatus == "complete")
-                            Globals.ThisAddIn.RefreshTaskPanePdf(_workbook, id);
                     });
             }
             catch (Exception ex)
@@ -140,11 +151,88 @@ namespace Talliark.Addin.Modules.WebView
                 var store = new TalliarkCustomXmlPartStore(_workbook);
                 var content = store.LoadContent();
                 Post(ReconcileMessageSerializer.BuildDataLoaded(
-                    _results.LoadDocuments(_workbook), content.Folders, _scanningPdfId));
+                    _results.LoadDocuments(_workbook), content.Pdfs, _scanningPdfId));
             }
             catch (Exception ex)
             {
                 TalliarkLog.Trace("Reconcile data load failed: " + ex.Message);
+            }
+        }
+
+        private bool ConfirmReplace()
+        {
+            if (new TalliarkCustomXmlPartStore(_workbook).LoadReconcileWorkspace().Primary == null) return true;
+            return MessageBox.Show(this,
+                "Replace the current Reconcile primary statement?\n\nThe active snapshot and its stored result will be replaced.",
+                "Replace Reconcile statement", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2) == DialogResult.OK;
+        }
+
+        private void CopyPrimary(string sourcePdfId)
+        {
+            if (_ocrService.IsRunning || string.IsNullOrWhiteSpace(sourcePdfId)) return;
+            if (!WorkbookProtectionGuard.TryRequireWritable(_workbook, this) || !ConfirmReplace()) return;
+            try { _workspaceService.CopyFromImported(_workbook, sourcePdfId); SendData(); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Copy to Reconcile", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+
+        private async Task ImportPrimaryAsync()
+        {
+            if (_ocrService.IsRunning) return;
+            if (!WorkbookProtectionGuard.TryRequireWritable(_workbook, this) || !ConfirmReplace()) return;
+            using (var picker = new OpenFileDialog { Title = "Import primary statement into Reconcile", Multiselect = false, Filter = "Documents|*.pdf;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.eml|All files|*.*" })
+            {
+                if (picker.ShowDialog(this) != DialogResult.OK) return;
+                await ImportPrimaryPathAsync(picker.FileName);
+            }
+        }
+
+        private async Task ImportPrimaryFromClipboardAsync()
+        {
+            if (_ocrService.IsRunning) return;
+            if (!Clipboard.ContainsFileDropList())
+            {
+                MessageBox.Show(this, "The clipboard does not contain a file.", "Import to Reconcile", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            string path = Clipboard.GetFileDropList().Cast<string>().FirstOrDefault(File.Exists);
+            if (string.IsNullOrEmpty(path)) return;
+            if (!WorkbookProtectionGuard.TryRequireWritable(_workbook, this) || !ConfirmReplace()) return;
+            await ImportPrimaryPathAsync(path);
+        }
+
+        private async Task ImportPrimaryPathAsync(string path)
+        {
+            try
+            {
+                var plan = ImportPreparationService.Plan(this, new[] { new ImportCandidate { Path = path, Name = Path.GetFileName(path) } });
+                if (plan.Cancelled) return;
+                using (var progress = ThreadedProgressController.Show("Preparing Reconcile statement..."))
+                using (PreparedImport prepared = await ImportPreparationService.PrepareAsync(plan, progress))
+                {
+                    if (!prepared.HasWork) { if (prepared.Errors.Count > 0) MessageBox.Show(this, string.Join("\n", prepared.Errors)); return; }
+                    string name;
+                    string base64;
+                    if (prepared.PathRequests.Count > 0)
+                    {
+                        PdfPathImportRequest request = prepared.PathRequests[0];
+                        name = string.IsNullOrWhiteSpace(request.DisplayName) ? Path.GetFileName(request.Path) : request.DisplayName;
+                        base64 = Convert.ToBase64String(File.ReadAllBytes(request.Path));
+                    }
+                    else
+                    {
+                        PdfBase64ImportRequest request = prepared.Base64Requests[0];
+                        name = request.Name;
+                        base64 = request.Base64;
+                    }
+                    _workspaceService.ReplacePrimary(_workbook, name, base64);
+                }
+                SendData();
+            }
+            catch (Exception ex)
+            {
+                TalliarkLog.Trace("Reconcile import failed: " + ex);
+                MessageBox.Show(this, ex.Message, "Import to Reconcile", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

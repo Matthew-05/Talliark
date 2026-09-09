@@ -1077,6 +1077,20 @@ namespace Talliark.Addin
             }
         }
 
+        private void OnExperimentalTableDetectionChanged(object sender, bool enabled)
+        {
+            foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
+            {
+                try { entry.Host?.SendTableDetectionEnabled(enabled); }
+                catch (Exception ex) { Modules.TalliarkLog.Trace("Table detection update skipped pane: " + ex.Message); }
+            }
+            foreach (WorkbookViewerEntry entry in _workbookViewers.ToArray())
+            {
+                try { if (entry.Window != null && !entry.Window.IsDisposed) entry.Window.SendTableDetectionEnabled(enabled); }
+                catch (Exception ex) { Modules.TalliarkLog.Trace("Table detection update skipped viewer: " + ex.Message); }
+            }
+        }
+
         private void OnValuesChanged(object sender, bool visible)
         {
             foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
@@ -1332,6 +1346,8 @@ namespace Talliark.Addin
             Modules.Infrastructure.DevSettings.ReferencesChanged += OnReferencesChanged;
             Modules.Infrastructure.DevSettings.StructureChanged += OnStructureChanged;
             Modules.Infrastructure.DevSettings.ValueNoiseChanged += OnValueNoiseChanged;
+            Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged +=
+                OnExperimentalTableDetectionChanged;
 
             _ = CheckForUpdateOnOpenAsync();
 
@@ -1357,6 +1373,8 @@ namespace Talliark.Addin
             Modules.Infrastructure.DevSettings.ReferencesChanged -= OnReferencesChanged;
             Modules.Infrastructure.DevSettings.StructureChanged -= OnStructureChanged;
             Modules.Infrastructure.DevSettings.ValueNoiseChanged -= OnValueNoiseChanged;
+            Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged -=
+                OnExperimentalTableDetectionChanged;
 
             Application.SheetSelectionChange -= Application_SheetSelectionChange;
 

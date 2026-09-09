@@ -10,6 +10,9 @@
     <Setting Name="ShowCharBoundingBoxes" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ExperimentalTableDetection" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="ShowValues" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>

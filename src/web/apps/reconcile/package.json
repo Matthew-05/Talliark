@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p ../../tsconfig.tools.json && node build.ts"
+    "build": "tsc -p ../../tsconfig.tools.json && node build.ts",
+    "test": "node --test test/*.test.ts"
   },
   "dependencies": {
     "@talliark/shared": "*",

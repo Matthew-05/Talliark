@@ -900,6 +900,17 @@
       ]
     },
 
+    "SetTableDetectionEnabledMessage": {
+      "description": "Sent after viewer-ready and whenever the persisted Experimental Table Detection setting changes. False makes cached detector output unavailable to viewer assistance; manual table rectangles and grids remain available.",
+      "type": "object",
+      "required": ["type", "enabled"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "set-table-detection-enabled" },
+        "enabled": { "type": "boolean" }
+      }
+    },
+
     "SetValuesVisibleMessage": {
       "description": "Sent by the C# host when the detected-value overlay toggle changes and once after viewer-ready. Values measure, and their overlay is clickable.",
       "type": "object",
@@ -1095,6 +1106,23 @@
       ]
     },
 
+    "ImportReconcilePrimaryMessage": {
+      "description": "Opens the shared import/convert flow and replaces the workbook's Reconcile primary with an independent snapshot.",
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "import-reconcile-primary" } }
+    },
+    "ImportReconcilePrimaryClipboardMessage": {
+      "description": "Imports the first file path on the Windows clipboard through the shared import/convert flow into an independent Reconcile primary snapshot.",
+      "type": "object", "required": ["type"], "additionalProperties": false,
+      "properties": { "type": { "const": "import-reconcile-primary-clipboard" } }
+    },
+
+    "CopyReconcilePrimaryMessage": {
+      "description": "Copies one ordinary imported PDF into a new independent Reconcile document/version snapshot. sourcePdfId is intake-only and is never persisted.",
+      "type": "object", "required": ["type", "sourcePdfId"], "additionalProperties": false,
+      "properties": { "type": { "const": "copy-reconcile-primary" }, "sourcePdfId": { "type": "string", "minLength": 1 } }
+    },
+
     "ReconcileReadyMessage": {
       "description": "Sent once by the reconcile web app after JavaScript has initialised. The host responds with ReconcileDataLoadedMessage. The app opens against the workbook, not against a sheet or a selection, so nothing about Excel's current state is carried here.",
       "type": "object",
@@ -1114,10 +1142,11 @@
     "ReconcileDocumentPayload": {
       "description": "One document in the workbook as the Reconcile home lists it: what it is, and what reconcile data the workbook holds for it. The counts travel with the list so the home can render without loading a sum tree per document -- a clean scan reads '14 totals verified, 0 exceptions', which is what makes it trustworthy instead of indistinguishable from a scan that never ran.",
       "type": "object",
-      "required": ["id", "name", "staleness"],
+      "required": ["id", "versionId", "name", "staleness"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "description": "GUID of the PdfDocument." },
+        "id": { "type": "string", "description": "GUID of the Reconcile-owned document." },
+        "versionId": { "type": "string", "description": "GUID of its current Reconcile-owned version." },
         "name": { "type": "string", "description": "Display name." },
         "folderId": { "type": "string", "description": "GUID of the owning folder, absent when uncategorised." },
         "pageCount": { "type": "integer", "minimum": 0 },
@@ -1149,7 +1178,7 @@
       "properties": {
         "type": { "const": "reconcile-data-loaded" },
         "documents": { "type": "array", "items": { "$ref": "#/definitions/ReconcileDocumentPayload" } },
-        "folders": { "type": "array", "items": { "$ref": "#/definitions/FolderPayload" } },
+        "sources": { "type": "array", "description": "Ordinary imported documents offered only as one-time copy sources.", "items": { "type": "object", "required": ["id", "name"], "additionalProperties": false, "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } },
         "scanning": { "type": "string", "description": "GUID of the document a scan is already running for, so an app that mounts mid-scan shows progress rather than an idle home. Absent when no scan is running." }
       },
       "examples": [
@@ -1452,6 +1481,7 @@
     { "$ref": "#/definitions/LinkSelectionChangedMessage" },
     { "$ref": "#/definitions/SetSearchQueryMessage" },
     { "$ref": "#/definitions/SetCharBboxesVisibleMessage" },
+    { "$ref": "#/definitions/SetTableDetectionEnabledMessage" },
     { "$ref": "#/definitions/SetValuesVisibleMessage" },
     { "$ref": "#/definitions/SetReferencesVisibleMessage" },
     { "$ref": "#/definitions/SetStructureVisibleMessage" },
@@ -1464,6 +1494,9 @@
     { "$ref": "#/definitions/PageRotationsUpdatedMessage" },
 
     { "$ref": "#/definitions/ReconcileReadyMessage" },
+    { "$ref": "#/definitions/ImportReconcilePrimaryMessage" },
+    { "$ref": "#/definitions/ImportReconcilePrimaryClipboardMessage" },
+    { "$ref": "#/definitions/CopyReconcilePrimaryMessage" },
     { "$ref": "#/definitions/ReconcileDataLoadedMessage" },
     { "$ref": "#/definitions/RunReconcileScanMessage" },
     { "$ref": "#/definitions/CancelReconcileScanMessage" },

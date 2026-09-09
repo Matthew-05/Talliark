@@ -46,6 +46,7 @@ namespace Talliark.Addin.Modules.UI
 
         private readonly ReleaseNotesControl _updateHistory;
         private readonly Panel _content;
+        private readonly CardPanel _experimentalCard;
         private readonly CardPanel _developmentCard;
         private readonly CardPanel _updatesCard;
         private bool _layingOutContent;
@@ -94,6 +95,9 @@ namespace Talliark.Addin.Modules.UI
                 $"Version {AppVersion.Current}", new Point(ContentMargin + 4, 51)));
 
             int nextCardTop = 82;
+            _experimentalCard = BuildExperimentalCard(new Point(ContentMargin, nextCardTop), cardWidth);
+            _content.Controls.Add(_experimentalCard);
+            nextCardTop += _experimentalCard.Height + CardGap;
 
             _developmentCard = null;
             if (showDevelopmentSection)
@@ -145,7 +149,8 @@ namespace Talliark.Addin.Modules.UI
                 int cardWidth = Math.Max(
                     1, _content.ClientSize.Width - (ContentMargin * 2));
 
-                int updatesTop = 82;
+                _experimentalCard.Width = cardWidth;
+                int updatesTop = _experimentalCard.Bottom + CardGap;
                 if (_developmentCard != null)
                 {
                     _developmentCard.Width = cardWidth;
@@ -166,6 +171,37 @@ namespace Talliark.Addin.Modules.UI
             {
                 _layingOutContent = false;
             }
+        }
+
+        private CardPanel BuildExperimentalCard(Point location, int width)
+        {
+            var card = new CardPanel
+            {
+                Location = location,
+                Size = new Size(width, 158),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
+            };
+            card.Controls.Add(DialogTheme.CreateSectionTitle("Experimental", new Point(CardPadding, 14)));
+            card.Controls.Add(DialogTheme.CreateSeparator(new Point(CardPadding, 46), width - (CardPadding * 2)));
+            var toggle = new CheckBox
+            {
+                Text = "Table Detection",
+                AutoSize = true,
+                Location = new Point(CardPadding + 2, 62),
+                Font = DialogTheme.BodyFont,
+                ForeColor = DialogTheme.Text,
+                Cursor = Cursors.Hand,
+                Checked = ExperimentalSettings.TableDetection
+            };
+            toggle.CheckedChanged += (sender, args) => ExperimentalSettings.TableDetection = toggle.Checked;
+            card.Controls.Add(toggle);
+            var caption = DialogTheme.CreateCaption(
+                "Detects table structure during ordinary OCR and enables detected-table assistance in the document viewer. " +
+                "Reconcile always detects tables. Manually drawn table rectangles and their grids remain available.",
+                new Point(CardPadding + CaptionIndent, 88));
+            DialogTheme.WrapAt(caption, Math.Max(1, width - CardPadding * 2 - CaptionIndent));
+            card.Controls.Add(caption);
+            return card;
         }
 
         /// <summary>Developer-only card; shown in development and beta builds.</summary>

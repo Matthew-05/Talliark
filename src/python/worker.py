@@ -500,20 +500,24 @@ def _handle_job(job: OcrJob) -> None:
         table_structure_base64 = ""
         table_structure: dict | None = None
         table_started = time.perf_counter()
-        try:
-            on_progress("Detecting table structure…", Stage.TABLE_STRUCTURE)
-            table_diagnostics: dict = {}
-            table_structure = detect_tables(
-                pdf_bytes,
-                geometry,
-                progress_callback=on_progress,
-                diagnostics=table_diagnostics,
-            )
-            diagnostics.update(table_diagnostics)
-            table_structure_base64 = structure_to_base64(table_structure)
-        except Exception as exc:  # noqa: BLE001 — optional stage must preserve OCR
-            diagnostics["table_structure_error"] = str(exc)
-            on_progress("Table structure detection unavailable; keeping OCR geometry…", Stage.TABLE_STRUCTURE)
+        # Published table structure is experimental for ordinary OCR. Reconcile
+        # always needs it and therefore forces the effective gate on. Cell-level
+        # table OCR recovery above remains unconditional text-quality work.
+        if job.detect_tables or job.analysis:
+            try:
+                on_progress("Detecting table structure…", Stage.TABLE_STRUCTURE)
+                table_diagnostics: dict = {}
+                table_structure = detect_tables(
+                    pdf_bytes,
+                    geometry,
+                    progress_callback=on_progress,
+                    diagnostics=table_diagnostics,
+                )
+                diagnostics.update(table_diagnostics)
+                table_structure_base64 = structure_to_base64(table_structure)
+            except Exception as exc:  # noqa: BLE001 — optional stage must preserve OCR
+                diagnostics["table_structure_error"] = str(exc)
+                on_progress("Table structure detection unavailable; keeping OCR geometry…", Stage.TABLE_STRUCTURE)
         diagnostics["table_structure_ms"] = elapsed_ms(table_started)
 
         # The two tiers read one prepared document. The financial tier runs
@@ -598,6 +602,7 @@ def _handle_job(job: OcrJob) -> None:
                     pdf_bytes,
                     geometry,
                     document_id=job.document_id,
+                    version_id=job.version_id,
                     values=values_model,
                     financial=financial_model,
                     tables=table_structure,

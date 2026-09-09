@@ -690,6 +690,13 @@ namespace Talliark.Addin.Modules.WebView
             }
         }
 
+        internal void SendTableDetectionEnabled(bool enabled)
+        {
+            if (_disposed || !_webViewReady) return;
+            try { _webView.CoreWebView2.PostWebMessageAsString(HostMessageSerializer.BuildSetTableDetectionEnabled(enabled)); }
+            catch (Exception ex) { TalliarkLog.Trace("SendTableDetectionEnabled failed: " + ex.Message); }
+        }
+
         internal void SendValuesVisible(bool visible)
         {
             if (_disposed || !_webViewReady) return;
@@ -761,6 +768,7 @@ namespace Talliark.Addin.Modules.WebView
         private void SendDevStateToWebView()
         {
             SendCharBboxesVisible(Infrastructure.DevSettings.ShowCharBoundingBoxes);
+            SendTableDetectionEnabled(Infrastructure.ExperimentalSettings.TableDetection);
             SendValuesVisible(Infrastructure.DevSettings.ShowValues);
             SendReferencesVisible(Infrastructure.DevSettings.ShowReferences);
             SendStructureVisible(Infrastructure.DevSettings.ShowStructure);

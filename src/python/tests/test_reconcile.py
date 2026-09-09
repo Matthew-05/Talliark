@@ -191,6 +191,7 @@ class ScanEnvelope(unittest.TestCase):
     def test_the_source_records_what_staleness_is_decided_from(self) -> None:
         source = self.model["source"]
         self.assertEqual(source["documentId"], "7c9e6679-7425-40de-944b-e07fc1f90ae7")
+        self.assertEqual(source["versionId"], source["documentId"])
         self.assertEqual(source["pageCount"], len(self.geometry["pages"]))
         self.assertEqual(source["geometryFingerprint"], geometry_fingerprint(self.geometry))
         self.assertTrue(source["tableDetectorVersion"])

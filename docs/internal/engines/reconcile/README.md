@@ -5,7 +5,7 @@
 | **Source** | `src/python/engines/reconcile/` |
 | **Contract** | `contracts/reconcile-v1.json` |
 | **Entry point** | `engines/reconcile/detector.py` |
-| **Consumes** | Private `FinancialTableScan` blocks; source versions from the cache artifacts |
+| **Consumes** | The Reconcile-owned PDF version, its freshly produced artifacts, and private `FinancialTableScan` blocks |
 | **Tests** | `src/python/tests/test_reconcile.py`; fixtures in `src/python/tests/fixtures/reconcile/` |
 
 **Modules**
@@ -25,16 +25,27 @@ recognition or value-to-cell membership.
 ## 2. Inputs and outputs
 
 `detect_reconcile` invokes `engines.financial_table.detect_financial_tables`
-after the cache-build table and value models exist. It consumes the returned
+after the same Reconcile worker job produces geometry, table, value and financial
+models from the independent PDF snapshot. It consumes the returned
 page-local blocks in page and reading order, evaluates every nominated total,
 and publishes `reconcile-v1`.
 
 The contract carries every examined block, not only exceptions. Every nominated
 total has exactly one outcome--confirmed, break, or unresolved--and only findings
 that can be restated as evidence-backed arithmetic are spoken. The source
-records geometry and cache-artifact versions for staleness; the Reconcile
+records Reconcile document/version identity, geometry, and artifact versions for
+currentness against that same snapshot; the Reconcile
 detector version also includes the financial-table version because the sister is
 a private implementation dependency rather than a separately stored artifact.
+
+One dedicated workbook Custom XML part owns the workspace. Its current model has
+one primary slot and reserves `comparison-1` and `comparison-2`; each slot has a
+document identity and one current version identity. Importing or copying creates
+new identities and duplicates bytes rather than retaining an ordinary-document
+reference. A successful scan atomically replaces the primary version's analysis
+artifacts and result. Failure or cancellation performs no storage write, so an
+earlier successful result remains intact. Comparison analysis and version-history
+UI are intentionally not implemented.
 
 ## 3. Types
 

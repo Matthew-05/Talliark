@@ -28,6 +28,7 @@ export interface ReconcileSummary {
 
 export interface ReconcileDocument {
   readonly id: string;
+  readonly versionId: string;
   readonly name: string;
   readonly folderId?: string | undefined;
   readonly pageCount?: number | undefined;
@@ -37,6 +38,7 @@ export interface ReconcileDocument {
   /** Absent when staleness is `none`. */
   readonly summary?: ReconcileSummary | undefined;
 }
+export interface ReconcileImportSource { readonly id: string; readonly name: string; }
 
 export interface FolderEntry {
   readonly id: string;
@@ -168,6 +170,7 @@ export interface ReconcileModel {
   readonly detectorVersion: string;
   readonly source: {
     readonly documentId: string;
+    readonly versionId: string;
     readonly pageCount: number;
     readonly scannedAt?: string | undefined;
   };

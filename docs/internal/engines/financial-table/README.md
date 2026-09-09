@@ -33,7 +33,7 @@ The rule in one sentence is:
 
 | Concern | General `table` scan | `financial_table` sister | Reconcile |
 | --- | --- | --- | --- |
-| Runtime | Cache build on every document | Explicit Reconcile scan only | Explicit Reconcile scan only |
+| Runtime | Experimental ordinary OCR, and always inside a Reconcile scan | Explicit Reconcile scan only | Explicit Reconcile scan only |
 | Evidence | Text/rule/image geometry and primitive token shapes | General tables, values, geometry, financial conventions | Financial cells, independent structural signals, decimal arithmetic |
 | Regions | Decide whether a visible region is a table and publish its bounds | Recover private statement blocks even when the general scan declined or fragmented them | Never decide that a table exists |
 | Rows and columns | Fit generic rows, columns, wrapped cells, section rows, and repeated headers | Align financial values by row centre and last-digit edge; join multi-panel label columns | Walk nominated rows and columns as candidate sum runs |

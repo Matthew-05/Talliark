@@ -252,10 +252,11 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
    * the same purely visual grid detection it always did.
    */
   const tableSuggestionVisibility = new TableSuggestionVisibility();
+  let experimentalTableDetectionEnabled = false;
   const detectedTableAt = (
     pdfId: string, pageIndex: number, rect: NormalizedRect,
   ): DetectedTable | null => (
-    tableSuggestionVisibility.isEnabled(pdfId)
+    experimentalTableDetectionEnabled && tableSuggestionVisibility.isEnabled(pdfId)
       ? tableCache.tableAt(pdfId, pageIndex, rect)
       : null
   );
@@ -323,6 +324,14 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
 
   /** Recomputes what is still worth suggesting, and who should be saying so. */
   const syncTableSuggestions = (): void => {
+    tableToggle.element.hidden = !experimentalTableDetectionEnabled;
+    if (!experimentalTableDetectionEnabled) {
+      _remainingTables = 0;
+      tableSuggestions.hide();
+      tableNotice.setVisible(false);
+      tableToggle.setActive(false);
+      return;
+    }
     const pdfId = viewer.getActivePdfId();
     if (!pdfId) {
       _remainingTables = 0;
@@ -353,13 +362,16 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   };
 
   const refreshTableMetadata = (): void => {
-    _currentRects = _currentRects.map((entry) => enrichTableMetadata(stripTableMetadata(entry)));
+    _currentRects = _currentRects.map((entry) => experimentalTableDetectionEnabled
+      ? enrichTableMetadata(stripTableMetadata(entry))
+      : stripTableMetadata(entry));
     renderer.setRectangles(_currentRects);
     tableSuggestions.refresh();
     syncTableSuggestions();
   };
 
   const setTableModelEnabled = (enabled: boolean): void => {
+    if (!experimentalTableDetectionEnabled) return;
     const pdfId = viewer.getActivePdfId();
     if (!pdfId || tableSuggestionVisibility.isEnabled(pdfId) === enabled) return;
     tableSuggestionVisibility.setEnabled(pdfId, enabled);
@@ -668,6 +680,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   });
 
   tableSuggestions.onSuggestionClicked((pdfId, page, detectedTable) => {
+    if (!experimentalTableDetectionEnabled) return;
     const rect = detectedTable.bounds;
     _pendingLinkedTables.add(detectedTable.id);
     syncTableSuggestions();
@@ -825,13 +838,14 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     showValueNoise: () => valuesOverlay.showNoise(),
     hideValueNoise: () => valuesOverlay.hideNoise(),
     toggleTableSuggestions: () => {
+      if (!experimentalTableDetectionEnabled) return false;
       const pdfId = viewer.getActivePdfId();
       if (!pdfId) return false;
       const enabled = !tableSuggestionVisibility.isEnabled(pdfId);
       setTableModelEnabled(enabled);
       return enabled;
     },
-    showTableSuggestions: () => setTableModelEnabled(true),
+    showTableSuggestions: () => { if (experimentalTableDetectionEnabled) setTableModelEnabled(true); },
     hideTableSuggestions: () => setTableModelEnabled(false),
   };
 
@@ -872,6 +886,14 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
       valuesOverlay.refresh();
     },
     {
+      onSetTableDetectionEnabled: (enabled) => {
+        experimentalTableDetectionEnabled = enabled;
+        if (!enabled) {
+          const pdfId = viewer.getActivePdfId();
+          if (pdfId) tableSuggestionVisibility.setEnabled(pdfId, false);
+        }
+        refreshTableMetadata();
+      },
       onViewerSurfaceShown: () => {
         // Let the native task pane/window and WebView2 settle before repainting.
         // The current page is rendered first; the shared viewer repairs the rest

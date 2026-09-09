@@ -22,8 +22,6 @@ namespace Talliark.Addin.Modules.CustomXml.Serialization
                 root.Add(new XElement(ns + TalliarkXml.DocumentValuesBase64ElementName, parts.DocumentValuesBase64));
             if (!string.IsNullOrEmpty(parts?.FinancialStructureBase64))
                 root.Add(new XElement(ns + TalliarkXml.FinancialStructureBase64ElementName, parts.FinancialStructureBase64));
-            if (!string.IsNullOrEmpty(parts?.ReconcileBase64))
-                root.Add(new XElement(ns + TalliarkXml.ReconcileBase64ElementName, parts.ReconcileBase64));
 
             return new XDocument(new XDeclaration("1.0", "utf-8", null), root)
                 .ToString(SaveOptions.DisableFormatting);
@@ -47,7 +45,6 @@ namespace Talliark.Addin.Modules.CustomXml.Serialization
             parts.TableStructureBase64 = NullIfEmpty(root.Element(ns + TalliarkXml.TableStructureBase64ElementName)?.Value);
             parts.DocumentValuesBase64 = NullIfEmpty(root.Element(ns + TalliarkXml.DocumentValuesBase64ElementName)?.Value);
             parts.FinancialStructureBase64 = NullIfEmpty(root.Element(ns + TalliarkXml.FinancialStructureBase64ElementName)?.Value);
-            parts.ReconcileBase64 = NullIfEmpty(root.Element(ns + TalliarkXml.ReconcileBase64ElementName)?.Value);
             return parts;
         }
 

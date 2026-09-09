@@ -17,11 +17,14 @@
  * means the scan found nothing it could check, which is a statement about the
  * scan.
  */
-import type { ReconcileDocument, ReconcileSummary } from "../../types/index.js";
+import type { ReconcileDocument, ReconcileImportSource, ReconcileSummary } from "../../types/index.js";
 
 export interface DocumentListCallbacks {
   onScan(pdfId: string): void;
   onOpen(pdfId: string): void;
+  onImport(): void;
+  onClipboard(): void;
+  onCopy(sourcePdfId: string): void;
 }
 
 /** What a stored scan came to, in the sentence the home prints for it. */
@@ -56,8 +59,11 @@ export class DocumentList {
   private readonly body: HTMLElement;
   private documents: ReconcileDocument[] = [];
   private scanningId: string | null = null;
+  private sources: ReconcileImportSource[] = [];
+  private readonly callbacks: DocumentListCallbacks;
 
-  constructor(parent: HTMLElement, private readonly callbacks: DocumentListCallbacks) {
+  constructor(parent: HTMLElement, callbacks: DocumentListCallbacks) {
+    this.callbacks = callbacks;
     this.element = document.createElement("section");
     this.element.className = "document-list";
 
@@ -86,11 +92,33 @@ export class DocumentList {
     this.documents = documents;
     this.render();
   }
+  setSources(sources: ReconcileImportSource[]): void { this.sources = sources; this.render(); }
 
   private render(): void {
     this.body.replaceChildren();
     for (const document_ of this.documents) {
       this.body.appendChild(this.row(document_));
+    }
+    if (this.documents.length > 0) {
+      const replace = document.createElement("div");
+      replace.className = "document-row__actions";
+      const button = document.createElement("button");
+      button.type = "button"; button.className = "button button--secondary";
+      button.textContent = "Replace primary…"; button.disabled = this.scanningId !== null;
+      button.addEventListener("click", this.callbacks.onImport);
+      const clipboard = document.createElement("button");
+      clipboard.type = "button"; clipboard.className = "button button--secondary";
+      clipboard.textContent = "Replace from clipboard"; clipboard.disabled = this.scanningId !== null;
+      clipboard.addEventListener("click", this.callbacks.onClipboard);
+      const select = document.createElement("select");
+      select.append(new Option("Copy replacement from imported documents…", ""),
+        ...this.sources.map((source) => new Option(source.name, source.id)));
+      const copy = document.createElement("button");
+      copy.type = "button"; copy.className = "button button--secondary"; copy.textContent = "Replace with copy";
+      copy.disabled = this.scanningId !== null;
+      copy.addEventListener("click", () => { if (select.value) this.callbacks.onCopy(select.value); });
+      replace.append(button, clipboard, select, copy);
+      this.body.appendChild(replace);
     }
   }
 

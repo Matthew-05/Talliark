@@ -46,10 +46,11 @@
     "ScanSource": {
       "type": "object",
       "description": "What this result was produced from. A stored result is shown as STALE rather than silently recomputed when any of this no longer matches what the workbook holds; only an explicit re-scan replaces it. A reviewer who has read a finding must never find it quietly changed underneath them.",
-      "required": ["documentId", "pageCount", "geometryFingerprint", "tableDetectorVersion", "valueDetectorVersion"],
+      "required": ["documentId", "versionId", "pageCount", "geometryFingerprint", "tableDetectorVersion", "valueDetectorVersion"],
       "additionalProperties": false,
       "properties": {
-        "documentId": { "type": "string", "minLength": 1, "description": "GUID of the PdfDocument in the workbook this scan ran on." },
+        "documentId": { "type": "string", "minLength": 1, "description": "GUID of the Reconcile-owned document this scan ran on; never an ordinary imported-PDF id." },
+        "versionId": { "type": "string", "minLength": 1, "description": "GUID of the exact Reconcile-owned document version whose snapshot supplied every scan artifact." },
         "pageCount": { "type": "integer", "minimum": 0 },
         "geometryFingerprint": { "type": "string", "pattern": "^[0-9a-f]{16}$", "description": "Hash over the text geometry the scan read. Span ids are stable across detector versions but not across a re-OCR that moves geometry, so this is the fact that tells a result anchored to the old geometry from one anchored to the new." },
         "tableDetectorVersion": { "type": "string", "minLength": 1, "description": "Version of the cached table model used as optional corroboration, or 'unavailable'." },

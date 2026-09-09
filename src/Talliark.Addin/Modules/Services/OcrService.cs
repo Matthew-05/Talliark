@@ -68,7 +68,8 @@ namespace Talliark.Addin.Modules.Services
             Excel.Workbook workbook,
             Action<string, string, OcrStatusDetail> onStatusUpdate)
         {
-            return RunJobsAsync(pdfIds, workbook, onStatusUpdate, analysis: false);
+            return RunJobsAsync(pdfIds, workbook, onStatusUpdate, analysis: false,
+                detectTables: Infrastructure.ExperimentalSettings.TableDetection);
         }
 
         /// <summary>
@@ -82,14 +83,16 @@ namespace Talliark.Addin.Modules.Services
         {
             if (string.IsNullOrWhiteSpace(pdfId))
                 throw new ArgumentException("PDF id must be non-empty.", nameof(pdfId));
-            return RunJobsAsync(new[] { pdfId }, workbook, onStatusUpdate, analysis: true);
+            return RunJobsAsync(new[] { pdfId }, workbook, onStatusUpdate, analysis: true,
+                detectTables: true);
         }
 
         private async Task RunJobsAsync(
             IList<string> pdfIds,
             Excel.Workbook workbook,
             Action<string, string, OcrStatusDetail> onStatusUpdate,
-            bool analysis)
+            bool analysis,
+            bool detectTables)
         {
             if (pdfIds == null || pdfIds.Count == 0) return;
             if (workbook == null) throw new ArgumentNullException(nameof(workbook));
@@ -120,7 +123,7 @@ namespace Talliark.Addin.Modules.Services
             }
 
             var loadClock = Stopwatch.StartNew();
-            var jobs = LoadJobData(pdfIds, workbook, analysis);
+            var jobs = LoadJobData(pdfIds, workbook, analysis, detectTables);
             loadClock.Stop();
             if (jobs.Count == 0)
             {
@@ -289,10 +292,15 @@ namespace Talliark.Addin.Modules.Services
                             job.PdfId,
                             progress =>
                             {
-                                Invoke(() => onStatusUpdate(
-                                    job.PdfId,
-                                    "processing",
-                                    OcrStatusDetail.FromWorker(progress, jobIndex + 1, jobs.Count)));
+                                OcrStatusDetail presentedProgress = PresentWorkerProgress(
+                                    job, progress, jobIndex + 1, jobs.Count);
+                                if (presentedProgress != null)
+                                {
+                                    Invoke(() => onStatusUpdate(
+                                        job.PdfId,
+                                        "processing",
+                                        presentedProgress));
+                                }
 
                                 string stage = progress.Stage;
                                 if (string.Equals(stage, lastProgressStage, StringComparison.Ordinal)
@@ -347,6 +355,13 @@ namespace Talliark.Addin.Modules.Services
                         var parsed = ParseResultLine(resultLine);
                         parseClock.Stop();
 
+                        // The host is the storage boundary for the experimental
+                        // feature. Even if an older or mismatched worker were to
+                        // return table structure, an ordinary gated-off OCR run
+                        // must neither expose nor persist it.
+                        if (!job.Analysis && !job.DetectTables)
+                            parsed.TableStructureBase64 = string.Empty;
+
                         if (job.Analysis
                             && string.Equals(parsed.Status, "success", StringComparison.Ordinal)
                             && string.IsNullOrEmpty(parsed.ReconcileBase64))
@@ -381,15 +396,18 @@ namespace Talliark.Addin.Modules.Services
                                 var storageClock = Stopwatch.StartNew();
                                 try
                                 {
-                                    if (string.Equals(job.Mode, "geometry-only", StringComparison.Ordinal))
+                                    if (job.Analysis)
+                                    {
+                                        SaveReconcileResult(workbook, job, parsed);
+                                    }
+                                    else if (string.Equals(job.Mode, "geometry-only", StringComparison.Ordinal))
                                     {
                                         _manageService.UpdatePdfGeometry(
                                             workbook, job.PdfId,
                                             parsed.GeometryBase64 ?? string.Empty,
                                             parsed.TableStructureBase64 ?? string.Empty,
                                             parsed.DocumentValuesBase64 ?? string.Empty,
-                                            parsed.FinancialStructureBase64 ?? string.Empty,
-                                            job.Analysis ? parsed.ReconcileBase64 : null);
+                                            parsed.FinancialStructureBase64 ?? string.Empty);
                                     }
                                     else
                                     {
@@ -400,8 +418,7 @@ namespace Talliark.Addin.Modules.Services
                                             parsed.GeometryBase64 ?? string.Empty,
                                             parsed.TableStructureBase64 ?? string.Empty,
                                             parsed.DocumentValuesBase64 ?? string.Empty,
-                                            parsed.FinancialStructureBase64 ?? string.Empty,
-                                            job.Analysis ? parsed.ReconcileBase64 : null);
+                                            parsed.FinancialStructureBase64 ?? string.Empty);
                                     }
                                     storageClock.Stop();
                                     storageMs = storageClock.ElapsedMilliseconds;
@@ -549,6 +566,28 @@ namespace Talliark.Addin.Modules.Services
             return (value.Length / 4L) * 3L - padding;
         }
 
+        private static void SaveReconcileResult(
+            Excel.Workbook workbook, OcrJobEntry job, OcrWorkerResult result)
+        {
+            var store = new CustomXml.TalliarkCustomXmlPartStore(workbook);
+            ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+            ReconcileDocument document = workspace.Documents.FirstOrDefault(d =>
+                string.Equals(d.Id, job.DocumentId, StringComparison.Ordinal));
+            if (document?.Version == null
+                || !string.Equals(document.Version.Id, job.VersionId, StringComparison.Ordinal))
+                throw new InvalidOperationException("The Reconcile statement was replaced while its scan was running.");
+
+            // Build the complete replacement in memory and publish it with the
+            // store's add-before-delete atomic replacement. The original PDF and
+            // import metadata remain the independent snapshot imported by the user.
+            document.Version.GeometryBase64 = result.GeometryBase64 ?? string.Empty;
+            document.Version.TableStructureBase64 = result.TableStructureBase64 ?? string.Empty;
+            document.Version.DocumentValuesBase64 = result.DocumentValuesBase64 ?? string.Empty;
+            document.Version.FinancialStructureBase64 = result.FinancialStructureBase64 ?? string.Empty;
+            document.Version.ReconcileBase64 = result.ReconcileBase64 ?? string.Empty;
+            store.SaveReconcileWorkspace(workspace);
+        }
+
         private static OcrWorkerResult ParseResultLine(string line)
         {
             try
@@ -609,10 +648,48 @@ namespace Talliark.Addin.Modules.Services
             if (job.Analysis)
             {
                 sb.Append(",\"analysis\":true,\"document_id\":");
-                PythonWorkerSession.AppendJsonString(sb, job.PdfId);
+                PythonWorkerSession.AppendJsonString(sb, job.DocumentId);
+                sb.Append(",\"version_id\":");
+                PythonWorkerSession.AppendJsonString(sb, job.VersionId);
             }
+            sb.Append(",\"detect_tables\":");
+            sb.Append(job.DetectTables ? "true" : "false");
             sb.Append('}');
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Keeps the ordinary OCR presentation aligned with the experimental
+        /// table-detection gate. Ruled-cell recovery remains unconditional OCR
+        /// repair, but when table detection is off it is presented as generic
+        /// text refinement. A table-structure update in that mode is unexpected
+        /// detector work and is not exposed to the pane.
+        /// </summary>
+        private static OcrStatusDetail PresentWorkerProgress(
+            OcrJobEntry job,
+            WorkerProgress progress,
+            int fileIndex,
+            int fileCount)
+        {
+            bool exposeTableDetection = job.Analysis || job.DetectTables;
+            if (!exposeTableDetection
+                && string.Equals(progress.Stage, ProgressStages.TableRecovery, StringComparison.Ordinal))
+            {
+                return OcrStatusDetail.ForStage(
+                    "Refining text recognition…",
+                    ProgressStages.AdaptiveOcr,
+                    fileIndex,
+                    fileCount,
+                    progress.Current,
+                    progress.Total,
+                    progress.Unit);
+            }
+
+            if (!exposeTableDetection
+                && string.Equals(progress.Stage, ProgressStages.TableStructure, StringComparison.Ordinal))
+                return null;
+
+            return OcrStatusDetail.FromWorker(progress, fileIndex, fileCount);
         }
 
         /// <summary>
@@ -620,9 +697,34 @@ namespace Talliark.Addin.Modules.Services
         /// full OCR mode. Must be called on the UI thread.
         /// </summary>
         private static IList<OcrJobEntry> LoadJobData(
-            IList<string> pdfIds, Excel.Workbook workbook, bool analysis)
+            IList<string> pdfIds, Excel.Workbook workbook, bool analysis, bool detectTables)
         {
             var store = new CustomXml.TalliarkCustomXmlPartStore(workbook);
+            if (analysis)
+            {
+                ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+                var reconcileJobs = new List<OcrJobEntry>();
+                foreach (string id in pdfIds)
+                {
+                    ReconcileDocument document = workspace.Documents.FirstOrDefault(d =>
+                        string.Equals(d.Id, id, StringComparison.Ordinal));
+                    if (document?.Version == null) continue;
+                    reconcileJobs.Add(new OcrJobEntry
+                    {
+                        PdfId = document.Id,
+                        DocumentId = document.Id,
+                        VersionId = document.Version.Id,
+                        Name = document.DisplayName ?? string.Empty,
+                        Base64 = document.Version.Base64 ?? string.Empty,
+                        InputBytes = Base64DecodedLength(document.Version.Base64),
+                        Mode = "full",
+                        OriginalStatus = PdfStatus.None,
+                        Analysis = true,
+                        DetectTables = true,
+                    });
+                }
+                return reconcileJobs;
+            }
             TalliarkContent content = store.LoadContent(); // metadata only — fast
 
             var result = new List<OcrJobEntry>();
@@ -646,6 +748,7 @@ namespace Talliark.Addin.Modules.Services
                     Mode = "full",
                     OriginalStatus = status,
                     Analysis = analysis,
+                    DetectTables = detectTables,
                 });
             }
             return result;
@@ -669,6 +772,9 @@ namespace Talliark.Addin.Modules.Services
             public string Mode { get; set; }
             public string OriginalStatus { get; set; }
             public bool Analysis { get; set; }
+            public bool DetectTables { get; set; }
+            public string DocumentId { get; set; }
+            public string VersionId { get; set; }
         }
 
         private sealed class OcrBatchMetrics

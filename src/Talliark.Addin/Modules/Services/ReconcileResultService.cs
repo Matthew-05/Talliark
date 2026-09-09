@@ -16,50 +16,45 @@ namespace Talliark.Addin.Modules.Services
 {
     /// <summary>
     /// Reads stored Reconcile envelopes and decides current/stale/none against the
-    /// cache artifacts the workbook holds. A mismatch is reported, never rebuilt.
+    /// artifacts in the same workbook-scoped snapshot. A mismatch is reported, never rebuilt.
     /// </summary>
     internal sealed class ReconcileResultService
     {
         public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
-            TalliarkContent content = store.LoadContent();
-            var result = new List<ReconcileDocumentInfo>(content.Pdfs.Count);
-
-            foreach (PdfMetadata metadata in content.Pdfs)
-            {
-                store.TryLoadPdfBinary(metadata.Id, out PdfBinaryParts parts);
-                result.Add(ReadDocument(metadata, parts));
-            }
-            return result;
+            ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+            return workspace.Primary == null
+                ? new List<ReconcileDocumentInfo>()
+                : new List<ReconcileDocumentInfo> { ReadDocument(workspace.Primary) };
         }
 
         public ReconcileStoredResult LoadResult(Excel.Workbook workbook, string pdfId)
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
-            if (!store.TryGetMetadata(pdfId, out PdfMetadata metadata))
+            ReconcileDocument document = store.LoadReconcileWorkspace().Documents.FirstOrDefault(d =>
+                string.Equals(d.Id, pdfId, StringComparison.Ordinal));
+            if (document?.Version == null)
                 return new ReconcileStoredResult { PdfId = pdfId, Staleness = "none" };
-
-            store.TryLoadPdfBinary(pdfId, out PdfBinaryParts parts);
-            ReconcileDocumentInfo document = ReadDocument(metadata, parts);
+            ReconcileDocumentInfo info = ReadDocument(document);
             return new ReconcileStoredResult
             {
                 PdfId = pdfId,
-                PdfBase64 = parts.Base64,
-                PageRotations = metadata.PageRotations,
-                ReconcileBase64 = parts.ReconcileBase64,
-                Staleness = document.Staleness,
+                PdfBase64 = document.Version.Base64,
+                PageRotations = document.Version.PageRotations,
+                ReconcileBase64 = document.Version.ReconcileBase64,
+                Staleness = info.Staleness,
             };
         }
 
-        private static ReconcileDocumentInfo ReadDocument(
-            PdfMetadata metadata, PdfBinaryParts parts)
+        private static ReconcileDocumentInfo ReadDocument(ReconcileDocument document)
         {
+            ReconcileDocumentVersion parts = document.Version;
             var info = new ReconcileDocumentInfo
             {
-                Id = metadata.Id,
-                Name = metadata.Name ?? string.Empty,
-                FolderId = metadata.FolderId,
+                Id = document.Id,
+                VersionId = parts.Id,
+                Name = document.DisplayName ?? string.Empty,
                 Staleness = "none",
             };
 
@@ -82,7 +77,8 @@ namespace Talliark.Addin.Modules.Services
             };
 
             bool current = source != null
-                && string.Equals(GetString(source, "documentId"), metadata.Id, StringComparison.Ordinal)
+                && string.Equals(GetString(source, "documentId"), document.Id, StringComparison.Ordinal)
+                && string.Equals(GetString(source, "versionId"), parts.Id, StringComparison.Ordinal)
                 && string.Equals(GetString(source, "geometryFingerprint"),
                     GeometryFingerprint(parts.GeometryBase64), StringComparison.Ordinal)
                 && VersionMatches(source, "tableDetectorVersion", parts.TableStructureBase64)
@@ -300,6 +296,7 @@ namespace Talliark.Addin.Modules.Services
     {
         public string Id { get; set; }
         public string Name { get; set; }
+        public string VersionId { get; set; }
         public string FolderId { get; set; }
         public int? PageCount { get; set; }
         public string Staleness { get; set; }
