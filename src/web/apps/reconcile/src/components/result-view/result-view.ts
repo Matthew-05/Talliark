@@ -34,15 +34,46 @@ export class ResultView {
     this.element.hidden = !visible;
   }
 
+  setScanning(scanning: boolean): void {
+    for (const button of this.element.querySelectorAll<HTMLButtonElement>(
+      ".result-state__action, .results-shell__actions .button",
+    )) {
+      button.disabled = scanning;
+    }
+  }
+
   showLoading(entry: ReconcileDocument): void {
     this.model = null;
-    this.renderWorkspace(entry, this.state("Loading scan and source document…"));
+    this.renderOverviewState(
+      entry,
+      "loading",
+      "Opening your scan",
+      "Loading the results and source document…",
+    );
+  }
+
+  showInitialScan(entry: ReconcileDocument): HTMLElement {
+    this.model = null;
+    this.viewer = null;
+    this.sidebar = null;
+    this.sumTree = null;
+    const shell = new ResultsShell(entry, {
+      onRescan: (pdfId) => this.callbacks.onRescan(pdfId),
+      onModeChanged: () => undefined,
+    }, { layout: "overview", showRescan: false, scanning: true });
+    this.element.replaceChildren(shell.element);
+    return shell.overviewSlot!;
   }
 
   showError(entry: ReconcileDocument, message: string): void {
     this.model = null;
-    this.renderWorkspace(entry, this.state(message, true));
-    this.viewer?.showUnavailable();
+    const isEmpty = entry.staleness === "none";
+    this.renderOverviewState(
+      entry,
+      isEmpty ? "empty" : "error",
+      isEmpty ? "No scan results yet" : "We couldn’t open this scan",
+      message,
+    );
   }
 
   showResult(
@@ -58,14 +89,30 @@ export class ResultView {
     else this.viewer?.showUnavailable();
   }
 
-  private renderWorkspace(entry: ReconcileDocument, content?: HTMLElement): void {
+  private renderWorkspace(entry: ReconcileDocument): void {
     const shell = new ResultsShell(entry, {
       onRescan: (pdfId) => this.callbacks.onRescan(pdfId),
       onModeChanged: (mode) => this.showMode(mode),
     });
     this.viewer = new ReconcileViewer();
     shell.viewerSlot.appendChild(this.viewer.element);
-    if (content) shell.sidebarSlot.appendChild(content);
+    this.element.replaceChildren(shell.element);
+  }
+
+  private renderOverviewState(
+    entry: ReconcileDocument,
+    kind: "loading" | "empty" | "error",
+    title: string,
+    message: string,
+  ): void {
+    this.viewer = null;
+    this.sidebar = null;
+    this.sumTree = null;
+    const shell = new ResultsShell(entry, {
+      onRescan: (pdfId) => this.callbacks.onRescan(pdfId),
+      onModeChanged: () => undefined,
+    }, { layout: "overview", showRescan: false });
+    shell.overviewSlot?.appendChild(this.state(entry, kind, title, message));
     this.element.replaceChildren(shell.element);
   }
 
@@ -107,10 +154,45 @@ export class ResultView {
     );
   }
 
-  private state(message: string, error = false): HTMLElement {
+  private state(
+    entry: ReconcileDocument,
+    kind: "loading" | "empty" | "error",
+    titleText: string,
+    message: string,
+  ): HTMLElement {
     const state = document.createElement("div");
-    state.className = `result-state${error ? " result-state--error" : ""}`;
-    state.textContent = message;
+    state.className = `result-state result-state--${kind}`;
+    if (kind === "loading") {
+      state.setAttribute("role", "status");
+      state.setAttribute("aria-live", "polite");
+    }
+
+    const visual = document.createElement("div");
+    visual.className = "result-state__visual";
+    visual.setAttribute("aria-hidden", "true");
+    const documentIcon = document.createElement("span");
+    documentIcon.className = "result-state__document-icon";
+    visual.appendChild(documentIcon);
+    if (kind === "loading") {
+      const spinner = document.createElement("span");
+      spinner.className = "result-state__spinner";
+      visual.appendChild(spinner);
+    }
+
+    const title = document.createElement("h2");
+    title.textContent = titleText;
+    const description = document.createElement("p");
+    description.textContent = message;
+    state.append(visual, title, description);
+
+    if (kind !== "loading") {
+      const scan = document.createElement("button");
+      scan.type = "button";
+      scan.className = "button button--primary result-state__action";
+      scan.textContent = kind === "empty" ? "Scan document" : "Scan again";
+      scan.addEventListener("click", () => this.callbacks.onRescan(entry.id));
+      state.appendChild(scan);
+    }
     return state;
   }
 }

@@ -10,6 +10,7 @@ export interface WebAppBuildOptions {
   completionMessage: string;
   cleanDist?: boolean;
   copyPdfWorker?: boolean;
+  inlineSvg?: boolean;
   production?: boolean;
   splitting?: boolean;
 }
@@ -81,6 +82,7 @@ export async function buildWebApp(options: WebAppBuildOptions): Promise<void> {
     ...sharedOptions,
     entryPoints: ["src/styles/main.css"],
     outfile: "dist/index.css",
+    ...(options.inlineSvg ? { loader: { ".svg": "dataurl" } } : {}),
   });
 
   console.log(options.completionMessage);

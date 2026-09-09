@@ -26,6 +26,7 @@ export function mountApp(root: HTMLElement): void {
 
   let documents: ReconcileDocument[] = [];
   let scanningId: string | null = null;
+  let scanPresentation: "inline" | "floating" | null = null;
   let selectedId: string | null = null;
   let projectName = "";
 
@@ -47,6 +48,7 @@ export function mountApp(root: HTMLElement): void {
   const resultView = new ResultView(root, {
     onRescan(pdfId: string) {
       scanningId = pdfId;
+      presentScan(pdfId);
       sendRunScan(pdfId);
       render();
     },
@@ -56,13 +58,28 @@ export function mountApp(root: HTMLElement): void {
     return documents.find((entry) => entry.id === pdfId)?.name ?? "";
   }
 
+  function presentScan(pdfId: string): void {
+    const entry = documents.find((document_) => document_.id === pdfId);
+    const isInitialScan = entry?.staleness === "none" && !entry.summary;
+    if (entry && isInitialScan) {
+      scanPresentation = "inline";
+      scanProgress.showInline(resultView.showInitialScan(entry));
+    } else {
+      scanPresentation = "floating";
+      scanProgress.showFloating();
+    }
+    scanProgress.begin(nameOf(pdfId));
+  }
+
   function render(): void {
     // There is no project home between setup and review. Once setup has been
     // completed, the primary statement's result is the app's landing screen.
     const setupComplete = completedPrimary(documents, projectName) !== null;
+    const isScanning = scanningId !== null;
     setupWizard.setVisible(!setupComplete);
     resultView.setVisible(setupComplete);
-    scanProgress.setVisible(scanningId !== null);
+    resultView.setScanning(isScanning);
+    scanProgress.setVisible(isScanning);
   }
 
   initHostBridge({
@@ -85,11 +102,15 @@ export function mountApp(root: HTMLElement): void {
           resultView.showError(primary, "No stored scan result is available for this document. Re-scan to create one.");
         }
       }
+      if (scanningId) presentScan(scanningId);
+      else scanPresentation = null;
       render();
     },
 
     onScanStatus(pdfId: string, status: ScanStatus, progress: ScanProgress) {
       if (status === "complete" || status === "cancelled" || status === "error") {
+        const finishedPresentation = scanPresentation;
+        const entry = documents.find((document_) => document_.id === pdfId);
         if (status === "error") {
           console.error(
             `[Talliark] reconcile scan failed for ${pdfId}:`,
@@ -100,16 +121,24 @@ export function mountApp(root: HTMLElement): void {
         // untouched; the host follows a completion with fresh data, so nothing
         // here edits the list.
         scanningId = null;
+        scanPresentation = null;
         if (status === "complete") {
           selectedId = pdfId;
-          const entry = documents.find((document_) => document_.id === pdfId);
           if (entry) resultView.showLoading(entry);
           sendRequestResult(pdfId);
+        } else if (finishedPresentation === "inline" && entry) {
+          resultView.showError(
+            entry,
+            status === "error"
+              ? progress.message ?? "The scan couldn’t be completed. Try again."
+              : "No stored scan result is available for this document. Scan it to create one.",
+          );
         }
         render();
         return;
       }
 
+      if (scanningId !== pdfId || scanPresentation === null) presentScan(pdfId);
       scanningId = pdfId;
       render();
       scanProgress.update(nameOf(pdfId), status, progress);

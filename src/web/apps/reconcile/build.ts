@@ -5,6 +5,7 @@ await buildWebApp({
   title: "Talliark — Reconcile",
   format: "iife",
   copyPdfWorker: true,
+  inlineSvg: true,
   completionMessage: "[Talliark] reconcile build complete",
   production: process.argv.includes("--prod"),
 });

@@ -1,36 +1,131 @@
 .scan-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
+  position: fixed;
+  z-index: 20;
+  right: 28px;
+  bottom: 28px;
+  width: min(390px, calc(100vw - 40px));
+  padding: 16px 17px 13px;
+  border: 1px solid rgba(var(--color-accent-rgb), .24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 12px 34px rgba(26, 26, 40, .16);
+  backdrop-filter: blur(8px);
+}
+
+.scan-progress__header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+}
+
+.scan-progress__activity {
+  width: 27px;
+  height: 27px;
+  background: url("../../../../../resources/icons/icon-reconcile.svg") center / contain no-repeat;
+}
+
+.scan-progress__identity {
+  min-width: 0;
+}
+
+.scan-progress__eyebrow {
+  margin-bottom: 2px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .055em;
+  text-transform: uppercase;
 }
 
 .scan-progress__name {
-  font-weight: 600;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-progress__percent {
+  min-width: 32px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .scan-progress__stage {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  margin-top: 13px;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .scan-progress__track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-surface-2);
+  height: 5px;
+  margin-top: 7px;
   overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-2);
 }
 
 .scan-progress__fill {
   height: 100%;
   width: 0;
+  border-radius: inherit;
   background: var(--color-accent);
-  transition: width 120ms linear;
+  transition: width 240ms ease-out;
 }
 
-.scan-progress .button {
-  align-self: flex-start;
+.scan-progress__detail {
+  min-height: 16px;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-progress__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border);
+}
+
+.scan-progress__footer p {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.scan-progress__cancel {
+  min-height: 27px;
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.scan-progress--inline {
+  position: static;
+  width: min(440px, 100%);
+  padding: 40px 32px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+@media (max-width: 560px) {
+  .scan-progress {
+    right: 16px;
+    bottom: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-progress__fill { transition: none; }
 }

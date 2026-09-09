@@ -5,15 +5,73 @@
 }
 
 .result-state {
-  display: grid;
-  min-height: 180px;
-  place-items: center;
-  padding: 24px;
-  color: var(--color-text-muted);
+  display: flex;
+  width: min(440px, 100%);
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 32px;
   text-align: center;
 }
 
-.result-state--error { color: var(--color-danger); }
+.result-state__visual {
+  position: relative;
+  display: grid;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  place-items: center;
+}
+
+.result-state__document-icon {
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  background: url("../../../../../resources/icons/icon-reconcile.svg") center / contain no-repeat;
+}
+
+.result-state__spinner {
+  position: absolute;
+  inset: 0;
+  width: 78px;
+  height: 78px;
+  margin: auto;
+  border: 2px solid var(--color-surface-2);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: result-state-spin .85s linear infinite;
+}
+
+.result-state h2 {
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -.015em;
+  line-height: 1.25;
+}
+
+.result-state p {
+  max-width: 380px;
+  margin-top: 9px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.result-state__action {
+  min-width: 132px;
+  margin-top: 24px;
+}
+
+.result-state--error .result-state__document-icon {
+  opacity: .7;
+}
+
+@keyframes result-state-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-state__spinner { animation: none; border-top-color: var(--color-surface-2); }
+}
 
 .status-badge {
   display: inline-flex;
@@ -29,6 +87,7 @@
 .status-badge--current { background: #e3f4e9; color: #176b38; }
 .status-badge--stale { background: #fff0ce; color: #75530a; }
 .status-badge--none { background: var(--color-surface-2); color: var(--color-text-muted); }
+.status-badge--scanning { background: rgba(var(--color-accent-rgb), .11); color: var(--color-accent-hover); }
 
 .stale-notice {
   padding: 8px 12px;

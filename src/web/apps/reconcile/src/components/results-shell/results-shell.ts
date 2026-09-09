@@ -7,6 +7,12 @@ export interface ResultsShellCallbacks {
   onModeChanged(mode: ReviewMode): void;
 }
 
+export interface ResultsShellOptions {
+  readonly layout?: "review" | "overview";
+  readonly showRescan?: boolean;
+  readonly scanning?: boolean;
+}
+
 const MODES: ReadonlyArray<{ id: ReviewMode; label: string }> = [
   { id: "mathematical", label: "Mathematical Accuracy" },
   { id: "intra-document", label: "Intra Document Consistency" },
@@ -17,12 +23,17 @@ export class ResultsShell {
   readonly element: HTMLElement;
   readonly sidebarSlot: HTMLElement;
   readonly viewerSlot: HTMLElement;
+  readonly overviewSlot: HTMLElement | null;
   private readonly tabs = new Map<ReviewMode, HTMLButtonElement>();
-  private readonly staleNotice: HTMLElement;
 
-  constructor(entry: ReconcileDocument, callbacks: ResultsShellCallbacks) {
+  constructor(
+    entry: ReconcileDocument,
+    callbacks: ResultsShellCallbacks,
+    options: ResultsShellOptions = {},
+  ) {
+    const layout = options.layout ?? "review";
     this.element = document.createElement("div");
-    this.element.className = "results-shell";
+    this.element.className = `results-shell results-shell--${layout}`;
 
     const topbar = document.createElement("header");
     topbar.className = "results-shell__topbar";
@@ -32,10 +43,11 @@ export class ResultsShell {
     title.className = "results-shell__title";
     title.textContent = entry.name;
     const badge = document.createElement("span");
-    badge.className = `status-badge status-badge--${entry.staleness}`;
-    badge.textContent = entry.staleness === "stale"
-      ? "Stale"
-      : entry.staleness === "none" ? "Not scanned" : "Current";
+    badge.className = `status-badge status-badge--${options.scanning ? "scanning" : entry.staleness}`;
+    badge.textContent = options.scanning
+      ? "Scanning"
+      : entry.staleness === "stale" ? "Stale"
+        : entry.staleness === "none" ? "Not scanned" : "Current";
     identity.append(title, badge);
 
     const actions = document.createElement("div");
@@ -45,8 +57,21 @@ export class ResultsShell {
     rescan.className = "button button--secondary";
     rescan.textContent = "Re-scan";
     rescan.addEventListener("click", () => callbacks.onRescan(entry.id));
-    actions.appendChild(rescan);
+    if (options.showRescan ?? layout === "review") actions.appendChild(rescan);
     topbar.append(identity, actions);
+
+    this.sidebarSlot = document.createElement("div");
+    this.sidebarSlot.className = "results-shell__sidebar-slot";
+    this.viewerSlot = document.createElement("div");
+    this.viewerSlot.className = "results-shell__viewer-slot";
+
+    if (layout === "overview") {
+      this.overviewSlot = document.createElement("main");
+      this.overviewSlot.className = "results-shell__overview-slot";
+      this.element.append(topbar, this.overviewSlot);
+      return;
+    }
+    this.overviewSlot = null;
 
     const navigation = document.createElement("nav");
     navigation.className = "results-shell__tabs";
@@ -64,19 +89,15 @@ export class ResultsShell {
       navigation.appendChild(tab);
     }
 
-    this.staleNotice = document.createElement("div");
-    this.staleNotice.className = "stale-notice results-shell__stale";
-    this.staleNotice.hidden = entry.staleness !== "stale";
-    this.staleNotice.textContent = "This scan no longer matches the document’s current analysis data. Re-scan before relying on it.";
+    const staleNotice = document.createElement("div");
+    staleNotice.className = "stale-notice results-shell__stale";
+    staleNotice.hidden = entry.staleness !== "stale";
+    staleNotice.textContent = "This scan no longer matches the document’s current analysis data. Re-scan before relying on it.";
 
     const workspace = document.createElement("div");
     workspace.className = "results-shell__workspace";
-    this.sidebarSlot = document.createElement("div");
-    this.sidebarSlot.className = "results-shell__sidebar-slot";
-    this.viewerSlot = document.createElement("div");
-    this.viewerSlot.className = "results-shell__viewer-slot";
     workspace.append(this.sidebarSlot, this.viewerSlot);
-    this.element.append(topbar, navigation, this.staleNotice, workspace);
+    this.element.append(topbar, navigation, staleNotice, workspace);
     this.setMode("mathematical");
   }
 

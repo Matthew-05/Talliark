@@ -9,6 +9,20 @@
   background: var(--color-surface);
 }
 
+.results-shell--overview {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.results-shell__overview-slot {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(var(--color-accent-rgb), .055), transparent 34%),
+    var(--color-surface);
+}
+
 .results-shell__topbar {
   display: flex;
   min-width: 0;
