@@ -30,11 +30,12 @@ from schemas.models import Stage
 
 from . import findings as findings_module
 from . import nominate as nominate_module
+from . import propagate as propagate_module
 from . import sums
 from . import structures
 
 
-DETECTOR_VERSION = f"reconcile-detector-7+{FINANCIAL_TABLE_VERSION}"
+DETECTOR_VERSION = f"reconcile-detector-9+{FINANCIAL_TABLE_VERSION}"
 
 
 def geometry_fingerprint(geometry: dict) -> str:
@@ -85,6 +86,8 @@ def detect_reconcile(
     blocks_examined = 0
     hypotheses = 0
     truncated_structure_blocks = 0
+    propagated_confirmed = 0
+    propagated_misses: list[dict] = []
     withheld_candidates: dict[str, int] = {}
     for position, page_scan in enumerate(financial_scan.pages):
         page_index = page_scan.page_index
@@ -104,6 +107,8 @@ def detect_reconcile(
             )
             hypotheses += block_diagnostics["hypotheses"]
             truncated_structure_blocks += int(block_diagnostics["truncated"])
+            propagated_confirmed += int(block_diagnostics.get("propagated_confirmed", 0))
+            propagated_misses.extend(block_diagnostics.get("propagated_misses", []))
             _merge_counts(withheld_candidates, block_diagnostics.get("withheld", {}))
             published.append(reconciled)
 
@@ -123,6 +128,8 @@ def detect_reconcile(
             )
             hypotheses += grid_diagnostics["hypotheses"]
             truncated_structure_blocks += int(grid_diagnostics["truncated"])
+            propagated_confirmed += int(grid_diagnostics.get("propagated_confirmed", 0))
+            propagated_misses.extend(grid_diagnostics.get("propagated_misses", []))
             _merge_counts(withheld_candidates, grid_diagnostics.get("withheld", {}))
             if exact_only:
                 # Composition deliberately removes the caption boundaries that
@@ -196,6 +203,12 @@ def detect_reconcile(
         )
         for reason, count in sorted(withheld_candidates.items()):
             diagnostics[f"reconcile_withheld_{reason.replace('-', '_')}"] = count
+        # A propagated structure that did not tie is left unresolved, but kept
+        # here so a rounding difference that recurs across a statement is
+        # visible to development without enlarging the reviewer's Not checked
+        # list.
+        diagnostics["reconcile_propagated_confirmed"] = propagated_confirmed
+        diagnostics["reconcile_propagated_misses"] = propagated_misses
         diagnostics["reconcile_substrate_disagreements"] = (
             financial_scan.boundary_disagreements
         )
@@ -307,9 +320,18 @@ def _reconcile_block(
     # A block therefore converges in at most one pass per row; deriving this
     # guard from the input removes the former four-level nesting ceiling while
     # retaining a hard stop against a future non-monotone regression.
+    propagated_misses: list[dict] = []
+    propagated_cells: set[str] = set()
     for _ in range(max(1, built.row_count)):
         column_results, column_state = _resolve_columns(built, by_column, seed)
         _corroborate_short_runs(built, column_results, column_state)
+        # A confirmed total is evidence for its neighbours: the same row
+        # structure is spent in the remaining columns, and the addend rows it
+        # proves are trusted. This runs before the seed is rebuilt so a
+        # propagated confirmation becomes a subtotal for the pass above it.
+        propagated_cells |= propagate_module.propagate(
+            built, column_results, column_state, miss_log=propagated_misses
+        )
         learned = {
             column: dict(blocks) for column, blocks in seed.items()
         }
@@ -466,6 +488,22 @@ def _reconcile_block(
     if built.header_labels:
         model["headerLabels"] = built.header_labels
     structure_diagnostics["withheld"] = withheld
+    structure_diagnostics["propagated_confirmed"] = len(propagated_cells)
+    seen_misses: set[tuple] = set()
+    unique_misses: list[dict] = []
+    for miss in propagated_misses:
+        key = (
+            miss.get("column"),
+            miss.get("label"),
+            miss.get("value"),
+            miss.get("delta"),
+            tuple(miss.get("addendRows", ())),
+        )
+        if key in seen_misses:
+            continue
+        seen_misses.add(key)
+        unique_misses.append({**miss, "tableId": built.table_id, "pageIndex": page_index})
+    structure_diagnostics["propagated_misses"] = unique_misses
     return model, structure_diagnostics
 
 
@@ -622,11 +660,17 @@ def _composed_parallel_total_ids(block: dict) -> frozenset[str]:
         if not addend_ids or any(cell_id not in cells for cell_id in addend_ids):
             continue
         negated = frozenset(resolution.get("negatedAddendCellIds") or [])
+        # The structure is compared by each addend's offset from its own total
+        # row, not by absolute row index. A statement that stacks its periods
+        # vertically -- the 2025 fair-value table above the 2024 one -- prints
+        # the same relationship twice at different rows, and absolute indices
+        # would call those two independent proofs unrelated. Offsets also keep
+        # the sign pattern comparable across periods.
+        total_row = int(total["rowIndex"])
         signature = (
-            int(total["rowIndex"]),
-            tuple(int(cells[cell_id]["rowIndex"]) for cell_id in addend_ids),
+            tuple(int(cells[cell_id]["rowIndex"]) - total_row for cell_id in addend_ids),
             tuple(
-                int(cells[cell_id]["rowIndex"])
+                int(cells[cell_id]["rowIndex"]) - total_row
                 for cell_id in addend_ids
                 if cell_id in negated
             ),
@@ -641,16 +685,29 @@ def _composed_parallel_total_ids(block: dict) -> frozenset[str]:
     for entries in grouped.values():
         independent: list[list[Decimal]] = []
         columns: set[int] = set()
+        rows_seen: set[int] = set()
         for total, values in entries:
             column = int(total["columnIndex"])
-            if column in columns:
+            resolution = total.get("resolution") or {}
+            rows = frozenset(
+                int(cells[cell_id]["rowIndex"])
+                for cell_id in resolution.get("addendCellIds", [])
+                if cell_id in cells
+            )
+            # A witness is independent of the ones already counted when it is a
+            # different value column, or the same column at disjoint rows. The
+            # second shape is a statement that stacks its periods vertically --
+            # the 2025 fair-value table printed above the 2024 one -- and it is
+            # two proofs of the same relationship, not one proof counted twice.
+            if column in columns and rows & rows_seen:
                 continue
             if any(sums.proportional_values(values, prior) for prior in independent):
                 continue
             columns.add(column)
+            rows_seen |= rows
             independent.append(values)
         if len(independent) >= 2:
-            # Once two columns independently agree on the structure, every
+            # Once two witnesses independently agree on the structure, every
             # exact column carrying that same printed row pattern is supported.
             supported.update(total["id"] for total, _ in entries)
     return frozenset(supported)

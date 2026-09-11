@@ -84,6 +84,12 @@ _COLLAPSE = re.compile(r"\s+")
 # word the label actually starts with.
 _LEADING_APPARATUS = re.compile(r"^[\s\-–—•\(\)\[\]0-9.]+")
 
+# Typographic apostrophes and quotes, folded to their ASCII form. A statement
+# sets "stockholders' equity" with a curly apostrophe and a lexicon that
+# compares against the straight one silently fails to recognise the row --
+# which is exactly how the balance-sheet side boundary is read.
+_QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u02bc": "'", "\u0060": "'"})
+
 _NONCONTROLLING_ALLOCATION = re.compile(
     r"^net (?:income|loss|earnings) attributable to "
     r"(?:redeemable )?noncontrolling\b"
@@ -120,7 +126,7 @@ _EQUITY_MOVEMENT_TERMS: tuple[str, ...] = (
 
 def normalize(text: str) -> str:
     """A label reduced to what it says: collapsed whitespace, lower case."""
-    return _COLLAPSE.sub(" ", (text or "").strip()).lower()
+    return _COLLAPSE.sub(" ", (text or "").strip().translate(_QUOTES)).lower()
 
 
 def row_label(text: str) -> str:

@@ -254,6 +254,7 @@ def _build_lattice(
     page_index: int,
     detected_tables: tuple[JsonMapping, ...],
     table: JsonMapping | None = None,
+    resolve_table: bool = True,
     id_prefix: str = "lattice",
 ) -> TableCells | None:
     flat = [value for row in rows for value in row]
@@ -266,7 +267,8 @@ def _build_lattice(
         for group in column_groups
     ]
     bounds = _bounds(flat)
-    table = table or _table_for(bounds, detected_tables)
+    if resolve_table:
+        table = table or _table_for(bounds, detected_tables)
     digest = hashlib.sha1(
         f"{page_index}:{bounds['y']:.5f}:{bounds['height']:.5f}".encode()
     ).hexdigest()[:10]
@@ -341,6 +343,64 @@ def build_page_lattice(
     return result
 
 
+# Two detected tables are one statement when they share the page's horizontal
+# extent and are separated by no more than a caption band. The general table
+# detector is tuned for linking and legitimately closes a table at a caption
+# such as "Commitments and contingencies" or "Stockholders' equity:", which for
+# arithmetic is the middle of a balance sheet: `Total liabilities` and
+# `Total stockholders' equity` are the addends of the grand total beneath them.
+# The gap is measured in row-pitch units, because a statement's caption band is
+# a few rows tall while two unrelated schedules are set much further apart.
+STATEMENT_MERGE_X_OVERLAP = 0.5
+STATEMENT_MERGE_GAP_ROWS = 3.0
+STATEMENT_MERGE_GAP_LINES = 8.0
+
+
+def _mergeable(first: JsonMapping, second: JsonMapping, gap_limit: float) -> bool:
+    a, b = first["bounds"], second["bounds"]
+    overlap = max(
+        0.0,
+        min(float(a["x"]) + float(a["width"]), float(b["x"]) + float(b["width"]))
+        - max(float(a["x"]), float(b["x"])),
+    )
+    if overlap < STATEMENT_MERGE_X_OVERLAP * min(float(a["width"]), float(b["width"])):
+        return False
+    gap = max(
+        float(b["y"]) - (float(a["y"]) + float(a["height"])),
+        float(a["y"]) - (float(b["y"]) + float(b["height"])),
+        0.0,
+    )
+    return gap <= gap_limit
+
+
+def _statement_regions(
+    tables: tuple[JsonMapping, ...], layout: AnalysisLayout
+) -> list[list[JsonMapping]]:
+    """Group adjacent detected tables that a statement split in two.
+
+    Clustering is transitive along the page's vertical order, so a statement
+    the detector cut into three tables is rejoined whole. Only regions of more
+    than one table are returned; a single table is already the ordinary view's
+    business. The merged region carries no general-table lineage -- it is a
+    private arithmetic view -- so it publishes as `lattice` provenance and is
+    admitted under the same exact-only composed rule as every other fallback.
+    """
+    gap_limit = max(
+        layout.row_gap * STATEMENT_MERGE_GAP_ROWS,
+        layout.line_height * STATEMENT_MERGE_GAP_LINES,
+    )
+    ordered = sorted(tables, key=lambda table: float(table["bounds"]["y"]))
+    regions: list[list[JsonMapping]] = []
+    for table in ordered:
+        for region in regions:
+            if _mergeable(region[-1], table, gap_limit):
+                region.append(table)
+                break
+        else:
+            regions.append([table])
+    return [region for region in regions if len(region) > 1]
+
+
 def build_page_composed_lattice(
     layout: AnalysisLayout,
     page_values: dict | None,
@@ -394,6 +454,29 @@ def build_page_composed_lattice(
             detected_tables=tables,
             table=table,
             id_prefix="lattice-composed",
+        )
+        if built is not None:
+            result.append(built)
+
+    # A statement the general detector closed at a caption band is still one
+    # statement to arithmetic. Rebuild each merged region from the fragments of
+    # its member tables, so a grand total whose addends straddle the split can
+    # foot. The per-table composed block above is retained: it is the safer
+    # view, and span identity lets whichever proves the stronger result win.
+    for region in _statement_regions(tables, layout):
+        rows: list[list[_Value]] = []
+        for table in region:
+            rows.extend(grouped.get(str(table["id"]), (None, [], 0))[1])
+        if len(rows) < MIN_BLOCK_ROWS:
+            continue
+        built = _build_lattice(
+            rows,
+            layout,
+            page_index=page_index,
+            detected_tables=tables,
+            table=None,
+            resolve_table=False,
+            id_prefix="lattice-merged",
         )
         if built is not None:
             result.append(built)

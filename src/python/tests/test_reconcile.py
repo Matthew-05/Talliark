@@ -31,7 +31,7 @@ from engines.financial_table.cells import (
     is_label_column,
 )
 from engines.financial_table.detector import DETECTOR_VERSION as FINANCIAL_TABLE_VERSION
-from engines.reconcile import findings, nominate, structures, sums
+from engines.reconcile import findings, nominate, propagate, structures, sums
 from engines.reconcile.detector import (
     DETECTOR_VERSION,
     _composed_parallel_total_ids,
@@ -847,7 +847,7 @@ class SumTree(unittest.TestCase):
         self.assertEqual(resolved[0]["outcome"], "confirmed")
         self.assertEqual(len(resolved[0]["resolution"]["addendCellIds"]), 3)
 
-    def test_a_blank_ends_the_candidate_rather_than_contributing_a_zero(self) -> None:
+    def test_a_blank_ends_the_bounded_run_but_a_crossing_reading_may_confirm(self) -> None:
         built = _table([
             ("Cash", "10"),
             ("Receivables", "20"),
@@ -856,9 +856,30 @@ class SumTree(unittest.TestCase):
             ("Other", "5"),
             ("Total", "40"),
         ])
-        # 10 + 20 + 5 + 5 is 40, and reaching it would mean reading through a
-        # caption row the statement put there to separate two blocks.
-        self.assertEqual(_resolve(built)[0]["outcome"], "unresolved")
+        # The bounded walk stops at the caption and holds only 5 + 5, a
+        # fragment it may never accuse from. The crossing reading reaches
+        # 10 + 20 + 5 + 5 = 40 and confirms on the exact tie -- and because it
+        # crossed a gap it may confirm and may never accuse, which is what keeps
+        # reading through a caption safe.
+        resolved = _resolve(built)[0]
+        self.assertEqual(resolved["outcome"], "confirmed")
+        self.assertEqual(resolved["resolution"]["basis"], "leaves")
+
+    def test_a_crossing_run_that_misses_never_accuses(self) -> None:
+        built = _table([
+            ("Earlier section", "100"),
+            ("Missing amount", ""),
+            ("Alpha", "10"),
+            ("Beta", "20"),
+            ("Gamma", "30"),
+            ("Total", "999"),
+        ])
+        # Neither the bounded fragment (10 + 20 + 30) nor the crossing reading
+        # (100 + 10 + 20 + 30) ties, and a run whose extent crossed a gap may
+        # not accuse the page of an error.
+        resolved = _resolve(built)[0]
+        self.assertEqual(resolved["outcome"], "unresolved")
+        self.assertNotIn(resolved["unresolvedReason"], {"break"})
 
     def test_a_run_fragment_cut_off_by_a_blank_never_accuses(self) -> None:
         built = _table([
@@ -904,6 +925,40 @@ class SumTree(unittest.TestCase):
         resolved = _resolve(built)
         self.assertEqual(resolved[0]["outcome"], "unresolved")
         self.assertEqual(resolved[0]["unresolvedReason"], "no-plausible-run")
+
+    def test_a_run_holding_a_subtotal_and_its_addends_collapses_to_the_tree(self) -> None:
+        # Apple's commercial-paper note again, but read from the opening
+        # balance. The net row (3,788) equals the two rows above it
+        # (5,836 - 2,048), and the grand total is the opening balance
+        # (-5,820) plus that net. A walk that does not know the net is a
+        # subtotal double-counts it; collapsing the subtotal with its own
+        # addends recovers -5,820 + 3,788 = -2,032 exactly.
+        built = _table([
+            ("Opening balance", "-5,820"),
+            ("Proceeds from commercial paper", "5,836"),
+            ("Repayments of commercial paper", "(2,048)"),
+            ("Proceeds from/(Repayments of) commercial paper, net", "3,788"),
+            ("Total proceeds from/(repayments of) commercial paper, net", "-2,032"),
+        ])
+        resolved = _resolve(built)
+        self.assertEqual(resolved[0]["outcome"], "confirmed")
+        self.assertEqual(resolved[0]["resolution"]["basis"], "subtotals")
+        self.assertEqual(resolved[0]["resolution"]["sum"], "-2032")
+        self.assertEqual(
+            resolved[0]["resolution"]["addendCellIds"],
+            ["t-r0-c1", "t-r3-c1"],
+        )
+
+    def test_a_collapsed_run_needs_two_figures(self) -> None:
+        # "778 + dash = 778" proves nothing on its own, and a crossing reading
+        # that reaches only one figure is exactly that: it may not confirm.
+        built = _table([
+            ("Earlier", "778"),
+            ("Heading", ""),
+            ("Total", "778"),
+        ])
+        resolved = _resolve(built)
+        self.assertEqual(resolved[0]["outcome"], "unresolved")
 
     def test_a_near_miss_is_a_break_carrying_the_delta_and_its_diagnosis(self) -> None:
         built = _table([
@@ -1400,6 +1455,98 @@ class ParallelColumnCorroboration(unittest.TestCase):
         supported = _composed_parallel_total_ids(block)
 
         self.assertEqual(supported, frozenset({"t1", "t2"}))
+
+
+class VerifiedStructurePropagation(unittest.TestCase):
+    """A confirmed total is evidence for the same row in other columns."""
+
+    def _nomination(self, built, row, column):
+        return nominate.Nomination(
+            cell=built.cell(row, column),
+            signals=({"name": "label-total", "evidence": "test"},),
+        )
+
+    def _confirmed(self, built, column, addend_rows):
+        return {
+            "outcome": "confirmed",
+            "resolution": {
+                "basis": "leaves",
+                "addendCellIds": [built.cell(row, column)["id"] for row in addend_rows],
+                "negatedAddendCellIds": [],
+                "sum": "0",
+                "delta": "0",
+            },
+        }
+
+    def test_a_structure_proved_in_two_columns_confirms_the_third(self) -> None:
+        built = _table([
+            ("Opening", "10", "20", "30"),
+            ("Movement", "5", "6", "7"),
+            ("Ending", "15", "26", "37"),
+        ])
+        # Columns 1 and 2 prove the structure [Opening, Movement] -> Ending.
+        # Column 3 is left unresolved on purpose, to isolate the propagation:
+        # it must confirm from the verified structure rather than its own walk.
+        column_results = {
+            1: [(self._nomination(built, 2, 1), self._confirmed(built, 1, (0, 1)))],
+            2: [(self._nomination(built, 2, 2), self._confirmed(built, 2, (0, 1)))],
+            3: [(
+                self._nomination(built, 2, 3),
+                {"outcome": "unresolved", "unresolvedReason": "run-too-short"},
+            )],
+        }
+
+        confirmed = propagate.propagate(built, column_results)
+
+        self.assertEqual(confirmed, {built.cell(2, 3)["id"]})
+        outcome = column_results[3][0][1]
+        self.assertEqual(outcome["outcome"], "confirmed")
+        self.assertEqual(
+            outcome["resolution"]["addendCellIds"],
+            [built.cell(0, 3)["id"], built.cell(1, 3)["id"]],
+        )
+        self.assertEqual(outcome["signals"][0]["name"], "column-corroboration")
+
+    def test_a_single_proof_does_not_propagate(self) -> None:
+        built = _table([
+            ("Opening", "10", "20", "30"),
+            ("Movement", "5", "6", "7"),
+            ("Ending", "15", "26", "37"),
+        ])
+        column_results = {
+            1: [(self._nomination(built, 2, 1), self._confirmed(built, 1, (0, 1)))],
+            3: [(
+                self._nomination(built, 2, 3),
+                {"outcome": "unresolved", "unresolvedReason": "run-too-short"},
+            )],
+        }
+
+        self.assertEqual(propagate.propagate(built, column_results), set())
+        self.assertEqual(column_results[3][0][1]["outcome"], "unresolved")
+
+    def test_a_propagated_rounding_miss_is_recorded_and_not_confirmed(self) -> None:
+        built = _table([
+            ("Domestic", "59.3", "60.1", "61.2"),
+            ("International", "72.3", "70.1", "69.4"),
+            ("Total", "131.6", "130.2", "130.5"),
+        ])
+        # Columns 1 and 2 tie exactly; column 3 is 0.1 low, inside the interval
+        # the printed tenths permit. The structure is proved, so the miss is
+        # worth recording, but it is not proof and must not confirm.
+        column_results = {
+            1: [(self._nomination(built, 2, 1), self._confirmed(built, 1, (0, 1)))],
+            2: [(self._nomination(built, 2, 2), self._confirmed(built, 2, (0, 1)))],
+            3: [(
+                self._nomination(built, 2, 3),
+                {"outcome": "unresolved", "unresolvedReason": "run-too-short"},
+            )],
+        }
+        misses: list[dict] = []
+
+        self.assertEqual(propagate.propagate(built, column_results, miss_log=misses), set())
+        self.assertEqual(column_results[3][0][1]["outcome"], "unresolved")
+        self.assertEqual(len(misses), 1)
+        self.assertTrue(misses[0]["withinRounding"])
 
 
 class HeaderSemantics(unittest.TestCase):

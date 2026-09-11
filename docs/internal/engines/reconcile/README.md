@@ -10,7 +10,8 @@
 
 **Modules**
 
-`detector.py`, `findings.py`, `nominate.py`, `structures.py`, `sums.py`
+`detector.py`, `findings.py`, `nominate.py`, `propagate.py`, `structures.py`,
+`sums.py`
 
 Reconcile and its financial-table input engine are on-demand; neither runs in
 the cache build.
@@ -99,12 +100,19 @@ implemented.
    different signed-row pattern.
 3. `nominate.py` adds explicit label, total-column, ruling-above, and
    double-rule-below nominations.
-4. `sums.py` walks permitted contiguous runs, protects already established
-   subtotal blocks from double counting, preserves printed decimal specificity,
-   and evaluates bounded sign-reversal variants.
+4. `sums.py` walks permitted contiguous runs twice -- bounded, stopping at the
+   first blank or caption, and then crossing every gap inside the block -- and
+   collapses any subtotal a run holds together with its own addends. It protects
+   already established subtotal blocks from double counting, preserves printed
+   decimal specificity, and evaluates bounded sign-reversal variants. A crossing
+   or collapsed reading may confirm and may never accuse.
 5. `detector.py` repeats column resolution while newly confirmed subtotals add
    safe block boundaries, with a row-count-derived convergence guard rather than
-   a fixed nesting-depth ceiling, then applies the narrow cross-footing pass.
+   a fixed nesting-depth ceiling. Each pass, `propagate.py` spends the structure
+   a confirmed total proved: the same row is re-tried in the columns that did
+   not resolve, and an unresolved total standing in a confirmed total's addend
+   row may use the corroborated floor. It then applies the narrow cross-footing
+   pass.
 6. A post-arithmetic admission pass keeps every confirmation and break. An
    unresolved candidate remains only when the document itself credibly asserts
    a footing relationship; rule-only recognizer probes, opening states, carried
@@ -235,19 +243,27 @@ precedence, findings, progress stages, and contract validation.
 Candidate real-document goldens are never accepted automatically; the
 whole-document scorer's hard bar is zero false ties.
 
-The eight-document corpus currently publishes 2,147 totals: 1,887 confirmed,
-two breaks, and 258 Not checked. Before statement-aware unresolved admission it
-published 2,978 totals with 1,081 Not checked, so the review list fell by 823
-(76.1%) and from 36.3% to 12.0% of the user-facing tree. Apple fell from 54 Not
-checked to one while retaining 248 confirmations; Quest publishes four and
-Disney six while retaining 138 and 689 confirmations respectively. The two
-Amazon breaks remain. The admission pass itself cannot reduce confirmed or
-break outcomes; the small corpus-wide confirmation difference from the earlier
-1,895 observation comes from correcting `Gross` so component phrases such as
-Gross benefits and Gross carrying amount no longer nominate, while Gross profit,
-margin, income, and earnings still do. No structure block reaches the hypothesis
-cap. The version is `reconcile-detector-7+financial-table-detector-4`. These are
-regression observations rather than hand-approved correctness goldens.
+The eight-document corpus currently publishes 2,188 totals: 2,034 confirmed,
+two breaks, and 152 Not checked. Before statement-aware unresolved admission it
+published 2,978 totals with 1,081 Not checked; the crossing walk, the subtotal
+reduction, the statement-region merge, relative-offset parallel corroboration,
+and verified-structure propagation have since moved recall from 1,887 to 2,034
+confirmations without adding a break. Apple publishes 249 confirmations and
+nothing Not checked; Quest two, Disney three, while retaining 141 and 694. The
+two Amazon breaks remain. Every newly confirmed total was read against the
+printed page; the sampled set — the two commercial-paper subtotals, the
+fair-value hierarchy totals, the reclassification total, the Amazon
+balance-sheet grand total, and the RoyCarver conversion total — is
+arithmetically correct. The admission pass itself cannot reduce confirmed or
+break outcomes. No structure block reaches the hypothesis cap. The version is
+`reconcile-detector-9+financial-table-detector-5`. These are regression
+observations rather than hand-approved correctness goldens: the corpus still has
+no approved golden, and building one is the next phase.
+
+The recall gain was measured with the null instrument (`sums`/crossing added
+about 0.8 points to the one-seed five-document false-tie rate, 11.66% to
+12.48%), which is why the zero-false-tie bar is now enforced by hand-approved
+goldens rather than by the null rate alone.
 
 ## 8. Related documents
 

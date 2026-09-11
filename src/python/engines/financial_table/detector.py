@@ -34,7 +34,7 @@ from .cells import TableCells, build_table_cells
 from .lattice import build_page_composed_lattice, build_page_lattice
 
 
-DETECTOR_VERSION = "financial-table-detector-4"
+DETECTOR_VERSION = "financial-table-detector-5"
 
 
 class FinancialTableInvariantError(RuntimeError):

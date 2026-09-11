@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pymupdf
 
+from engines.financial_table import lattice
 from engines.financial_table.detector import (
     DETECTOR_VERSION,
     detect_financial_tables,
@@ -66,7 +67,7 @@ class FinancialTableScanTests(unittest.TestCase):
             progress_callback=lambda _message, stage, **_kw: stages.append(stage),
         )
 
-        self.assertEqual(DETECTOR_VERSION, "financial-table-detector-4")
+        self.assertEqual(DETECTOR_VERSION, "financial-table-detector-5")
         self.assertEqual(scan.detector_version, DETECTOR_VERSION)
         self.assertEqual(len(scan.pages), len(self.geometry["pages"]))
         self.assertIn(Stage.RECONCILE_TABLES, stages)
@@ -190,6 +191,39 @@ class EngineBoundaryTests(unittest.TestCase):
 
         self.assertNotIn("engines.table.layout", sources)
         self.assertNotIn("engines.table.grid", sources)
+
+
+class StatementRegionTests(unittest.TestCase):
+    """Which adjacent detected tables a statement split in two are rejoined."""
+
+    def _layout(self):
+        return type("Layout", (), {"row_gap": 0.035, "line_height": 0.014})()
+
+    def _table(self, name, x, y, width, height):
+        return {
+            "id": name,
+            "bounds": {"x": x, "y": y, "width": width, "height": height},
+        }
+
+    def test_adjacent_tables_of_one_statement_are_merged(self) -> None:
+        first = self._table("a", 0.05, 0.10, 0.90, 0.40)
+        second = self._table("b", 0.06, 0.60, 0.90, 0.20)
+        regions = lattice._statement_regions((first, second), self._layout())
+        self.assertEqual(regions, [[first, second]])
+
+    def test_tables_separated_by_more_than_a_caption_band_are_not_merged(self) -> None:
+        first = self._table("a", 0.05, 0.10, 0.90, 0.10)
+        second = self._table("b", 0.05, 0.50, 0.90, 0.10)
+        self.assertEqual(
+            lattice._statement_regions((first, second), self._layout()), []
+        )
+
+    def test_side_by_side_tables_are_not_merged(self) -> None:
+        first = self._table("a", 0.05, 0.10, 0.30, 0.10)
+        second = self._table("b", 0.60, 0.12, 0.30, 0.10)
+        self.assertEqual(
+            lattice._statement_regions((first, second), self._layout()), []
+        )
 
 
 if __name__ == "__main__":

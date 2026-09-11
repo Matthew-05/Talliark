@@ -41,10 +41,28 @@ the leaf blocks each subtotal owns.
 
 - **Em dashes are zero.** A dash alone in a detected table cell is an addend
   worth zero. Simple and uniform; no rule about where in a run it may appear.
-- **Blank cells break the run.** A row with no value in this column is not a
-  zero, it is the end of the candidate. A fragment below that break may confirm
-  exactly but may never accuse the document; the same rule applies to a caption,
-  non-value, decimal change, or unresolved subtotal.
+- **A blank or caption ends the bounded run; a crossing reading may confirm.**
+  A row with no value in this column is not a zero, and the bounded walk stops
+  there. The same walk is then run a second time crossing every gap inside the
+  block — an absent cell, a caption, or a row whose figure is printed in another
+  period column. That reading reaches a total the page separated from its
+  addends: Apple's fair-value hierarchy sets *Assets valued at NAV as a
+  practical expedient:* between a subtotal and the rows it sums, and Disney's
+  reclassification table sets a caption between each component subtotal. Because
+  a crossing reading's extent was decided by the arithmetic rather than by a
+  boundary the page drew, it may confirm on an exact tie and may never accuse
+  the document (§7.7). The bounded reading is offered first, so a page-drawn
+  boundary always wins when it ties, and a bounded two-addend run still reports
+  `run-too-short` so the parallel-column floor can still reach it.
+
+- **A subtotal the walk did not know is collapsed, not counted twice.** Where a
+  contiguous block of a run sums exactly to the member immediately below it,
+  that block *is* that member's addends; taking both double-counts them. Apple's
+  commercial-paper note prints the opening balance, the two components of the
+  net, the net, and the total, and a walk that does not know the net is a
+  subtotal adds it together with its own components. The run is repaired by
+  replacing the block and its subtotal with the subtotal (§7.8); the repaired
+  reading may confirm and may never accuse.
 - **Light filtering, not semantics.** Members of a run must agree in printed
   decimal count with each other and with the total. That is enough to keep a
   per-share figure out of a column of whole millions without knowing what "per
@@ -448,7 +466,80 @@ The equality Total assets = Total liabilities and equity is not a footing run;
 it is the balance-sheet equation. A walk for the liability-and-equity grand total
 must stop before Total assets rather than consume it as an addend. The boundary
 is financial-statement semantics and deliberately recognizes both liabilities-
-and-equity and liabilities-and-stockholders'-equity wording.
+and-equity and liabilities-and-stockholders'-equity wording. Labels are
+normalized with typographic apostrophes folded to ASCII first, because a
+statement sets *stockholders’ equity* with a curly apostrophe and a lexicon that
+compares against the straight one silently fails to see the boundary — the walk
+then crosses Total assets and reports a 100%-of-total miss in a statement that
+foots perfectly.
+
+### 7.7 The walk crosses gaps, and a crossing run may confirm but never accuse
+
+A blank or caption is a real boundary, and the plan's default is to stop there:
+a run cut short holds a fragment of the addends, and a fragment that misses says
+something about the scan, not the page. But a total may genuinely sum across
+one, and refusing to cross loses it entirely. The same walk is therefore run
+twice for every candidate total: once bounded, stopping at the first absent cell
+or caption, and once crossing every gap inside the block. The bounded reading is
+offered first, so a page-drawn boundary always wins when it ties, and a bounded
+two-addend run still reports `run-too-short` so the parallel-column floor can
+still reach it. The crossing reading may confirm on an exact tie and may never
+accuse, because its extent was chosen by the arithmetic rather than by the page.
+
+Crossing is bounded by the block, so it cannot leap a section gap the lattice
+already cut, and it still stops at a nominated total, the top of the table, and
+the balance-sheet side boundary (§7.6). A crossing run that reaches only one
+figure is not published: *778 + dash = 778* proves nothing, and a single-figure
+run is that shape regardless of how many absent cells it crossed. A crossing run
+that misses leaves the bounded reading's own stop reason in place, so
+`no-candidate-run` and `run-too-short` still mean what they always did.
+
+### 7.8 A subtotal inside a run is collapsed, not counted twice
+
+Not every subtotal announces itself, and not every one is corroborated across
+columns. Where a contiguous block of a run sums exactly to the member
+immediately below it — printed signs, no reversal — that block *is* that
+member's addends, and a run that holds both double-counts them. The repair
+replaces the block and its subtotal with the subtotal and repeats, because
+collapsing an inner subtotal can expose the outer one. The repaired reading is
+offered ahead of the uncollapsed one and may confirm and may never accuse: it
+was reconstructed by arithmetic, so only an exact tie earns it a place. This is
+what lets Apple's commercial-paper note foot from the opening balance and what
+recovers Disney's reclassification total `341 + (−4) + (−28)`.
+
+The reduction is the arithmetic inverse of §7.1's refusal. §7.1 refutes a run
+that counts part of itself twice and can do nothing else; the reduction is what
+turns that refusal into the tree the page asserts.
+
+### 7.9 A confirmed total is evidence for its neighbours
+
+A total that foots in two independent columns proves the row structure: which
+rows are its addends, and which printed signs are reversed. That proof is
+stronger than anything a single column can offer, and `propagate.py` spends it
+in two ways.
+
+**Across the row.** The verified structure — the addend rows and the sign
+pattern, by offset from the total — is read in every column of the same row that
+did not resolve. The figures there are summed exactly as the proving columns
+summed theirs, so a column the ordinary walk could not reach is confirmed by the
+structure rather than by a new search. The evidence is the same leave-one-out
+parallel agreement the structure search already uses, and independence is
+tested with the same proportionality rule, so a percentage column cannot
+corroborate the amounts it measures.
+
+**Into the addends.** The addend rows of a confirmed total are known to be real,
+so an unresolved total standing in one of them and carrying a total's own label
+or drawn rule may use the corroborated floor — a two-addend run that a single
+column could not publish.
+
+A propagated run that misses is left unresolved, never a break: the structure is
+proved, but the figures in this column did not tie, and the difference is
+recorded for development rather than shown to a reviewer. Where the miss is
+inside the interval the printed decimals permit it is the shape of an
+unrounded source figure, which is exactly the case worth seeing even when it is
+not proof. The pass never nominates: a row with no total's mark in any column
+gets no hypothesis, so a figure that should foot only because of a hidden
+lexicon stays unresolved until the lexicon is widened.
 
 ## 8. Plausibility
 

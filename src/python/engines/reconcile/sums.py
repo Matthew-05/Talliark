@@ -74,6 +74,27 @@ SKIP_CAPTION_ROWS = False
 # marking carries §7.3's rule -- such a run may confirm and may never break.
 STEP_OVER_SECTION_CAPTIONS = True
 
+# Whether the walk crosses any vertical gap inside a block -- an absent cell, a
+# caption, or a row that carries no value in this column -- rather than ending
+# the candidate there.
+#
+# A blank or caption is a real boundary, and the plan's default is to stop: a
+# run cut short by one holds a fragment of the addends, and a fragment that
+# misses says something about the scan, not the page. But a total may genuinely
+# sum across one. Apple's fair-value hierarchy sets "Assets valued at NAV as a
+# practical expedient:" between a subtotal and the rows it sums; Disney's
+# reclassification table sets a caption between each component subtotal; a
+# comparative statement leaves a cell blank in one period column while the row
+# carries a figure in another. Refusing to cross loses those totals entirely.
+#
+# So the walk crosses, and every run that crossed is marked: it may confirm on
+# an exact tie and may never accuse the document (the `crossed` flag, §7.3).
+# The gap is where the scan stopped guessing, not where the page changed
+# subject, so the arithmetic alone decides whether the run ties. Runs that cross
+# still stop at a nominated total, the top of the table, and the balance-sheet
+# side boundary.
+CROSS_GAPS = True
+
 # A statement occasionally asserts a difference while printing every component
 # as a positive figure: gross margin is net sales less cost of sales, for
 # example. The run stays contiguous and no cell is omitted; what the search
@@ -197,6 +218,50 @@ def preferred_tied_variant(run: Run) -> Run | None:
     return variants[0] if variants else None
 
 
+def figure_count(run: Run) -> int:
+    """How many members carry a figure rather than a dash."""
+    return sum(1 for cell in run.cells if (value_of(cell) or Decimal(0)) != 0)
+
+
+def reduce_double_counted(run: Run) -> Run | None:
+    """Collapse a run that holds both a subtotal and the block it sums.
+
+    A statement's own identity printed inside a run is not a coincidence to be
+    refused; it is a subtotal the walk did not know was one. Where a contiguous
+    block of members sums exactly to the member immediately below it, that block
+    *is* that member's addends, and counting both double-counts them. Replacing
+    the block and its subtotal with the subtotal recovers the tree the page
+    asserts -- the repair for the shape `double_counts` refuses.
+
+    Only a printed-sign sum collapses, so no sign choice can manufacture one,
+    and the subtotal must itself carry a figure. The reduction repeats, because
+    collapsing an inner subtotal can expose the outer one. Returns `None` when
+    the run is already free of the shape.
+    """
+    cells = list(run.cells)
+    changed = False
+    while True:
+        collapsed = False
+        for index in range(2, len(cells)):
+            subtotal = value_of(cells[index])
+            if subtotal is None or subtotal == 0:
+                continue
+            for start in range(index - 2, -1, -1):
+                if sum(
+                    (value_of(cell) or Decimal(0) for cell in cells[start:index]),
+                    Decimal(0),
+                ) == subtotal:
+                    cells = cells[:start] + [cells[index]] + cells[index + 1 :]
+                    changed = True
+                    collapsed = True
+                    break
+            if collapsed:
+                break
+        if not collapsed:
+            break
+    return Run("subtotals", tuple(cells), run.total, run.decimals) if changed else None
+
+
 def is_transposition(delta: Decimal) -> bool:
     """Whether a delta has the shape of a digit transposition."""
     if delta == 0:
@@ -290,19 +355,47 @@ def _eligible(cell: dict, decimals: int) -> bool:
     return int(cell.get("decimals", -1)) == decimals
 
 
-def leaf_run(table_cells, column_index: int, total_row: int, decimals: int, nominated_rows):
+def leaf_run(
+    table_cells,
+    column_index: int,
+    total_row: int,
+    decimals: int,
+    nominated_rows,
+    *,
+    cross_gaps: bool = False,
+):
     """The contiguous body cells above a total, taking no nominated total in.
 
     Bounded above by a blank, a cell that carries no value, a decimal
     disagreement, the previous nominated total in this column, or the top of the
     table. Returns the run and what stopped it, because the reason a run is too
     short is the difference between a scan limit and an accusation.
+
+    With `cross_gaps`, an absent cell or caption is stepped over instead and the
+    run is marked confirm-only. The caller asks for both readings: the bounded
+    one is the page's own, and the crossing one is the fallback that proves an
+    exact relationship the page did not draw a boundary around.
     """
-    return _walk(table_cells, column_index, total_row, decimals, nominated_rows, jump=None)
+    return _walk(
+        table_cells,
+        column_index,
+        total_row,
+        decimals,
+        nominated_rows,
+        jump=None,
+        cross_gaps=cross_gaps,
+    )
 
 
 def subtotal_run(
-    table_cells, column_index: int, total_row: int, decimals: int, nominated_rows, jump: dict
+    table_cells,
+    column_index: int,
+    total_row: int,
+    decimals: int,
+    nominated_rows,
+    jump: dict,
+    *,
+    cross_gaps: bool = False,
 ):
     """The same walk, consuming nominated subtotals instead of stopping at them.
 
@@ -313,7 +406,15 @@ def subtotal_run(
     lets this walk step over a subtotal's addends instead of double-counting
     them.
     """
-    return _walk(table_cells, column_index, total_row, decimals, nominated_rows, jump=jump)
+    return _walk(
+        table_cells,
+        column_index,
+        total_row,
+        decimals,
+        nominated_rows,
+        jump=jump,
+        cross_gaps=cross_gaps,
+    )
 
 
 def cross_run(
@@ -438,6 +539,7 @@ def _walk(
     nominated_rows,
     *,
     jump: dict | None,
+    cross_gaps: bool = False,
 ):
     cells: list[dict] = []
     stopped = "top-of-table"
@@ -453,6 +555,13 @@ def _walk(
     while row >= 0:
         cell = table_cells.cell(row, column_index)
         if cell is None:
+            if cross_gaps:
+                # An absent cell in this column -- a caption, a blank, or a row
+                # whose figure is printed in another period column -- is crossed,
+                # and the run is marked confirm-only for having done so.
+                crossed_a_caption = True
+                row -= 1
+                continue
             if table_cells.is_caption_row(row):
                 if SKIP_CAPTION_ROWS:
                     crossed_a_caption = True
@@ -550,13 +659,19 @@ def resolve(
     # because two candidates can share a basis: the walk that ends on a
     # nominated total whose block was never resolved yields two readings of the
     # same run, and they are not the same evidence.
-    candidates: list[tuple[Run, str, bool]] = []
+    #
+    # The bounded readings -- the page's own, where a blank or caption ends the
+    # run -- are kept apart from the crossing fallback. A bounded miss reports
+    # the bounded walk's stop reason, so a two-addend bounded run is still
+    # `run-too-short` and the parallel-column upgrade can still find it; only a
+    # crossing run that ties is allowed to change the answer.
+    bounded: list[tuple[Run, str, bool]] = []
     # A run that crossed a caption may confirm and may never break, whether the
     # caption ended it (§7.3) or it stepped over the heading of a block it took
     # whole. Both hold a run whose extent was decided by something other than
     # the arithmetic, and a miss there is about the scan and not about the page.
     if consumed and len(nested) >= floor:
-        candidates.append(
+        bounded.append(
             (Run("subtotals", tuple(nested), total, decimals), nested_stop, nested_crossed)
         )
     if consumed and highest is not None:
@@ -580,15 +695,57 @@ def resolve(
         # the page marked, it may confirm and may never accuse.
         short = [cell for cell in nested if int(cell["rowIndex"]) >= highest]
         if len(short) < len(nested) and len(short) >= floor:
-            candidates.append(
+            bounded.append(
                 (Run("subtotals", tuple(short), total, decimals), nested_stop, True)
             )
     if len(leaves) >= floor:
-        candidates.append(
+        bounded.append(
             (Run("leaves", tuple(leaves), total, decimals), leaf_stop, leaf_crossed)
         )
 
-    if not candidates:
+    # The bounded readings above are the page's own: a blank or caption ends the
+    # run. They are offered first, so a bounded exact tie is always the tree
+    # published. Only when none of them resolves does the walk ask the second
+    # question -- what would this total be if the gaps were crossed? -- and that
+    # reading may confirm and may never accuse, because its extent was decided
+    # by the arithmetic rather than by a boundary the page drew.
+    crossing: list[tuple[Run, str, bool]] = []
+    if CROSS_GAPS:
+        cross_leaves, cross_leaf_stop, _, _, _ = leaf_run(
+            table_cells, column, row, decimals, nominated_rows, cross_gaps=True
+        )
+        (
+            cross_nested,
+            cross_nested_stop,
+            cross_consumed,
+            _,
+            _,
+        ) = subtotal_run(
+            table_cells,
+            column,
+            row,
+            decimals,
+            nominated_rows,
+            jump,
+            cross_gaps=True,
+        )
+        cross_nested_run = Run("subtotals", tuple(cross_nested), total, decimals)
+        if (
+            cross_consumed
+            and len(cross_nested) >= floor
+            and tuple(cross_nested) != tuple(nested)
+            and figure_count(cross_nested_run) >= 2
+        ):
+            crossing.append((cross_nested_run, cross_nested_stop, True))
+        cross_leaf_run = Run("leaves", tuple(cross_leaves), total, decimals)
+        if (
+            len(cross_leaves) >= floor
+            and tuple(cross_leaves) != tuple(leaves)
+            and figure_count(cross_leaf_run) >= 2
+        ):
+            crossing.append((cross_leaf_run, cross_leaf_stop, True))
+
+    if not bounded and not crossing:
         if len(leaves) >= nominate.MIN_ADDENDS:
             displayed = Run("leaves", tuple(leaves), total, decimals)
             if not double_counts(displayed) and rounding_can_explain(displayed):
@@ -598,7 +755,29 @@ def resolve(
                 }
         return {"outcome": "unresolved", "unresolvedReason": _why(leaves, nested, leaf_stop)}
 
-    candidates = [entry for entry in candidates if not double_counts(entry[0])]
+    # A run that still holds a subtotal together with that subtotal's own
+    # addends is not a candidate; it is a tree with one level left uncollapsed.
+    # Offer the collapsed reading first -- it is the relationship the page
+    # asserts -- and keep the original behind it. The collapsed reading may
+    # confirm and may never accuse: it was reconstructed by arithmetic rather
+    # than drawn by the page, and only an exact tie earns it a place.
+    def _expand(entries):
+        expanded: list[tuple[Run, str, bool]] = []
+        for run, stop, quiet in entries:
+            reduced = reduce_double_counted(run)
+            if reduced is not None and figure_count(reduced) >= 2:
+                expanded.append((reduced, stop, True))
+            expanded.append((run, stop, quiet))
+        return [entry for entry in expanded if not double_counts(entry[0])]
+
+    # Whether the bounded walk produced a candidate at all, before the
+    # double-count filter. A bounded run too short to offer reports the walk's
+    # limit (`run-too-short`); one that was offered and refused because it
+    # contains its own subtotal is a different fact -- `no-plausible-run`.
+    bounded_formed = bool(bounded)
+    bounded = _expand(bounded)
+    crossing = _expand(crossing)
+    candidates = bounded + crossing
     if not candidates:
         # A run that contains its own subtotal is not a candidate at all, and
         # this is the one place arithmetic is allowed near nomination: it
@@ -620,6 +799,16 @@ def resolve(
         if others and others[0].cells != chosen.cells:
             published["leafResolution"] = others[0].as_dict()
         return published
+
+    if not bounded:
+        # Only the crossing fallback was available and none of it tied. A
+        # bounded run that was offered and refused is `no-plausible-run`; a
+        # bounded walk too short to offer reports its own stop reason --
+        # `run-too-short` or `no-candidate-run` -- which is also what lets the
+        # caller's parallel-column upgrade still reconsider the two-addend case.
+        if bounded_formed:
+            return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+        return {"outcome": "unresolved", "unresolvedReason": _why(leaves, nested, leaf_stop)}
 
     chosen, chosen_stop, chosen_quiet = evaluated[0]
     if rounding_can_explain(chosen):

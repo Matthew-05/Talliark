@@ -137,6 +137,13 @@ so recognition changes can be measured separately from arithmetic outcomes.
    exact totals whose row/sign structure also agrees in independent columns, so
    removing a caption boundary can recover proof but cannot create a break or
    enlarge the Not checked list.
+5b. Adjacent detected tables that a statement split in two -- a balance sheet
+   the general detector closed at *Commitments and contingencies* or
+   *Stockholders' equity:* -- are additionally merged into one statement region
+   and rebuilt whole. The region carries no general-table lineage, publishes as
+   `lattice` provenance, and is admitted under the same exact-only composed
+   rule, so it can prove the grand total whose addends straddle the split
+   without changing the general grid or the ordinary blocks.
 6. `cells.py` recovers accounting dashes omitted by the values model, joins
    values to rows and columns, chooses the nearest label column to the left, and
    marks single rules above and double rules below candidate subtotal rows.
@@ -164,6 +171,7 @@ so recognition changes can be measured separately from arithmetic outcomes.
 | Composed fragments | at least `2` fragments and `3` total rows | Composition repairs a split statement rather than replacing ordinary block detection. |
 | One-row composed fragment | at least `2` figures | Recovers a wrapped opening row without treating isolated page furniture as a footing block. |
 | Composed adjacency | `max(row_gap, 2 × line_height)` | Allows a first data row classified into a header band to retain its table lineage while keeping unrelated nearby schedules separate. |
+| Statement-region merge | `max(3 × row_gap, 8 × line_height)`, and `50%` horizontal overlap | Rejoins two detected tables a statement split at a caption band (the balance sheet's two sides) without merging schedules set further apart or side by side. |
 | Maximum row gap | `max(row_gap, pitch × 2.35)` | Separates vertically independent schedules while retaining ordinary statement spacing. |
 | General-table overlap | `25%` of lattice area | Enough shared area to borrow headers and rulings without requiring equal bounds. |
 | Rule-grid suppression | rules above more than `50%` of rows | A fully ruled grid does not use a rule above as a subtotal signal. |
