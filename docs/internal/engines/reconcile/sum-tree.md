@@ -42,7 +42,9 @@ the leaf blocks each subtotal owns.
 - **Em dashes are zero.** A dash alone in a detected table cell is an addend
   worth zero. Simple and uniform; no rule about where in a run it may appear.
 - **Blank cells break the run.** A row with no value in this column is not a
-  zero, it is the end of the candidate.
+  zero, it is the end of the candidate. A fragment below that break may confirm
+  exactly but may never accuse the document; the same rule applies to a caption,
+  non-value, decimal change, or unresolved subtotal.
 - **Light filtering, not semantics.** Members of a run must agree in printed
   decimal count with each other and with the total. That is enough to keep a
   per-share figure out of a column of whole millions without knowing what "per
@@ -50,7 +52,7 @@ the leaf blocks each subtotal owns.
   rather than as a law. Deliberately primitive: heavier eligibility logic is
   overfitting before there is anything to fit to.
 
-- **A two-addend run needs the parallel columns.** A run of three or more may be
+- **A two-addend vertical run needs the parallel columns.** A run of three or more may be
   confirmed on `label-total` alone; a pair that happens to sum is nearly
   evidence-free. The second signal the floor waits for is the one the plan
   already names — the same rows footing independently in another value column —
@@ -106,6 +108,8 @@ nonsense that happened to tie. `MAX_SIGN_CANDIDATES` caps how many starting
 points may be tried at all; the longest real signed run is seven members.
 
 Parallel columns corroborate only when they reverse the same row positions. A
+zero or dash has no sign, so a zero inside the shared reversed suffix is ignored
+when the patterns are compared and is never published as a negated addend. A
 candidate that ties by subtracting a subtotal from the members that make that
 subtotal is refused as algebraic cancellation rather than accepted as a tree, and
 so is one that subtracts a figure it also adds — the pair cancels, and whatever
@@ -125,6 +129,12 @@ foot on: the walk would either take a subtotal's own addends a second time or ru
 straight through the subtotal as if it were an ordinary row. A corroborated
 *break* contributes the row and no top, which is §7.2 unchanged.
 
+The block boundary prevents partial double counting too. A candidate that
+contains a confirmed subtotal and even one row inside the interval that subtotal
+owns is refused before proposal ranking. The arithmetic-only guard cannot catch
+that case because the candidate may start halfway through the subtotal's block,
+where the visible fragment no longer adds to the subtotal.
+
 **Where a run stops is sometimes two questions.** A run that consumed subtotals
 has a boundary the page drew — the topmost subtotal it took — and above that lies
 whatever preceded the block. Those rows may be the run's remaining addends or
@@ -141,13 +151,20 @@ is evaluated first and the shorter one can only win by tying exactly; being a
 boundary the arithmetic chose rather than one the page marked, it may confirm and
 may never accuse.
 
+Across all permitted structures for one cell, any exact resolution outranks a
+miss. This follows directly from the outcome vocabulary: a break says no
+permitted run ties. Evidence strength and proximity choose only between
+proposals with the same outcome.
+
 **Resolution repeats while it is still learning.** A total that foots on a
 subtotal cannot be settled before that subtotal is, and corroboration can only
 confirm a short run after every column has been walked — by which time the totals
 above it have already been resolved without it. Apple's commercial paper note is
 two deep exactly this way: its second net line is confirmed by the parallel
-columns, and its Total rests on that line. The pass repeats (at most
-`MAX_RESOLUTION_PASSES`) and stops as soon as a pass learns nothing.
+columns, and its Total rests on that line. The pass stops as soon as it learns
+nothing. Its safety guard is derived from the block's row count, because each
+productive pass can only establish or extend a boundary to an earlier row;
+there is no fixed four-level nesting ceiling.
 
 **Sibling subtotals.** Section captions may split the value lattice even though
 the detected grid still covers the whole statement. Two independently
@@ -166,11 +183,23 @@ Three, and the distinction between the last two is the module's credibility.
 | Outcome | Meaning |
 |---|---|
 | **confirmed** | a candidate run sums exactly to the nominated total |
-| **break** | no run sums to it, but a plausible run misses by a small delta — reported with the delta, and with the transposition (divisible by 9) and single-glyph diagnoses where they apply |
+| **break** | no permitted run sums to it, the run ends at a complete structural boundary, and a plausible run misses by a small delta — reported with the delta, and with transposition, sign, and single-glyph diagnoses where they apply |
 | **unresolved** | nothing plausible was found. Recorded, never phrased as a failure of the document |
 
-A nominated total with no candidate run is *unresolved, no candidate run*. It is
+An admitted total with no candidate run is *unresolved, no candidate run*. It is
 not an accusation, and the window must not word it as one.
+
+**Admission follows arithmetic.** Nomination deliberately reaches farther than
+the user-facing tree: a rule-only row is worth attempting because an exact tie
+can prove it. Once evaluated, every confirmation and supported break is admitted.
+An unresolved candidate is admitted only when the financial statement itself
+still makes a credible footing assertion. Rule-only probes, opening states,
+carried statement results, peer cash-flow summary rows, equity-rollforward
+movements, noncontrolling allocations, component uses of Net, and values under
+unambiguously non-additive headers remain diagnostic instead. This is a general
+financial-statement grammar; it contains no issuer, document, page, or expected
+value. `reconcile_candidates_withheld` and the per-reason diagnostics keep the
+recognizer trace measurable without turning it into a Not checked queue.
 
 **Tolerance.** The first pass confirms on exact ties only.
 `0.5 × 10^−decimals × addend count` is the intended shape, but it ships after
@@ -178,19 +207,30 @@ the drift is measured on real statements rather than before. Applying a
 tolerance nobody has measured is how a rounding allowance quietly blesses a real
 error.
 
-**Which unresolved totals are spoken.** `no-candidate-run` and `run-too-short`
-describe what the scan could reach, not what the document did, and the Apple
-10-K yields 127 of them; surfacing each as a finding would bury the exceptions
-under the scan's own limits. Only `no-plausible-run` is published as a
-`footing-unresolved` finding. Every unresolved total is still counted in
-`summary` and carries its own outcome, so nothing is hidden by staying quiet.
+Displayed decimal figures have one narrower treatment that does not alter that
+rule. If the miss fits inside the combined half-unit intervals implied by every
+addend and the total, the result is `rounding-indeterminate`: the printed values
+cannot prove the unrounded arithmetic either way. It is never confirmed and
+never a break. Whole-number statement scales are excluded because the cell model
+does not yet carry the displayed magnitude unit. Disney+'s 59.3 + 72.4 = 131.6
+subscriber row is the measured case; the exact 2024 row beside it still confirms.
+
+**Which admitted unresolved totals are spoken.** `no-candidate-run` and
+`run-too-short` describe what the scan could reach, not what the document did;
+surfacing each as a finding would bury the exceptions under the scan's own
+limits. Only `no-plausible-run` is published as a `footing-unresolved` finding.
+Every admitted unresolved total is still counted in `summary` and carries its
+own outcome; withheld internal candidates are counted in diagnostics instead.
+`rounding-indeterminate` also stays quiet: it explains why exact proof is
+unavailable, not something a reviewer should treat as an exception.
 
 ## 5. Cross-footing
 
 In scope, secondary, and narrow: a cross-foot is attempted **only against a
-column whose own header names a total** — Total, Consolidated, Combined. No
-total-headed column, no cross-foot. `total-column` is that nomination and is
-declared in the registry beside the others.
+column whose own header names an additive or subtractive result** — Total,
+Consolidated, Combined, or Net. No result-headed column, no cross-foot.
+`total-column` is that nomination and is declared in the registry beside the
+others.
 
 One guard: if two or more of a table's column headers parse as periods or years,
 cross-footing is disabled for that table entirely. It is a comparative
@@ -199,8 +239,9 @@ tolerance model would catch.
 
 **The run** is the horizontal twin of the leaf run and deliberately the same
 walk — a blank ends it, a dash is an addend worth zero, printed decimals must
-agree — with one addition: it stops at the previous total-headed column, exactly
-as the vertical walk stops at the previous nominated total. A statement of equity
+agree — with two additions. A header-defined non-additive metadata column, such
+as Estimated Useful Life, is skipped. The walk stops at the previous
+result-headed column, exactly as the vertical walk stops at the previous nominated total. A statement of equity
 prints *Total Disney Shareholders' Equity* and then *Total Equity*, and the
 second is the first plus noncontrolling interests, not the first plus every
 component the first already consumed.
@@ -221,6 +262,17 @@ Confirmation is worth having on its own. An exact tie across six segment columns
 corroborates every figure in the row, and it is what ticks the row totals of a
 segment schedule that the vertical pass can only ever tick down. A miss becomes
 `no-plausible-run`: counted, never spoken.
+
+**A direct two-addend row must repeat.** Financial statements commonly present
+Cash + Stock awards = Total or Gross carrying amount − Accumulated amortization
+= Net. Those rows are valuable, but one pair that happens to tie remains nearly
+evidence-free. A two-addend cross-foot is therefore published only when another
+row in the same block repeats the same result column, addend columns, and
+reversed-sign positions. Three-or-more-addend rows retain the ordinary result-
+header rule. The repeated-row guard reduced the one-seed null result from 12 to
+9 two-addend cross-foot coincidences while retaining two-row commitment and
+government-wide schedules in the real corpus; a stricter table-majority rule
+was measured and rejected because it removed 11 legitimate confirmations.
 
 **A cross-foot is a second assertion about the same figure, not a duplicate of
 the first.** A segment schedule's grand total is both the total of its column and
@@ -285,10 +337,9 @@ rule extents would lift that restriction and is the obvious next measurement.
 
 Rulings and arithmetic remain independent, so a disagreement between them is
 itself a finding — a total drawn like a total that nothing sums to, or a confirmed
-tie with no rule above it. That finding kind, and the `ruling-above` signal, are
-still unbuilt; `docs/internal/engines/reconcile/corroboration.md` §6 measures `ruling-above` as no
-longer a first-pass dependency, parallel-column agreement having supplied the
-second signal it was being held open for.
+tie with no rule above it. That finding kind is still unbuilt. `ruling-above`
+itself is enabled as a confirmation-only nomination route; `corroboration.md`
+§6 records why it no longer blocks the first pass.
 
 ## 7. Rules the corpus forced
 
@@ -330,21 +381,21 @@ table then added the 2025 issuance a second time and reported a 4,500 break. The
 walk stops instead of guessing, which costs a confirmation and buys the
 correctness back.
 
-### 7.3 A run cut short by a caption row may confirm but may never break
+### 7.3 A run cut short at an incomplete boundary may confirm but may never break
 
-A caption — *Changes in assets and liabilities:*, *Cash Flows from Investing
-Activities:* — is the statement separating one block from the next, so a run that
-stopped at one holds a fragment of the addends rather than all of them. A
-fragment that misses says something about the scan, not about the page; a
-fragment that ties exactly is still a tie, because coincidental exact ties are
-what the whole design exists to make unreachable. Without this the Carver Trust's
-cash-flow statement reported a 3.4 M break against four of the eight rows that
-make its total.
+A caption, blank, non-value, decimal change, or unresolved subtotal leaves the
+walk with only a fragment of the possible addends. A fragment that misses says
+something about the scan, not about the page; a fragment that ties exactly is
+still a tie, because coincidental exact ties are what the whole design exists to
+make unreachable. Only the top of the block or an established total boundary
+closes a run strongly enough to support an accusation. Without this the Carver
+Trust's cash-flow statement reported a 3.4 M break against four of the eight rows
+that make its total, and the CAFR corpus reported operating expenses against only
+the rows below a blank amount cell.
 
-A run that a caption cut short is short for a structural reason, and
-`run-too-short` is what it is; `no-plausible-run` stays reserved for a run that
-was long enough to publish and was refused anyway, which is the list worth
-reading.
+A fragment too short to evaluate is `run-too-short`; a long enough fragment that
+misses is `no-plausible-run`, the same unresolved vocabulary used for other runs
+that cannot safely support an assertion.
 
 ### 7.4 Stepping over caption rows is measured, and off — except one caption
 
@@ -381,6 +432,23 @@ reviewer cannot tell the gap from a finding.
 
 A run that took the step is marked, and the marking carries §7.3's rule
 unchanged: **it may confirm and may never break.**
+
+### 7.5 A nested subtotal propagates the deepest top it owns
+
+When a parent total consumes an established subtotal, the parent's block begins
+where that subtotal's own block begins, not at the subtotal row. Without this,
+Disney's net property row owned only itself when the property/projects/land
+subtotal consumed it, and Total assets could later mix a nested result with part
+of the leaf interval already represented by that result. Structure propagation
+now carries the deepest established top recursively.
+
+### 7.6 Total assets is the boundary between balance-sheet sides
+
+The equality Total assets = Total liabilities and equity is not a footing run;
+it is the balance-sheet equation. A walk for the liability-and-equity grand total
+must stop before Total assets rather than consume it as an addend. The boundary
+is financial-statement semantics and deliberately recognizes both liabilities-
+and-equity and liabilities-and-stockholders'-equity wording.
 
 ## 8. Plausibility
 
@@ -426,6 +494,13 @@ the corpus is the false-tie rate of the whole nomination-and-search machine.
 
 Permuting inside a column rather than across the table is deliberate: a
 coincidence has to beat figures of the same magnitude, which is the hard case.
+The document name is hashed with SHA-256 into the requested seed, rather than
+using Python's process-randomized `hash()`, and every permutation is a complete
+derangement. The same command therefore exercises the same cells on every run.
+The null instrument disables only the post-arithmetic presentation admission:
+its denominator is the complete internal candidate set. Otherwise unresolved
+candidates would leave the denominator while chance confirmations necessarily
+survived, changing the reported rate without changing nomination or search.
 
 **Read it as an upper bound, not as an error rate.** A column that contains a
 total and its parts always admits *total − part = other part* somewhere, so the
@@ -447,6 +522,25 @@ the rate where it was; widening §7.1 took it to 11.4%.
 | Suffix reversals only | 2,648 | 350 | 13.2% |
 | Plus `ruling-above`, caption spans, two run readings | 3,295 | 413 | 12.5% |
 | Plus §7.1 widened | 3,294 | 375 | **11.4%** |
+
+After relative independence, local-only accusation evidence, and partial-block
+double-count protection, the reproducible one-seed five-document run reports
+194 false ties from 1,680 nominations (**11.55%**). That single seed is a smoke
+measurement, not a replacement for the multi-seed history above.
+
+The composed-fragment and result-column changes report 209 false ties from 1,691
+nominations (**12.36%**) on the same seed. The 0.81-point increase is retained
+because the real corpus gains complete cash-flow, borrowing, balance-sheet,
+compensation, and Net-intangibles relationships. Requiring two-addend equations
+to characterize a majority of the result column lowered the null rate to 12.05%
+but removed 11 legitimate Boeing, government-wide, and trust-statement
+confirmations, so that stricter rule is not shipped.
+
+The current detector reports 194 false ties from 1,664 internal nominations
+(**11.66%**) on that seed. Presentation admission is disabled for this
+instrument as described above, so the improvement is not produced by hiding
+unresolved rows from the denominator; it comes from narrowing `Gross` nomination
+to financial result phrases rather than component labels.
 
 Over the same span, real confirmations went from 1,003 to 1,314 and breaks from
 35 to 5.

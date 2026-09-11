@@ -97,7 +97,12 @@ def _row_groups(values: list[_Value], layout: AnalysisLayout) -> list[list[_Valu
     return _cluster(values, lambda value: value.center_y, tolerance)
 
 
-def _blocks(rows: list[list[_Value]], layout: AnalysisLayout) -> list[list[list[_Value]]]:
+def _blocks(
+    rows: list[list[_Value]],
+    layout: AnalysisLayout,
+    *,
+    minimum_rows: int = MIN_BLOCK_ROWS,
+) -> list[list[list[_Value]]]:
     if not rows:
         return []
     pitch = median(
@@ -113,7 +118,7 @@ def _blocks(rows: list[list[_Value]], layout: AnalysisLayout) -> list[list[list[
             result.append([row])
         else:
             result[-1].append(row)
-    return [block for block in result if len(block) >= MIN_BLOCK_ROWS]
+    return [block for block in result if len(block) >= minimum_rows]
 
 
 def _bounds(values: list[_Value]) -> dict:
@@ -132,6 +137,46 @@ def _overlap(first: dict, second: dict) -> float:
 
 def _table_for(bounds: dict, tables: tuple[JsonMapping, ...]) -> JsonMapping | None:
     matches = [(table, _overlap(bounds, table["bounds"])) for table in tables]
+    match, area = max(matches, key=lambda pair: pair[1], default=(None, 0.0))
+    return match if area >= bounds["width"] * bounds["height"] * 0.25 else None
+
+
+def _nearby_table_for(
+    bounds: dict,
+    tables: tuple[JsonMapping, ...],
+    layout: AnalysisLayout,
+) -> JsonMapping | None:
+    """A table containing, or immediately adjacent to, one value fragment.
+
+    General table fitting can classify the first data row as part of the header
+    when its label wraps. The values remain aligned a single line above the
+    published body bounds. Composition may recover that row, but the ordinary
+    lattice keeps the stricter overlap rule so no independent block silently
+    borrows table evidence.
+    """
+    direct = _table_for(bounds, tables)
+    if direct is not None:
+        return direct
+    slack = max(layout.row_gap, layout.line_height * 2)
+    expanded = []
+    for table in tables:
+        table_bounds = dict(table["bounds"])
+        y = max(0.0, float(table_bounds["y"]) - slack)
+        bottom = min(
+            1.0,
+            float(table_bounds["y"]) + float(table_bounds["height"]) + slack,
+        )
+        expanded.append(
+            (
+                table,
+                {
+                    **table_bounds,
+                    "y": y,
+                    "height": bottom - y,
+                },
+            )
+        )
+    matches = [(table, _overlap(bounds, expanded_bounds)) for table, expanded_bounds in expanded]
     match, area = max(matches, key=lambda pair: pair[1], default=(None, 0.0))
     return match if area >= bounds["width"] * bounds["height"] * 0.25 else None
 
@@ -202,6 +247,77 @@ def _add_dashes(
             built.by_id[cell["id"]] = cell
 
 
+def _build_lattice(
+    rows: list[list[_Value]],
+    layout: AnalysisLayout,
+    *,
+    page_index: int,
+    detected_tables: tuple[JsonMapping, ...],
+    table: JsonMapping | None = None,
+    id_prefix: str = "lattice",
+) -> TableCells | None:
+    flat = [value for row in rows for value in row]
+    column_groups = _cluster(flat, lambda value: value.digit_right, RIGHT_EDGE_TOLERANCE)
+    column_groups = [group for group in column_groups if len(group) >= 2]
+    if not column_groups:
+        return None
+    column_edges = [
+        sum(value.digit_right for value in group) / len(group)
+        for group in column_groups
+    ]
+    bounds = _bounds(flat)
+    table = table or _table_for(bounds, detected_tables)
+    digest = hashlib.sha1(
+        f"{page_index}:{bounds['y']:.5f}:{bounds['height']:.5f}".encode()
+    ).hexdigest()[:10]
+    built = TableCells(
+        table_id=f"{id_prefix}-p{page_index}-{digest}",
+        page_index=page_index,
+        column_count=len(column_edges) + 1,
+        row_count=len(rows),
+        row_labels=[""] * len(rows),
+    )
+    built.bounds = bounds
+    built.provenance = "lattice+table" if table else "lattice"
+    built.value_column_edges = tuple(round(edge, 6) for edge in column_edges)
+    if table is not None:
+        built.source_general_table_id = str(table["id"])
+        built.source_general_geometry_digest = table_geometry_digest(table)
+    built.header_labels = _header_semantics(table, column_edges)
+    for row_index, row in enumerate(rows):
+        for value in row:
+            nearest = min(
+                range(len(column_edges)),
+                key=lambda index: abs(column_edges[index] - value.digit_right),
+            )
+            if abs(column_edges[nearest] - value.digit_right) > RIGHT_EDGE_TOLERANCE:
+                continue
+            column_index = nearest + 1
+            label = _label_for(layout, value, row)
+            if label and not built.row_labels[row_index]:
+                built.row_labels[row_index] = labels.row_label(label)
+            cell = {
+                "id": f"{built.table_id}-r{row_index}-c{column_index}",
+                "rowIndex": row_index,
+                "columnIndex": column_index,
+                "text": value.span.get("text", ""),
+                "bounds": dict(value.span["bounds"]),
+                "spanId": value.span["id"],
+                "normalizedValue": value.span["normalizedValue"],
+                "decimals": decimals_of(value.span.get("text", "")),
+            }
+            if label:
+                cell["rowLabel"] = label
+            built.published.append(cell)
+            built.by_position[(row_index, column_index)] = cell
+            built.by_id[cell["id"]] = cell
+    _add_dashes(built, layout, rows, column_edges)
+    built.published.sort(key=lambda cell: (cell["rowIndex"], cell["columnIndex"]))
+    mark_double_rules(built, horizontal_rules(table))
+    mark_rules_above(built, horizontal_rules(table))
+    return built
+
+
 def build_page_lattice(
     layout: AnalysisLayout,
     page_values: dict | None,
@@ -213,58 +329,72 @@ def build_page_lattice(
     values = _values(page_values)
     blocks = _blocks(_row_groups(values, layout), layout)
     result: list[TableCells] = []
-    for block_number, rows in enumerate(blocks):
-        flat = [value for row in rows for value in row]
-        column_groups = _cluster(flat, lambda value: value.digit_right, RIGHT_EDGE_TOLERANCE)
-        column_groups = [group for group in column_groups if len(group) >= 2]
-        if not column_groups:
-            continue
-        column_edges = [sum(value.digit_right for value in group) / len(group) for group in column_groups]
-        bounds = _bounds(flat)
-        table = _table_for(bounds, detected_tables or [])
-        digest = hashlib.sha1(f"{page_index}:{bounds['y']:.5f}:{bounds['height']:.5f}".encode()).hexdigest()[:10]
-        built = TableCells(
-            table_id=f"lattice-p{page_index}-{digest}",
+    for rows in blocks:
+        built = _build_lattice(
+            rows,
+            layout,
             page_index=page_index,
-            column_count=len(column_edges) + 1,
-            row_count=len(rows),
-            row_labels=[""] * len(rows),
+            detected_tables=detected_tables or (),
         )
-        built.bounds = bounds
-        built.provenance = "lattice+table" if table else "lattice"
-        built.value_column_edges = tuple(round(edge, 6) for edge in column_edges)
-        if table is not None:
-            built.source_general_table_id = str(table["id"])
-            built.source_general_geometry_digest = table_geometry_digest(table)
-        built.header_labels = _header_semantics(table, column_edges)
-        for row_index, row in enumerate(rows):
-            for value in row:
-                nearest = min(range(len(column_edges)), key=lambda index: abs(column_edges[index] - value.digit_right))
-                if abs(column_edges[nearest] - value.digit_right) > RIGHT_EDGE_TOLERANCE:
-                    continue
-                column_index = nearest + 1
-                label = _label_for(layout, value, row)
-                cell = {
-                    "id": f"{built.table_id}-r{row_index}-c{column_index}",
-                    "rowIndex": row_index,
-                    "columnIndex": column_index,
-                    "text": value.span.get("text", ""),
-                    "bounds": dict(value.span["bounds"]),
-                    "spanId": value.span["id"],
-                    "normalizedValue": value.span["normalizedValue"],
-                    "decimals": decimals_of(value.span.get("text", "")),
-                }
-                if label:
-                    cell["rowLabel"] = label
-                built.published.append(cell)
-                built.by_position[(row_index, column_index)] = cell
-                built.by_id[cell["id"]] = cell
-        _add_dashes(built, layout, rows, column_edges)
-        built.published.sort(key=lambda cell: (cell["rowIndex"], cell["columnIndex"]))
-        # Rules are the detected table's fact to publish and Reconcile's to read.
-        # A lattice block with no table under it has no ruling evidence at all,
-        # which is why the signal is absent there rather than false.
-        mark_double_rules(built, horizontal_rules(table))
-        mark_rules_above(built, horizontal_rules(table))
-        result.append(built)
+        if built is not None:
+            result.append(built)
+    return result
+
+
+def build_page_composed_lattice(
+    layout: AnalysisLayout,
+    page_values: dict | None,
+    *,
+    page_index: int,
+    detected_tables: tuple[JsonMapping, ...] | None = None,
+) -> list[TableCells]:
+    """Reassemble value fragments belonging to one detected statement table.
+
+    Captions, wrapped labels, and extra vertical space deliberately split the
+    ordinary lattice: those cuts keep a partial run from accusing a document.
+    They should not prevent an exact relationship from being proved, however.
+    This fallback composes fragments only when the general table independently
+    places them in the same visible table, and Reconcile admits only outcomes
+    stronger than the ordinary blocks already published.
+
+    One-row fragments are eligible only when they carry at least two figures.
+    That recovers a statement's opening balance or first wrapped row without
+    turning isolated page furniture into a one-column footing hypothesis.
+    """
+    tables = detected_tables or ()
+    if not tables:
+        return []
+    raw_blocks = _blocks(
+        _row_groups(_values(page_values), layout),
+        layout,
+        minimum_rows=1,
+    )
+    grouped: dict[str, tuple[JsonMapping, list[list[_Value]], int]] = {}
+    for rows in raw_blocks:
+        if len(rows) == 1 and len(rows[0]) < 2:
+            continue
+        flat = [value for row in rows for value in row]
+        table = _nearby_table_for(_bounds(flat), tables, layout)
+        if table is None:
+            continue
+        key = str(table["id"])
+        if key not in grouped:
+            grouped[key] = (table, [], 0)
+        grouped[key][1].extend(rows)
+        grouped[key] = (table, grouped[key][1], grouped[key][2] + 1)
+
+    result: list[TableCells] = []
+    for table, rows, fragment_count in grouped.values():
+        if fragment_count < 2 or len(rows) < MIN_BLOCK_ROWS:
+            continue
+        built = _build_lattice(
+            rows,
+            layout,
+            page_index=page_index,
+            detected_tables=tables,
+            table=table,
+            id_prefix="lattice-composed",
+        )
+        if built is not None:
+            result.append(built)
     return result

@@ -49,8 +49,8 @@ SIGNALS: tuple[SignalDefinition, ...] = (
     SignalDefinition(
         "total-column",
         enabled=True,
-        sees="this cell's own column header names a total -- Total, Consolidated, "
-        "Combined -- which is the only thing that may propose a cross-foot",
+        sees="this cell's own column header names a result -- Total, Consolidated, "
+        "Combined, Net -- which is the only thing that may propose a cross-foot",
     ),
     SignalDefinition(
         "ruling-above",
@@ -87,6 +87,12 @@ MIN_ADDENDS_ON_ONE_SIGNAL = 3
 # coincidences are the most common accidental tie, and a pair that happens to sum
 # is nearly evidence-free.
 MIN_ADDENDS = 2
+
+# A two-term cross-foot has only the result column's header as evidence.  It is
+# published only when another row in the same table repeats the same addend and
+# sign pattern.  This is the row-axis counterpart to parallel-column
+# corroboration for short vertical runs.
+MIN_REPEATED_CROSS_ROWS = 2
 
 
 def two_addend_runs_publishable() -> bool:
@@ -130,10 +136,10 @@ def label_total(cell: dict) -> dict | None:
 def total_column(header: dict | None) -> dict | None:
     """The signal behind a cross-foot, and the only one there is.
 
-    A cross-foot is attempted only against a column whose own header names a
-    total. No total-headed column, no cross-foot: the alternative is adding
-    across a comparative statement, and 2025 plus 2024 is nonsense no tolerance
-    model would catch.
+    A cross-foot is attempted only against a column whose own header names an
+    additive or subtractive result. No result-headed column, no cross-foot: the
+    alternative is combining columns in a comparative statement, and 2025 plus
+    2024 is nonsense no tolerance model would catch.
     """
     if header is None or not header.get("isTotalColumn"):
         return None

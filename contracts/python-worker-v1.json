@@ -185,6 +185,7 @@
         "reconcile_ms": { "type": "integer", "minimum": 0, "description": "Milliseconds spent in the on-demand financial-table and Reconcile engines." },
         "reconcile_table_detection_ms": { "type": "integer", "minimum": 0, "description": "Milliseconds spent building private financial-statement table blocks from values and the cached general table model." },
         "reconcile_structure_hypotheses": { "type": "integer", "minimum": 0, "description": "Contiguous row structures evaluated across value-aligned columns." },
+        "reconcile_structure_truncated_blocks": { "type": "integer", "minimum": 0, "description": "Financial blocks whose parallel-column structure search reached its safety cap. Short spans are budgeted across the whole block first, so truncation reduces look-back without making later totals unreachable." },
         "reconcile_substrate_disagreements": { "type": "integer", "minimum": 0, "description": "Numeric-column partition mismatches between corroborating general grids and private financial value lattices; diagnostic only, never an automatic rewrite." },
         "reconcile_error": { "type": "string", "description": "Present when the scan failed and the worker safely retained the OCR result. The analysis is optional work layered on a finished pipeline, exactly as table structure and values are." },
         "reconcile_detector_version": { "type": "string", "description": "Identifier of the Reconcile engine that produced the returned reconcile-v1 model." },

@@ -62,12 +62,12 @@
 
     "Summary": {
       "type": "object",
-      "description": "The counts the home screen reads. Every nominated total lands in exactly one of confirmed, breaks and unresolved, so those three sum to totalsNominated.",
+      "description": "The counts the home screen reads. totalsNominated counts admitted document assertions, not internal recognizer probes. Every admitted total lands in exactly one of confirmed, breaks and unresolved, so those three sum to totalsNominated.",
       "required": ["tablesExamined", "totalsNominated", "confirmed", "breaks", "unresolved"],
       "additionalProperties": false,
       "properties": {
         "tablesExamined": { "type": "integer", "minimum": 0 },
-        "totalsNominated": { "type": "integer", "minimum": 0 },
+        "totalsNominated": { "type": "integer", "minimum": 0, "description": "Totals admitted to the durable user-facing tree. An unresolved candidate supported only by recognizer geometry, or whose financial-statement context identifies it as an opening state, carried result, allocation component, movement, or non-additive measure, remains diagnostic and is not counted." },
         "confirmed": { "type": "integer", "minimum": 0 },
         "breaks": { "type": "integer", "minimum": 0 },
         "unresolved": { "type": "integer", "minimum": 0 }
@@ -76,7 +76,7 @@
 
     "Table": {
       "type": "object",
-      "description": "One footing block, with every total nominated inside it. Normally its cells come from the value lattice; a cached detected-table cell layer may contribute a deduplicated fallback block under the same corroboration policy.",
+      "description": "One footing block, with every admitted total inside it. Arithmetic examines a broader internal candidate set first; confirmed totals and supported breaks are always admitted, while unresolved recognizer probes and rows whose statement context says they are not footing assertions remain diagnostic. Normally its cells come from the value lattice; a cached detected-table cell layer or a privately reassembled lattice may contribute a deduplicated fallback block under stricter corroboration policy.",
       "required": ["id", "pageIndex", "bounds", "provenance", "columnCount", "rowCount", "cells", "totals"],
       "additionalProperties": false,
       "properties": {
@@ -98,7 +98,7 @@
         },
         "totals": {
           "type": "array",
-          "description": "Every cell nominated as a total in this table, whatever the arithmetic then made of it.",
+          "description": "Every total admitted to the durable tree in this table, with its structural signals and arithmetic outcome.",
           "items": { "$ref": "#/definitions/NominatedTotal" }
         }
       }
@@ -111,7 +111,7 @@
       "properties": {
         "columnIndex": { "type": "integer", "minimum": 0 },
         "text": { "type": "string", "description": "The label as printed, joined across header bands in reading order." },
-        "isTotalColumn": { "type": "boolean", "description": "The header names a total -- Total, Consolidated, Combined. A cross-foot is attempted only against a column whose own header says so." },
+        "isTotalColumn": { "type": "boolean", "description": "The header names an additive or subtractive result -- Total, Consolidated, Combined, or Net. A cross-foot is attempted only against a column whose own header says so." },
         "isPeriodColumn": { "type": "boolean", "description": "The header parses as a period or a year. Two or more of these in one table disables cross-footing for the table entirely: it is a comparative statement, and adding 2025 to 2024 is nonsense no tolerance model would catch." },
         "period": { "type": "string", "minLength": 1, "description": "The period the label names, as printed. Absent when it names none." }
       }
@@ -139,7 +139,7 @@
     "SignalName": {
       "type": "string",
       "enum": ["label-total", "column-corroboration", "total-column", "ruling-above", "outdent", "block-terminal", "double-rule-below"],
-      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. total-column is the cross-foot's only nominator and its only signal: the cell's own column header names a total. Having one signal and nothing to corroborate it is why a cross-foot confirms and never breaks. Column corroboration is leave-one-out: arithmetic in other independent columns may nominate the cell being judged, while its own arithmetic may not. Text geometry carries no font or weight, so bold is not a signal that exists."
+      "description": "The independent structural signals that may nominate a cell as a total. Structure nominates; arithmetic confirms. total-column is the cross-foot's only nominator and its only signal: the cell's own column header names an additive or subtractive result. A cross-foot confirms and never breaks; a two-addend cross-foot is published only when the same addend-column and sign pattern ties in another row. Column corroboration is leave-one-out: arithmetic in other independent columns may nominate the cell being judged, while its own arithmetic may not. Text geometry carries no font or weight, so bold is not a signal that exists."
     },
 
     "Signal": {
@@ -160,7 +160,7 @@
 
     "NominatedTotal": {
       "type": "object",
-      "description": "A cell nominated as a total on structural evidence, and what the arithmetic then made of it.",
+      "description": "A total admitted to the durable sum tree after arithmetic and financial-statement context have distinguished a document assertion from an internal recognizer probe. A confirmed or break outcome is never withheld by this admission step.",
       "required": ["id", "cellId", "rowIndex", "columnIndex", "signals", "outcome"],
       "additionalProperties": false,
       "properties": {
@@ -172,13 +172,13 @@
         "signals": {
           "type": "array",
           "minItems": 1,
-          "description": "Why this cell was nominated. A run of three or more addends may be confirmed on label-total alone; a run of two requires a second enabled signal, and until one is enabled two-addend runs are not published at all -- a pair that happens to sum is nearly evidence-free.",
+          "description": "Why this cell was nominated. Vertically, a run of three or more addends may be confirmed on label-total alone and a run of two requires parallel-column corroboration. Across a result-headed column, a two-addend run instead requires the same signed equation shape to tie in another row. A pair that happens to sum is nearly evidence-free.",
           "items": { "$ref": "#/definitions/Signal" }
         },
         "outcome": { "$ref": "#/definitions/Outcome" },
         "resolution": { "$ref": "#/definitions/SumRun", "description": "The run the tree is built on. Where a total could be confirmed either by the subtotals between it and the previous total or by the leaf rows beneath them, the subtotals win: that is the tree the statement is asserting. Absent when the outcome is unresolved." },
         "leafResolution": { "$ref": "#/definitions/SumRun", "description": "The same total resolved against the leaf rows instead of the subtotals. Recorded because it is the same arithmetic and costs nothing, and never the tree. Absent unless the two differ." },
-        "unresolvedReason": { "type": "string", "enum": ["no-candidate-run", "run-too-short", "no-plausible-run", "mixed-decimals"], "description": "Why nothing was resolved. Present only when the outcome is unresolved. 'no-candidate-run' is the common one and is a statement about what was above the cell, not an accusation about the document." }
+        "unresolvedReason": { "type": "string", "enum": ["no-candidate-run", "run-too-short", "no-plausible-run", "mixed-decimals", "rounding-indeterminate"], "description": "Why nothing was resolved. Present only when the outcome is unresolved. 'rounding-indeterminate' means the displayed figures differ within the interval their printed decimal precision permits, so the unrounded arithmetic cannot be proved either way." }
       }
     },
 
@@ -188,7 +188,7 @@
       "required": ["basis", "addendCellIds", "negatedAddendCellIds", "sum", "delta"],
       "additionalProperties": false,
       "properties": {
-        "basis": { "type": "string", "enum": ["subtotals", "leaves", "row"], "description": "Whether the run is made of the nominated subtotals between this total and the previous one, of the leaf rows beneath them, or -- for a cross-foot -- of the cells to the left of it in its own row, bounded by the previous total-headed column." },
+        "basis": { "type": "string", "enum": ["subtotals", "leaves", "row"], "description": "Whether the run is made of the nominated subtotals between this total and the previous one, of the leaf rows beneath them, or -- for a cross-foot -- of the cells to the left of it in its own row, bounded by the previous result-headed column. Non-additive metadata columns such as useful life are skipped rather than treated as addends." },
         "addendCellIds": {
           "type": "array",
           "minItems": 2,

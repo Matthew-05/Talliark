@@ -27,12 +27,16 @@ recognition or value-to-cell membership.
 `detect_reconcile` invokes `engines.financial_table.detect_financial_tables`
 after the same Reconcile worker job produces geometry, table, value and financial
 models from the independent PDF snapshot. It consumes the returned
-page-local blocks in page and reading order, evaluates every nominated total,
-and publishes `reconcile-v1`.
+page-local blocks in page and reading order, evaluates every internal candidate,
+and publishes the candidates that survive the statement-aware admission policy
+as `reconcile-v1`.
 
-The contract carries every examined block, not only exceptions. Every nominated
+The contract carries every examined block, not only exceptions. Every admitted
 total has exactly one outcome--confirmed, break, or unresolved--and only findings
-that can be restated as evidence-backed arithmetic are spoken. The source
+that can be restated as evidence-backed arithmetic are spoken. Geometry-only
+recognizer probes and rows that financial-statement context identifies as an
+opening state, carried result, allocation, movement, or non-additive measure are
+kept in diagnostics when unresolved rather than presented as Not checked. The source
 records Reconcile document/version identity, geometry, and artifact versions for
 currentness against that same snapshot; the Reconcile
 detector version also includes the financial-table version because the sister is
@@ -61,8 +65,10 @@ implemented.
 
 ## 3. Types
 
-- **Nomination** - structural evidence that a printed cell asserts a total;
-  arithmetic is never allowed to create a nomination.
+- **Internal candidate** - a cell proposed by structural recognition for
+  arithmetic evaluation. Arithmetic is never allowed to create one.
+- **Admitted total** - a candidate credible enough to enter the durable,
+  user-facing tree after its arithmetic outcome and statement context are known.
 - **Run** - an ordered contiguous set of eligible addend cells above or beside a
   nominated total.
 - **Confirmed** - an independently nominated total for which a permitted run
@@ -77,22 +83,40 @@ implemented.
   in parallel value columns.
 - **Grid fallback** - a total reached through a general-grid cell view when that
   result is novel or stronger than the lattice result for the same span.
+- **Composed lattice fallback** - fragments assigned to one general table and
+  reassembled privately; only exact, independently parallel-supported results
+  are eligible, so the broader view contributes neither breaks nor unresolved
+  totals.
 
 ## 4. Algorithm
 
-1. The financial-table sister engine builds lattice and grid-fallback blocks.
+1. The financial-table sister engine builds ordinary lattice blocks, composed
+   lattice fallbacks, and grid fallbacks.
 2. `structures.py` discovers row relationships by leave-one-out agreement across
-   parallel columns. One column cannot supply evidence for its own conclusion.
+   parallel columns. Independence is computed from the perspective of the cell
+   being judged, so a proportional column cannot borrow the representative it
+   was collapsed into as corroboration. Zero and dash positions do not create a
+   different signed-row pattern.
 3. `nominate.py` adds explicit label, total-column, ruling-above, and
    double-rule-below nominations.
 4. `sums.py` walks permitted contiguous runs, protects already established
    subtotal blocks from double counting, preserves printed decimal specificity,
    and evaluates bounded sign-reversal variants.
 5. `detector.py` repeats column resolution while newly confirmed subtotals add
-   safe block boundaries, then applies the narrow cross-footing pass.
-6. Lattice and grid totals are deduplicated by value span and axis. A grid result
-   replaces only a weaker unresolved lattice duplicate.
-7. `findings.py` publishes confirmed evidence silently and turns supported
+   safe block boundaries, with a row-count-derived convergence guard rather than
+   a fixed nesting-depth ceiling, then applies the narrow cross-footing pass.
+6. A post-arithmetic admission pass keeps every confirmation and break. An
+   unresolved candidate remains only when the document itself credibly asserts
+   a footing relationship; rule-only recognizer probes, opening states, carried
+   results, peer cash-flow summaries, equity movements, allocation components,
+   component uses of Net, and high-confidence non-additive columns remain
+   diagnostic.
+7. Composed lattice results are admitted only when they tie exactly and the same
+   row/sign structure ties in at least two non-proportional columns. They never
+   enlarge Not checked. Lattice, composed, and grid totals are then deduplicated
+   by value span and axis. Exact confirmation outranks a break, a break outranks
+   unresolved, and substrate order settles equal outcomes.
+8. `findings.py` publishes confirmed evidence silently and turns supported
    breaks or selected unresolved cases into reviewer-checkable sentences.
 
 ### 4.1 Substrate: the alignment lattice
@@ -140,6 +164,24 @@ plateau, now live in the [sister engine record](../financial-table/README.md) §
 **`sums.SKIP_CAPTION_ROWS`.** Stepping over caption rows was measured and
 rejected: it buys 8 confirmations at the cost of 6 false breaks.
 
+**`structures.MAX_HYPOTHESES_PER_BLOCK`.** The parallel-column search examines
+at most 5,000 row spans per block. It visits a given span length across the
+whole block before trying longer spans, so the cap reduces maximum look-back
+evenly instead of making later totals unreachable. Diagnostics publish the
+number of truncated blocks; all eight current corpus documents report zero.
+
+**`nominate.MIN_REPEATED_CROSS_ROWS = 2`.** A direct two-addend cross-foot is
+published only when another row repeats the same result column, addend columns,
+and reversed-sign positions. Financial statements commonly print two-column
+Total and gross-less-accumulated Net schedules; an isolated pair remains too
+coincidental to publish.
+
+**Unresolved admission is deliberately asymmetric.** `detector.py` applies it
+only after arithmetic has returned `unresolved`; a confirmed total or supported
+break cannot be hidden by label semantics. A label is interpreted from the
+whole financial block, not from an issuer, form, page number, or fixture. The
+diagnostics report both the total withheld count and counts by reason.
+
 ## 6. Failure modes
 
 **Two structural models must stay coherent.** The lattice and the cached grid are
@@ -154,21 +196,58 @@ guards can turn recall gains into confident false ties.
 
 **A fragment may confirm but not accuse.** When the financial-table input cannot
 prove the full top of a block, an exact tie is still evidence but a mismatch is
-an unresolved scan limit rather than a break in the document.
+an unresolved scan limit rather than a break in the document. Caption, blank,
+non-value, mixed-decimal, and unresolved-subtotal stops are all incomplete
+boundaries for this purpose.
+
+**A confirmed subtotal owns its whole interval.** A parent candidate may consume
+the subtotal or its component rows, never the subtotal together with even part
+of that interval. Arithmetic-only duplicate detection cannot see the partial
+case; the established block top supplies the structural boundary.
+
+**Nested ownership propagates to the deepest leaf.** When a parent consumes a
+confirmed subtotal, its own top is the top of that subtotal's established block,
+not merely the subtotal row. This keeps a balance-sheet grand total from mixing
+a nested net asset with part of the asset block it already owns.
+
+**The two sides of a balance sheet are separate blocks.** `Total assets` is a
+hard statement-semantic boundary before `Total liabilities and equity` (and the
+stockholders'-equity spelling). The equality of those two grand totals is the
+accounting equation, not permission to add Total assets into the liability side.
+
+**Not checked is an admitted assertion, not a recognizer trace.** A single rule
+may be worth testing because an exact tie can confirm it, but a rule-only miss
+does not mean the row should foot. Opening balances seed rollforwards; Net income
+is carried into cash flow, comprehensive-income, EPS, and equity schedules;
+period movements are components of equity; and rate, average, useful-life,
+per-share, and similar columns are non-additive. Publishing those misses made
+the user review the recognizer rather than the statement. They remain counted
+by diagnostics so loss of recognition is still visible to development tooling.
 
 ## 7. Tests and corpus
 
-`test_reconcile.py` pins nomination independence, parallel-column
-corroboration, subtotal block protection, decimal specificity, bounded sign
-reversal, grid/lattice deduplication, findings, progress stages, and contract
-validation. Candidate real-document goldens are never accepted automatically;
-the whole-document scorer's hard bar is zero false ties.
+`test_reconcile.py` has 101 tests pinning nomination independence, relative
+column independence, zero-insensitive signed patterns, subtotal block
+protection and deepest-top propagation, balance-sheet side boundaries,
+incomplete-run safety, printed-rounding classification, bounded sign reversal,
+repeated two-addend cross-foots, unresolved admission, composed/grid/lattice
+precedence, findings, progress stages, and contract validation.
+Candidate real-document goldens are never accepted automatically; the
+whole-document scorer's hard bar is zero false ties.
 
-The Apple scorer currently completes with 238 confirmations, zero breaks, and
-55 unresolved totals. The ownership controls bump the composed version to
-`reconcile-detector-4+financial-table-detector-2` without changing arithmetic
-policy. That is a regression
-observation rather than a hand-approved correctness golden.
+The eight-document corpus currently publishes 2,147 totals: 1,887 confirmed,
+two breaks, and 258 Not checked. Before statement-aware unresolved admission it
+published 2,978 totals with 1,081 Not checked, so the review list fell by 823
+(76.1%) and from 36.3% to 12.0% of the user-facing tree. Apple fell from 54 Not
+checked to one while retaining 248 confirmations; Quest publishes four and
+Disney six while retaining 138 and 689 confirmations respectively. The two
+Amazon breaks remain. The admission pass itself cannot reduce confirmed or
+break outcomes; the small corpus-wide confirmation difference from the earlier
+1,895 observation comes from correcting `Gross` so component phrases such as
+Gross benefits and Gross carrying amount no longer nominate, while Gross profit,
+margin, income, and earnings still do. No structure block reaches the hypothesis
+cap. The version is `reconcile-detector-7+financial-table-detector-4`. These are
+regression observations rather than hand-approved correctness goldens.
 
 ## 8. Related documents
 

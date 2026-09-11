@@ -343,6 +343,8 @@ function unresolvedWording(reason: string | undefined, cell: ReconcileCell | und
       return `Only two rows stood above this cell, and a pair that happens to sum is not evidence enough to publish.${reads}`;
     case "mixed-decimals":
       return `The rows above this cell are printed to a different decimal place, so they are not figures of the same kind.${reads}`;
+    case "rounding-indeterminate":
+      return `The displayed figures differ only within their printed rounding precision, so the unrounded total cannot be checked exactly.${reads}`;
     case "no-plausible-run":
       return `A block stood above this cell but does not resemble its addends, so nothing is asserted about it either way.${reads}`;
     default:

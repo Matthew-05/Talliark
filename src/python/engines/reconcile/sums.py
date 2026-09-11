@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from engines.financial_table import labels
+
 from . import nominate
 
 
@@ -227,6 +229,25 @@ def _quantize(value: Decimal, decimals: int) -> str:
     return format(quantized, "f")
 
 
+def rounding_can_explain(run: Run) -> bool:
+    """Whether independently rounded displayed figures can contain an exact tie.
+
+    A value printed to d decimal places represents an interval half a displayed
+    unit wide. For n addends and one total, the largest explainable displayed
+    delta is therefore (n + 1) / 2 units. This classifies the limit; it never
+    confirms the arithmetic because the unrounded source figures are unknown.
+
+    The first measured use is decimal key metrics. Whole-number statement scales
+    are not carried into the cell model yet, so treating every one-unit whole
+    number miss as rounding would be broader than the available evidence.
+    """
+    if run.decimals <= 0 or run.delta == 0:
+        return False
+    unit = Decimal(1).scaleb(-run.decimals)
+    allowance = unit * Decimal(len(run.cells) + 1) / Decimal(2)
+    return run.delta.copy_abs() <= allowance
+
+
 def proportional_values(left: list[Decimal], right: list[Decimal]) -> bool:
     """Whether two runs are the same figures scaled, and so not independent.
 
@@ -295,7 +316,14 @@ def subtotal_run(
     return _walk(table_cells, column_index, total_row, decimals, nominated_rows, jump=jump)
 
 
-def cross_run(table_cells, row_index: int, total_column: int, decimals: int, total_columns):
+def cross_run(
+    table_cells,
+    row_index: int,
+    total_column: int,
+    decimals: int,
+    total_columns,
+    excluded_columns=frozenset(),
+):
     """The contiguous cells to the left of a row's total, and what stopped them.
 
     The horizontal twin of `leaf_run`, and deliberately the same walk: a blank
@@ -316,6 +344,8 @@ def cross_run(table_cells, row_index: int, total_column: int, decimals: int, tot
         if column in total_columns:
             stopped = "previous-total"
             break
+        if column in excluded_columns:
+            continue
         cell = table_cells.cell(row_index, column)
         if cell is None:
             stopped = "blank"
@@ -370,8 +400,16 @@ def resolve_cross(table_cells, total_cell: dict, signal_count: int, total_column
         int(total_cell["columnIndex"]),
         decimals,
         total_columns,
+        frozenset(
+            int(header["columnIndex"])
+            for header in table_cells.header_labels
+            if labels.is_non_additive_column(header.get("text", ""))
+        ),
     )
-    if len(cells) < min_addends(signal_count):
+    # A result header applies deliberately to every row beneath it.  Two-addend
+    # runs are resolved here so the caller can test whether the same equation
+    # shape repeats in another row; an isolated pair is never published.
+    if len(cells) < nominate.MIN_ADDENDS:
         return {
             "outcome": "unresolved",
             "unresolvedReason": (
@@ -410,6 +448,8 @@ def _walk(
     # row whose caption is that block's own heading rather than a boundary.
     block_below = None
     row = total_row - 1
+    total_cell = table_cells.cell(total_row, column_index)
+    total_label = (total_cell or {}).get("rowLabel", "")
     while row >= 0:
         cell = table_cells.cell(row, column_index)
         if cell is None:
@@ -436,6 +476,15 @@ def _walk(
             break
         if not _eligible(cell, decimals):
             stopped = "mixed-decimals"
+            break
+        if (
+            jump is not None
+            and row in nominated_rows
+            and labels.separates_balance_sheet_sides(
+                cell.get("rowLabel", ""), total_label
+            )
+        ):
+            stopped = "previous-total"
             break
         if jump is None and row in nominated_rows:
             stopped = "previous-total"
@@ -540,6 +589,13 @@ def resolve(
         )
 
     if not candidates:
+        if len(leaves) >= nominate.MIN_ADDENDS:
+            displayed = Run("leaves", tuple(leaves), total, decimals)
+            if not double_counts(displayed) and rounding_can_explain(displayed):
+                return {
+                    "outcome": "unresolved",
+                    "unresolvedReason": "rounding-indeterminate",
+                }
         return {"outcome": "unresolved", "unresolvedReason": _why(leaves, nested, leaf_stop)}
 
     candidates = [entry for entry in candidates if not double_counts(entry[0])]
@@ -566,6 +622,11 @@ def resolve(
         return published
 
     chosen, chosen_stop, chosen_quiet = evaluated[0]
+    if rounding_can_explain(chosen):
+        return {
+            "outcome": "unresolved",
+            "unresolvedReason": "rounding-indeterminate",
+        }
     if len(chosen.cells) < nominate.MIN_ADDENDS_ON_ONE_SIGNAL:
         # A pair that happens to sum is nearly evidence-free, which is why the
         # floor exists; a pair that happens not to sum is exactly as thin, and
@@ -575,14 +636,12 @@ def resolve(
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
     if chosen_quiet:
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
-    if chosen_stop == "caption":
-        # The run was cut short by a caption row -- "Changes in assets and
-        # liabilities:", "Cash Flows from Investing Activities:" -- which is the
-        # statement separating blocks, not the top of this one. What was
-        # collected is a fragment of the addends, and a fragment that misses is
-        # arithmetic about the scan rather than about the page. An exact tie is
-        # still a tie, because a fragment ties by coincidence about as often as
-        # anything else does, which is to say almost never; a miss says nothing.
+    if chosen_stop not in {"top-of-table", "previous-total", "edge-of-table"}:
+        # A run cut short by a caption, blank, non-value, decimal change, or an
+        # unresolved subtotal is only a fragment.  An exact tie remains useful,
+        # but a fragment that misses says something about the scan's reach, not
+        # about the page.  Only the top of the block or an established subtotal
+        # boundary closes a run strongly enough to support an accusation.
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
     if not _plausible(chosen):
         return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
@@ -727,7 +786,9 @@ def _sign(run: Run, delta: Decimal) -> dict | None:
     """The delta is exactly twice an addend: that addend carries the wrong sign."""
     for cell in run.cells:
         value = value_of(cell) or Decimal(0)
-        if value != 0 and value * 2 == delta:
+        # Reversing the printed sign changes the sum by -2 * value.  `delta` is
+        # total minus the current sum, so it has that direction, not +2 * value.
+        if value != 0 and value * -2 == delta:
             return {
                 "kind": "sign",
                 "detail": f"the difference is exactly twice {cell['text'].strip()}",

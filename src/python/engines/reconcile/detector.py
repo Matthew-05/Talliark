@@ -25,6 +25,7 @@ from engines.financial_table.detector import (
     DETECTOR_VERSION as FINANCIAL_TABLE_VERSION,
     detect_financial_tables,
 )
+from engines.financial_table import labels as financial_labels
 from schemas.models import Stage
 
 from . import findings as findings_module
@@ -33,7 +34,7 @@ from . import sums
 from . import structures
 
 
-DETECTOR_VERSION = f"reconcile-detector-4+{FINANCIAL_TABLE_VERSION}"
+DETECTOR_VERSION = f"reconcile-detector-7+{FINANCIAL_TABLE_VERSION}"
 
 
 def geometry_fingerprint(geometry: dict) -> str:
@@ -83,6 +84,8 @@ def detect_reconcile(
     findings: list[dict] = []
     blocks_examined = 0
     hypotheses = 0
+    truncated_structure_blocks = 0
+    withheld_candidates: dict[str, int] = {}
     for position, page_scan in enumerate(financial_scan.pages):
         page_index = page_scan.page_index
         if progress_callback:
@@ -100,17 +103,40 @@ def detect_reconcile(
                 block, page_index=page_index, findings=findings
             )
             hypotheses += block_diagnostics["hypotheses"]
+            truncated_structure_blocks += int(block_diagnostics["truncated"])
+            _merge_counts(withheld_candidates, block_diagnostics.get("withheld", {}))
             published.append(reconciled)
 
-        # The ADR's bake-off gate chose the union fallback when pure lattice
-        # recall trailed the grid corpus. Both substrates use the identical
-        # corroboration policy; span identity removes duplicate totals.
-        for grid in page_scan.grid_fallbacks:
-            grid_findings: list[dict] = []
+        # The ADR's bake-off gate chose the union fallback when a local lattice
+        # block trailed a broader supported view. The composed lattice can prove
+        # an exact relationship across statement captions; the grid can recover
+        # a row or column the lattice lost. Both use the identical arithmetic
+        # policy, and span identity admits only novel or stronger totals.
+        fallbacks = (
+            *((block, True) for block in page_scan.composed_lattice_fallbacks),
+            *((block, False) for block in page_scan.grid_fallbacks),
+        )
+        for fallback, exact_only in fallbacks:
+            fallback_findings: list[dict] = []
             reconciled, grid_diagnostics = _reconcile_block(
-                grid, page_index=page_index, findings=grid_findings
+                fallback, page_index=page_index, findings=fallback_findings
             )
             hypotheses += grid_diagnostics["hypotheses"]
+            truncated_structure_blocks += int(grid_diagnostics["truncated"])
+            _merge_counts(withheld_candidates, grid_diagnostics.get("withheld", {}))
+            if exact_only:
+                # Composition deliberately removes the caption boundaries that
+                # split the ordinary lattice. It may recover an exact proof,
+                # but a miss in that broader view says nothing about the page
+                # and must not enlarge the user's Not checked list.  An exact
+                # coincidence is admitted only where independent parallel
+                # columns also establish the row structure that was composed.
+                parallel_ids = _composed_parallel_total_ids(reconciled)
+                reconciled["totals"] = [
+                    total
+                    for total in reconciled["totals"]
+                    if _is_supported_composed_total(total, parallel_ids)
+                ]
             selected, replaced_ids = _select_grid_totals(reconciled, published)
             if not selected:
                 continue
@@ -124,7 +150,9 @@ def detect_reconcile(
                     if finding["totalId"] not in replaced_ids
                 ]
             findings.extend(
-                finding for finding in grid_findings if finding["totalId"] in selected_ids
+                finding
+                for finding in fallback_findings
+                if finding["totalId"] in selected_ids
             )
 
     model = {
@@ -154,9 +182,20 @@ def detect_reconcile(
         diagnostics["financial_table_grid_fallbacks"] = (
             financial_scan.grid_fallbacks
         )
+        diagnostics["financial_table_composed_lattice_fallbacks"] = (
+            financial_scan.composed_lattice_fallbacks
+        )
         diagnostics["reconcile_detector_version"] = DETECTOR_VERSION
         diagnostics["reconcile_table_detection_ms"] = financial_scan.elapsed_ms
         diagnostics["reconcile_structure_hypotheses"] = hypotheses
+        diagnostics["reconcile_structure_truncated_blocks"] = (
+            truncated_structure_blocks
+        )
+        diagnostics["reconcile_candidates_withheld"] = sum(
+            withheld_candidates.values()
+        )
+        for reason, count in sorted(withheld_candidates.items()):
+            diagnostics[f"reconcile_withheld_{reason.replace('-', '_')}"] = count
         diagnostics["reconcile_substrate_disagreements"] = (
             financial_scan.boundary_disagreements
         )
@@ -218,6 +257,7 @@ def _reconcile_block(
         by_column.setdefault(nomination.column_index, []).append(nomination)
 
     totals: list[dict] = []
+    withheld: dict[str, int] = {}
     labelled = {
         header["columnIndex"]: header.get("period") or header["text"]
         for header in built.header_labels
@@ -263,7 +303,11 @@ def _reconcile_block(
     seed = {
         column: dict(blocks) for column, blocks in corroborated_blocks.items()
     }
-    for _ in range(MAX_RESOLUTION_PASSES):
+    # Each pass can only establish or extend a block boundary to an earlier row.
+    # A block therefore converges in at most one pass per row; deriving this
+    # guard from the input removes the former four-level nesting ceiling while
+    # retaining a hard stop against a future non-monotone regression.
+    for _ in range(max(1, built.row_count)):
         column_results, column_state = _resolve_columns(built, by_column, seed)
         _corroborate_short_runs(built, column_results, column_state)
         learned = {
@@ -284,6 +328,12 @@ def _reconcile_block(
     for column_index, results in sorted(column_results.items()):
         column_label = labelled.get(column_index, "")
         for nomination, resolved in results:
+            withheld_reason = _withheld_unresolved_reason(
+                built, nomination, resolved
+            )
+            if withheld_reason is not None:
+                withheld[withheld_reason] = withheld.get(withheld_reason, 0) + 1
+                continue
             total_id = f"{built.table_id}-t{column_index}-r{nomination.row_index}"
             total = {
                 "id": total_id,
@@ -336,6 +386,7 @@ def _reconcile_block(
     # vertical pass and never feeds it -- a row that cross-foots is not thereby
     # a column total, and the tree stays the statement's own.
     cross_columns = frozenset(nominate_module.cross_foot_columns(built.header_labels))
+    cross_results = []
     for nomination in nominate_module.nominate_cross(built):
         column_index = nomination.column_index
         resolved = sums.resolve_cross(
@@ -346,10 +397,30 @@ def _reconcile_block(
             # exposed a fragment of the row, so confirmation is safe and
             # accusation is not.
             resolved = {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+        cross_results.append((nomination, resolved))
+
+    repeated_shapes: dict[tuple, int] = {}
+    for nomination, resolved in cross_results:
+        shape = _short_cross_shape(built, nomination, resolved)
+        if shape is not None:
+            repeated_shapes[shape] = repeated_shapes.get(shape, 0) + 1
+
+    for nomination, resolved in cross_results:
+        column_index = nomination.column_index
         if resolved["outcome"] == "unresolved":
             # A row that is simply not additive across is the common case in a
             # table that has a Total column at all -- a per-share line, a rate, a
             # count -- and saying so once per row would drown the column totals.
+            continue
+        shape = _short_cross_shape(built, nomination, resolved)
+        if (
+            shape is not None
+            and repeated_shapes.get(shape, 0)
+            < nominate_module.MIN_REPEATED_CROSS_ROWS
+        ):
+            # A single A +/- B coincidence is not enough to establish that the
+            # result header means arithmetic for this table.  Repetition in a
+            # second row supplies evidence independent of either row's values.
             continue
         total_id = f"{built.table_id}-x{column_index}-r{nomination.row_index}"
         total = {
@@ -394,10 +465,210 @@ def _reconcile_block(
     }
     if built.header_labels:
         model["headerLabels"] = built.header_labels
+    structure_diagnostics["withheld"] = withheld
     return model, structure_diagnostics
 
 
-MAX_RESOLUTION_PASSES = 4
+def _withheld_unresolved_reason(built, nomination, resolved) -> str | None:
+    """Why an internal candidate is not a user-worthy Not checked total.
+
+    Arithmetic still examines every nomination. This admission policy runs only
+    after an unresolved outcome, so it cannot create a confirmation or conceal
+    a break. It separates speculative recognizer probes from totals the document
+    credibly asserts should foot.
+    """
+    if resolved.get("outcome") != "unresolved":
+        return None
+    signals = {signal["name"] for signal in nomination.signals}
+    if "label-total" not in signals:
+        return "speculative-rule"
+
+    label = nomination.cell.get("rowLabel", "")
+    if financial_labels.is_noncontrolling_allocation_label(label):
+        return "allocation-component"
+    if financial_labels.is_equity_period_movement(
+        label, built.header_labels, built.row_labels
+    ):
+        return "equity-movement"
+    if financial_labels.is_non_total_net_measure(label):
+        return "net-component"
+    if (
+        financial_labels.is_balance_state_label(label)
+        and (
+            resolved.get("unresolvedReason") == "no-candidate-run"
+            or financial_labels.is_explicit_opening_state_label(label)
+        )
+    ):
+        return "opening-balance"
+    if _is_cash_flow_summary_peer(built, nomination):
+        return "cash-flow-summary-peer"
+    if (
+        financial_labels.is_net_income_or_loss_label(label)
+        and _is_statement_input_context(built)
+    ):
+        return "carried-result"
+    if (
+        resolved.get("unresolvedReason") == "no-candidate-run"
+        and financial_labels.is_total_label(label)
+        and _is_first_value_with_later_rows(built, nomination)
+    ):
+        return "carried-result"
+    header = next(
+        (
+            item.get("text", "")
+            for item in built.header_labels
+            if int(item["columnIndex"]) == nomination.column_index
+        ),
+        "",
+    )
+    if financial_labels.is_clearly_non_additive_column(header):
+        return "non-additive-column"
+    return None
+
+
+def _is_first_value_with_later_rows(built, nomination) -> bool:
+    rows = sorted(
+        int(cell["rowIndex"])
+        for cell in built.published
+        if int(cell["columnIndex"]) == nomination.column_index
+        and "normalizedValue" in cell
+    )
+    return bool(
+        rows
+        and nomination.row_index == rows[0]
+        and sum(row > nomination.row_index for row in rows) >= 2
+    )
+
+
+def _is_statement_input_context(built) -> bool:
+    """Whether a block reuses Net income/loss as another statement's input."""
+    labels = [financial_labels.normalize(label) for label in built.row_labels]
+    cash_flow = any(
+        financial_labels.cash_flow_activity(label) is not None
+        or "cash generated by operating activities" in label
+        or "cash provided by operations" in label
+        for label in labels
+    )
+    comprehensive_income = (
+        any(label.startswith("other comprehensive income") for label in labels)
+        and any(label.startswith("comprehensive income") for label in labels)
+    )
+    return cash_flow or comprehensive_income
+
+
+def _is_cash_flow_summary_peer(built, nomination) -> bool:
+    """Whether activity totals are adjacent peer rows in a summary table."""
+    if financial_labels.cash_flow_activity(
+        nomination.cell.get("rowLabel", "")
+    ) is None:
+        return False
+    peers = sorted(
+        (
+            int(cell["rowIndex"]),
+            financial_labels.cash_flow_activity(cell.get("rowLabel", "")),
+        )
+        for cell in built.published
+        if int(cell["columnIndex"]) == nomination.column_index
+        and "normalizedValue" in cell
+        and financial_labels.cash_flow_activity(cell.get("rowLabel", ""))
+        is not None
+    )
+    rows = [row for row, _ in peers]
+    activities = {activity for _, activity in peers}
+    return (
+        activities == {"operating", "investing", "financing"}
+        and rows == list(range(rows[0], rows[0] + len(rows)))
+    )
+
+
+def _merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
+    for key, count in source.items():
+        target[key] = target.get(key, 0) + int(count)
+
+
+def _short_cross_shape(built, nomination, resolved) -> tuple | None:
+    """The structural equation repeated by a confirmed two-addend cross-foot."""
+    if resolved.get("outcome") != "confirmed":
+        return None
+    resolution = resolved.get("resolution") or {}
+    addend_ids = resolution.get("addendCellIds") or []
+    if len(addend_ids) != nominate_module.MIN_ADDENDS:
+        return None
+    negated = frozenset(resolution.get("negatedAddendCellIds") or [])
+    addend_columns = tuple(
+        int(built.by_id[cell_id]["columnIndex"])
+        for cell_id in addend_ids
+        if cell_id in built.by_id
+    )
+    if len(addend_columns) != nominate_module.MIN_ADDENDS:
+        return None
+    negated_columns = tuple(
+        int(built.by_id[cell_id]["columnIndex"])
+        for cell_id in addend_ids
+        if cell_id in negated and cell_id in built.by_id
+    )
+    return (nomination.column_index, addend_columns, negated_columns)
+
+
+def _composed_parallel_total_ids(block: dict) -> frozenset[str]:
+    """Exact totals whose row/sign structure repeats in independent columns."""
+    cells = {cell["id"]: cell for cell in block.get("cells", [])}
+    grouped: dict[tuple, list[tuple[dict, list[Decimal]]]] = {}
+    for total in block.get("totals", []):
+        if total.get("outcome") != "confirmed" or total.get("axis") == "cross":
+            continue
+        resolution = total.get("resolution") or {}
+        addend_ids = resolution.get("addendCellIds") or []
+        if not addend_ids or any(cell_id not in cells for cell_id in addend_ids):
+            continue
+        negated = frozenset(resolution.get("negatedAddendCellIds") or [])
+        signature = (
+            int(total["rowIndex"]),
+            tuple(int(cells[cell_id]["rowIndex"]) for cell_id in addend_ids),
+            tuple(
+                int(cells[cell_id]["rowIndex"])
+                for cell_id in addend_ids
+                if cell_id in negated
+            ),
+        )
+        values = [
+            Decimal(cells[cell_id].get("normalizedValue", 0))
+            for cell_id in addend_ids
+        ]
+        grouped.setdefault(signature, []).append((total, values))
+
+    supported: set[str] = set()
+    for entries in grouped.values():
+        independent: list[list[Decimal]] = []
+        columns: set[int] = set()
+        for total, values in entries:
+            column = int(total["columnIndex"])
+            if column in columns:
+                continue
+            if any(sums.proportional_values(values, prior) for prior in independent):
+                continue
+            columns.add(column)
+            independent.append(values)
+        if len(independent) >= 2:
+            # Once two columns independently agree on the structure, every
+            # exact column carrying that same printed row pattern is supported.
+            supported.update(total["id"] for total, _ in entries)
+    return frozenset(supported)
+
+
+def _is_supported_composed_total(
+    total: dict,
+    parallel_ids: frozenset[str] = frozenset(),
+) -> bool:
+    """Whether a caption-spanning exact tie has independent structure evidence."""
+    return total.get("outcome") == "confirmed" and (
+        total.get("id") in parallel_ids
+        or any(
+            signal.get("name") == "column-corroboration"
+            for signal in total.get("signals", [])
+        )
+    )
+
 
 # The signals strong enough for a nominated row to stop another total's walk.
 # A label is the document's own word and a double rule is the grand-total
@@ -631,7 +902,9 @@ def _select_grid_totals(grid: dict, published: list[dict]) -> tuple[list[dict], 
 
     selected: list[dict] = []
     replaced_ids: set[str] = set()
-    rank = {"unresolved": 0, "break": 1, "confirmed": 1}
+    # Any exact permitted resolution defeats a miss: by definition a break says
+    # no permitted run ties.  Substrate order settles only equal outcomes.
+    rank = {"unresolved": 0, "break": 1, "confirmed": 2}
     for total in grid["totals"]:
         span = _span_for_total(grid, total)
         matches = existing.get(span, []) if span is not None else []

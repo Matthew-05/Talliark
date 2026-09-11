@@ -66,11 +66,16 @@ class FinancialTableScanTests(unittest.TestCase):
             progress_callback=lambda _message, stage, **_kw: stages.append(stage),
         )
 
-        self.assertEqual(DETECTOR_VERSION, "financial-table-detector-2")
+        self.assertEqual(DETECTOR_VERSION, "financial-table-detector-4")
         self.assertEqual(scan.detector_version, DETECTOR_VERSION)
         self.assertEqual(len(scan.pages), len(self.geometry["pages"]))
         self.assertIn(Stage.RECONCILE_TABLES, stages)
         self.assertNotIn(Stage.TABLE_STRUCTURE, stages)
+        self.assertTrue(all(
+            block.source_general_table_id is not None
+            for page in scan.pages
+            for block in page.composed_lattice_fallbacks
+        ))
 
     def test_missing_general_tables_still_allows_financial_lattice_recovery(self) -> None:
         scan = detect_financial_tables(
@@ -86,6 +91,20 @@ class FinancialTableScanTests(unittest.TestCase):
             for page in scan.pages
             for block in page.lattice_blocks
         ))
+
+    def test_lattice_row_context_matches_the_labels_published_on_its_cells(self) -> None:
+        scan = detect_financial_tables(self.geometry, self.values, self.tables)
+
+        labelled = 0
+        for page in scan.pages:
+            for block in page.lattice_blocks:
+                for cell in block.published:
+                    label = cell.get("rowLabel")
+                    if not label:
+                        continue
+                    labelled += 1
+                    self.assertEqual(block.row_labels[cell["rowIndex"]], label)
+        self.assertGreater(labelled, 0)
 
     def test_handoff_is_recursively_read_only(self) -> None:
         handoff = build_analysis_handoff(self.geometry, self.tables)

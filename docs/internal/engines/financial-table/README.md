@@ -82,6 +82,8 @@ The result is a versioned `FinancialTableScan`, a private in-memory object
 containing one `FinancialTablePage` per geometry page. Each page carries:
 
 - `lattice_blocks`: statement blocks inferred from aligned value spans;
+- `composed_lattice_fallbacks`: fragments privately reassembled where one
+  accepted general table independently says they belong to the same statement;
 - `grid_fallbacks`: cell joins over the general tables published on that page;
 - `disagreements`: structured cases where lattice numeric alignments fall
   outside a corroborating general grid, one general value column has no lattice
@@ -99,6 +101,9 @@ so recognition changes can be measured separately from arithmetic outcomes.
 - **Financial table page** - the ordered lattice and grid views for one page.
 - **Lattice block** - rows clustered by vertical centre and numeric columns
   clustered by the right edge of their last digit.
+- **Composed lattice fallback** - two or more lattice fragments mapped to one
+  general table and rebuilt as one arithmetic view. It is exact-only and must
+  be corroborated across independent value columns before Reconcile admits it.
 - **Grid fallback** - financial cells obtained by intersecting a published
   general grid with text and value geometry.
 - **Financial cell** - printed cell text plus optional normalized number,
@@ -125,19 +130,30 @@ so recognition changes can be measured separately from arithmetic outcomes.
 4. A general table overlapping at least 25% of the lattice block lends printed
    header labels, bounds, and horizontal rulings. It is corroboration, never a
    prerequisite.
-5. `cells.py` recovers accounting dashes omitted by the values model, joins
+5. One-row and multi-row value fragments mapped to the same general table are
+   composed into a fallback view. A one-row fragment must contain at least two
+   figures; a fragment immediately above or below the detected body may join
+   only within the row/line-height adjacency window. Reconcile admits only
+   exact totals whose row/sign structure also agrees in independent columns, so
+   removing a caption boundary can recover proof but cannot create a break or
+   enlarge the Not checked list.
+6. `cells.py` recovers accounting dashes omitted by the values model, joins
    values to rows and columns, chooses the nearest label column to the left, and
    marks single rules above and double rules below candidate subtotal rows.
-6. Every published general table is independently converted to a grid fallback.
+7. Every published general table is independently converted to a grid fallback.
    Reconcile later admits only fallback totals that are novel or stronger than
    their lattice duplicate.
-7. Source ids, geometry digests, bounds, row counts and column counts are
+8. Source ids, geometry digests, bounds, row counts and column counts are
    checked against every fallback. Lattice provenance is checked against its
    source lineage, and the original general artifact digest must be unchanged.
-8. Numeric-column partition disagreements are recorded in detail. Neither view
+9. Numeric-column partition disagreements are recorded in detail. Neither view
    is selected as the universal winner.
-9. `labels.py` interprets the printed labels without changing them. Arithmetic
-   nomination and proof remain downstream in `engines/reconcile/`.
+10. `labels.py` interprets the printed labels without changing them. `Net` is a
+    subtractive result column, while useful-life, rate, average, percentage and
+    per-unit columns are non-additive metadata. It also identifies opening
+    states, carried results, equity movements, allocation components, and the
+    narrow Gross result phrases used by Reconcile's unresolved admission.
+    Arithmetic nomination and proof remain downstream in `engines/reconcile/`.
 
 ## 5. Tuning and thresholds
 
@@ -145,6 +161,9 @@ so recognition changes can be measured separately from arithmetic outcomes.
 | --- | ---: | --- |
 | Right-edge tolerance | `0.005` | Plateau begins here on the Apple sweep; smaller values lose negative numbers whose closing parenthesis extends past the last digit. |
 | Minimum block rows | `3` | Two isolated aligned figures are not enough structure for a footing block. |
+| Composed fragments | at least `2` fragments and `3` total rows | Composition repairs a split statement rather than replacing ordinary block detection. |
+| One-row composed fragment | at least `2` figures | Recovers a wrapped opening row without treating isolated page furniture as a footing block. |
+| Composed adjacency | `max(row_gap, 2 × line_height)` | Allows a first data row classified into a header band to retain its table lineage while keeping unrelated nearby schedules separate. |
 | Maximum row gap | `max(row_gap, pitch × 2.35)` | Separates vertically independent schedules while retaining ordinary statement spacing. |
 | General-table overlap | `25%` of lattice area | Enough shared area to borrow headers and rulings without requiring equal bounds. |
 | Rule-grid suppression | rules above more than `50%` of rows | A fully ruled grid does not use a rule above as a subtotal signal. |
@@ -159,8 +178,16 @@ so recognition changes can be measured separately from arithmetic outcomes.
 - A page with values but no recognized `number` spans cannot form a lattice.
 - General-table header mistakes can lend incorrect column labels, though values
   and arithmetic do not depend on those labels for membership.
+- Lattice cells and the block's parallel `row_labels` array are populated from
+  the same nearest-left printed label. Statement-wide interpretation reads the
+  array, while evidence quotes the cell; a regression that lets them diverge is
+  pinned directly by `test_financial_table.py`.
 - Closely stacked schedules with no prose or pitch fence can form one lattice
   block. Caption rows constrain what Reconcile may accuse after such a merge.
+- Captions and wrapped first rows can split one visible statement into several
+  lattice fragments. Composition repairs only fragments with the same general
+  table lineage, and its exact-plus-parallel-column admission rule intentionally
+  leaves single-column cases unresolved.
 - Grid and lattice views can disagree. The detector counts those disagreements
   and retains their page, table, block, column band and lattice edges rather
   than silently choosing one as universally authoritative.

@@ -34,6 +34,8 @@ from engines.financial_table.detector import DETECTOR_VERSION as FINANCIAL_TABLE
 from engines.reconcile import findings, nominate, structures, sums
 from engines.reconcile.detector import (
     DETECTOR_VERSION,
+    _composed_parallel_total_ids,
+    _is_supported_composed_total,
     _reconcile_block,
     _select_grid_totals,
     detect_reconcile,
@@ -271,6 +273,8 @@ class ScanEnvelope(unittest.TestCase):
         self.assertGreater(self.diagnostics["financial_table_grid_fallbacks"], 0)
         self.assertIn("reconcile_table_detection_ms", self.diagnostics)
         self.assertIn("reconcile_ms", self.diagnostics)
+        self.assertIn("reconcile_structure_truncated_blocks", self.diagnostics)
+        self.assertIn("reconcile_candidates_withheld", self.diagnostics)
 
     def test_the_fingerprint_moves_when_the_geometry_does(self) -> None:
         # Span ids survive a detector upgrade and not a re-OCR that moves
@@ -292,8 +296,15 @@ class Decisions(unittest.TestCase):
             self.assertTrue(labels.is_total_label(label), label)
 
     def test_a_label_that_merely_mentions_a_total_is_not_one(self) -> None:
-        for label in ("Cost of sales", "the total of these amounts", "Percentage of total"):
+        for label in (
+            "Cost of sales",
+            "the total of these amounts",
+            "Percentage of total",
+            "Gross benefits paid",
+            "Gross carrying amount",
+        ):
             self.assertFalse(labels.is_total_label(label), label)
+        self.assertTrue(labels.is_total_label("Gross profit"))
 
     def test_the_enabled_signals_are_the_five_that_have_been_measured(self) -> None:
         self.assertEqual(
@@ -424,12 +435,272 @@ class Decisions(unittest.TestCase):
         # nothing corroborates it, so a miss is recorded and not spoken.
         self.assertFalse(sums.CROSS_FOOT_MAY_BREAK)
 
+    def test_an_unresolved_rule_probe_is_not_published_as_not_checked(self) -> None:
+        built = _table([
+            ("Alpha", "10"),
+            ("Beta", "20"),
+            ("Gamma", "30"),
+            ("Ordinary row", "99"),
+        ])
+        built.ruled_above = frozenset({3})
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertEqual(model["totals"], [])
+        self.assertEqual(diagnostics["withheld"], {"speculative-rule": 1})
+
+    def test_an_exact_rule_probe_is_still_published(self) -> None:
+        built = _table([
+            ("Alpha", "10"),
+            ("Beta", "20"),
+            ("Gamma", "40"),
+            ("Operating income", "70"),
+        ])
+        built.ruled_above = frozenset({3})
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertEqual([total["outcome"] for total in model["totals"]], ["confirmed"])
+        self.assertEqual(diagnostics["withheld"], {})
+
+    def test_an_opening_balance_without_addends_is_not_not_checked(self) -> None:
+        built = _table([("Balance at January 1, 2025", "100")])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertEqual(model["totals"], [])
+        self.assertEqual(diagnostics["withheld"], {"opening-balance": 1})
+
+    def test_a_total_in_a_non_additive_column_is_not_not_checked(self) -> None:
+        built = _table([
+            ("Alpha", "10.00"),
+            ("Beta", "20.00"),
+            ("Gamma", "30.00"),
+            ("Total", "99.00"),
+        ])
+        built.header_labels = [{
+            "columnIndex": 1,
+            "text": "Weighted Average Exercise Price Per Share",
+            "isPeriodColumn": False,
+            "isTotalColumn": False,
+        }]
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertEqual(model["totals"], [])
+        self.assertEqual(diagnostics["withheld"], {"non-additive-column": 1})
+
+    def test_a_noncontrolling_allocation_is_not_a_total_nomination(self) -> None:
+        built = _table([
+            ("Income before allocation", "100"),
+            ("Net income attributable to noncontrolling interests", "5"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(model["totals"])
+        self.assertEqual(diagnostics["withheld"]["allocation-component"], 1)
+
+    def test_a_net_named_tax_or_actuarial_component_is_not_not_checked(self) -> None:
+        for label in (
+            "Net operating losses and tax credit carryforwards",
+            "Net actuarial loss (gain)",
+        ):
+            with self.subTest(label=label):
+                built = _table([("Earlier component", "100"), (label, "5")])
+
+                model, diagnostics = _reconcile_block(
+                    built, page_index=0, findings=[]
+                )
+
+                self.assertFalse(model["totals"])
+                self.assertEqual(diagnostics["withheld"], {"net-component": 1})
+
+    def test_a_net_result_carried_into_a_new_statement_is_not_not_checked(self) -> None:
+        built = _table([
+            ("Net income", "100"),
+            ("Depreciation and amortization", "20"),
+            ("Other adjustment", "5"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(model["totals"])
+        self.assertEqual(diagnostics["withheld"], {"carried-result": 1})
+
+    def test_any_total_carried_in_as_the_first_row_is_not_not_checked(self) -> None:
+        built = _table([
+            ("Total revenue", "100"),
+            ("Cost of revenue", "60"),
+            ("Operating expense", "20"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(model["totals"])
+        self.assertEqual(diagnostics["withheld"], {"carried-result": 1})
+
+    def test_cash_flow_activity_rows_are_peers_in_a_summary_table(self) -> None:
+        built = _table([
+            ("Net cash provided by (used in) operating activities", "100"),
+            ("Net cash provided by (used in) investing activities", "20"),
+            ("Net cash provided by (used in) financing activities", "5"),
+            ("Net increase in cash and cash equivalents", "125"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        unresolved_labels = {
+            built.by_id[total["cellId"]]["rowLabel"]
+            for total in model["totals"]
+            if total["outcome"] == "unresolved"
+        }
+        self.assertFalse(any("activities" in label for label in unresolved_labels))
+        self.assertEqual(
+            diagnostics["withheld"],
+            {"cash-flow-summary-peer": 3},
+        )
+
+    def test_common_cash_flow_result_phrasings_name_the_same_activity(self) -> None:
+        for label, activity in (
+            ("Net cash used by financing activities", "financing"),
+            ("Net cash (used)/provided by investing activities", "investing"),
+            ("Net cash provided/(used) by operating activities", "operating"),
+        ):
+            with self.subTest(label=label):
+                self.assertEqual(labels.cash_flow_activity(label), activity)
+
+    def test_net_loss_is_a_movement_in_an_equity_rollforward(self) -> None:
+        built = _table([
+            ("Opening", "100"),
+            ("Net loss", "5"),
+        ])
+        built.header_labels = [
+            {"columnIndex": 1, "text": "Accumulated Deficit", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "Total Stockholders' Equity", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(model["totals"])
+        self.assertEqual(diagnostics["withheld"], {"equity-movement": 1})
+
+    def test_period_headers_do_not_hide_equity_rollforward_row_context(self) -> None:
+        built = _table([
+            ("Total shareholders' equity, beginning balances", "100"),
+            ("Common stock repurchased", "20"),
+            ("Dividends and dividend equivalents declared", "10"),
+            ("Net income", "5"),
+            ("Ending balances", "25"),
+        ])
+        built.header_labels = [{
+            "columnIndex": 1,
+            "text": "2025",
+            "isPeriodColumn": True,
+            "isTotalColumn": False,
+        }]
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(any(
+            built.by_id[total["cellId"]].get("rowLabel") == "Net income"
+            for total in model["totals"]
+        ))
+        self.assertEqual(diagnostics["withheld"]["equity-movement"], 1)
+
+    def test_net_income_after_opening_cash_is_a_cash_flow_input(self) -> None:
+        built = _table([
+            ("Cash, beginning of year", "50"),
+            ("Net income", "100"),
+            ("Depreciation", "20"),
+            ("Cash provided by operations", "120"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse(any(
+            built.by_id[total["cellId"]].get("rowLabel") == "Net income"
+            for total in model["totals"]
+        ))
+        self.assertEqual(diagnostics["withheld"]["carried-result"], 1)
+
+    def test_a_credible_labelled_total_remains_not_checked(self) -> None:
+        built = _table([
+            ("Alpha", "10"),
+            ("Beta", "20"),
+            ("Gamma", "30"),
+            ("Total liabilities", "99"),
+        ])
+
+        model, diagnostics = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertEqual([total["outcome"] for total in model["totals"]], ["unresolved"])
+        self.assertEqual(diagnostics["withheld"], {})
+
+    def test_a_result_header_checks_a_two_addend_row(self) -> None:
+        built = _table([
+            ("Director A", "40", "60", "100"),
+            ("Director B", "30", "20", "50"),
+        ])
+        built.header_labels = [
+            {"columnIndex": 1, "text": "Cash", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "Stock", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Total", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+
+        cross = [total for total in model["totals"] if total.get("axis") == "cross"]
+        self.assertEqual(len(cross), 2)
+        self.assertTrue(all(total["outcome"] == "confirmed" for total in cross))
+        self.assertTrue(all(len(total["resolution"]["addendCellIds"]) == 2 for total in cross))
+
+    def test_an_isolated_two_addend_cross_foot_is_not_published(self) -> None:
+        built = _table([("Director A", "40", "60", "100")])
+        built.header_labels = [
+            {"columnIndex": 1, "text": "Cash", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "Stock", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Total", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+
+        self.assertFalse([total for total in model["totals"] if total.get("axis") == "cross"])
+
+    def test_a_net_header_checks_a_subtractive_row(self) -> None:
+        built = _table([
+            ("Customer relationships", "5", "20,685", "17,979", "2,706"),
+            ("Software", "7", "5,740", "1,586", "4,154"),
+        ])
+        built.header_labels = [
+            {"columnIndex": 1, "text": "Estimated useful life", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "Gross carrying amount", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Accumulated amortization", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 4, "text": "Net", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+
+        cross = [total for total in model["totals"] if total.get("axis") == "cross"]
+        self.assertEqual(len(cross), 2)
+        self.assertTrue(all(total["outcome"] == "confirmed" for total in cross))
+        self.assertEqual(
+            cross[0]["resolution"]["negatedAddendCellIds"],
+            ["t-r0-c3"],
+        )
+
     def test_corporate_is_a_column_of_amounts_and_not_a_rate(self) -> None:
         # "rate" inside "Corporate" is the expensive false match: Corporate is a
         # real segment column in every segment schedule a filing prints.
         for header in ("Corporate", "Separate accounts", "Incorporated"):
             self.assertFalse(labels.is_non_additive_column(header), header)
-        for header in ("Effective Rate", "Interest Rates", "Weighted-Average", "% of total"):
+        for header in (
+            "Effective Rate",
+            "Interest Rates",
+            "Weighted-Average",
+            "% of total",
+            "Estimated Useful Life",
+        ):
             self.assertTrue(labels.is_non_additive_column(header), header)
 
     def test_a_consumed_block_s_own_caption_is_not_a_boundary(self) -> None:
@@ -446,11 +717,51 @@ class Decisions(unittest.TestCase):
     def test_the_first_pass_confirms_on_exact_ties_only(self) -> None:
         self.assertEqual(sums.TOLERANCE, Decimal(0))
 
+    def test_a_display_rounding_difference_is_named_but_never_confirmed(self) -> None:
+        built = _table([
+            ("Domestic", "59.3"),
+            ("International", "72.4"),
+            ("Disney+", "131.6"),
+        ])
+        built.double_ruled = frozenset({2})
+
+        resolved = _resolve(built)
+
+        self.assertEqual(resolved[0]["outcome"], "unresolved")
+        self.assertEqual(
+            resolved[0]["unresolvedReason"],
+            "rounding-indeterminate",
+        )
+
+    def test_whole_number_near_misses_are_not_assumed_to_be_rounded(self) -> None:
+        built = _table([
+            ("Domestic", "59"),
+            ("International", "72"),
+            ("Total", "130"),
+        ])
+
+        self.assertNotEqual(
+            _resolve(built)[0]["unresolvedReason"],
+            "rounding-indeterminate",
+        )
+
     def test_a_delta_divisible_by_nine_reads_as_a_transposition(self) -> None:
         self.assertTrue(sums.is_transposition(Decimal("9")))
         self.assertTrue(sums.is_transposition(Decimal("-18")))
         self.assertFalse(sums.is_transposition(Decimal("7")))
         self.assertFalse(sums.is_transposition(Decimal("0")))
+
+    def test_a_wrong_sign_diagnosis_uses_the_direction_of_the_delta(self) -> None:
+        built = _table([("Revenue", "10"), ("Cost", "5"), ("Total", "5")])
+        run = sums.Run(
+            "leaves",
+            (built.cell(0, 1), built.cell(1, 1)),
+            Decimal("5"),
+            0,
+        )
+        self.assertEqual(run.delta, Decimal("-10"))
+        self.assertEqual(sums.diagnose(run)["kind"], "sign")
+        self.assertEqual(sums.diagnose(run)["cellId"], "t-r1-c1")
 
     def test_no_finding_kind_words_an_unresolved_total_as_a_failure(self) -> None:
         self.assertIn("footing-unresolved", findings.KINDS)
@@ -548,6 +859,19 @@ class SumTree(unittest.TestCase):
         # 10 + 20 + 5 + 5 is 40, and reaching it would mean reading through a
         # caption row the statement put there to separate two blocks.
         self.assertEqual(_resolve(built)[0]["outcome"], "unresolved")
+
+    def test_a_run_fragment_cut_off_by_a_blank_never_accuses(self) -> None:
+        built = _table([
+            ("Earlier section", "100"),
+            ("Missing amount", ""),
+            ("Alpha", "10"),
+            ("Beta", "20"),
+            ("Gamma", "30"),
+            ("Total", "65"),
+        ])
+        resolved = _resolve(built)
+        self.assertEqual(resolved[0]["outcome"], "unresolved")
+        self.assertEqual(resolved[0]["unresolvedReason"], "no-plausible-run")
 
     def test_a_total_foots_on_its_subtotals_rather_than_on_the_leaves(self) -> None:
         built = _table([
@@ -751,7 +1075,12 @@ class Findings(unittest.TestCase):
         # `no-candidate-run` and `run-too-short` describe the scan, not the
         # document, and a filing yields hundreds of them. They are counted in
         # the summary and carried on the total; they are not spoken as findings.
-        for reason in ("no-candidate-run", "run-too-short", "mixed-decimals"):
+        for reason in (
+            "no-candidate-run",
+            "run-too-short",
+            "mixed-decimals",
+            "rounding-indeterminate",
+        ):
             self.assertNotIn(reason, findings.SPOKEN_UNRESOLVED)
         self.assertIn("no-plausible-run", findings.SPOKEN_UNRESOLVED)
 
@@ -835,6 +1164,144 @@ class ParallelColumnCorroboration(unittest.TestCase):
         resolved, _ = structures.resolve(built)
         self.assertEqual(resolved, [])
 
+    def test_proportional_labelled_columns_do_not_corroborate_each_other(self) -> None:
+        built = _table([
+            ("Opening", "10", "20"),
+            ("Movement", "5", "10"),
+            ("Total", "15", "30"),
+        ])
+        resolved, _ = structures.resolve(built)
+        self.assertEqual(resolved, [])
+
+    def test_zeroes_do_not_change_a_shared_signed_row_pattern(self) -> None:
+        built = _table([
+            ("Revenue", "100", "90"),
+            ("Returns", "40", "—"),
+            ("Discounts", "10", "30"),
+            ("Net revenue", "50", "60"),
+        ])
+        resolved, _ = structures.resolve(built)
+        self.assertEqual([entry["outcome"] for entry in resolved], [
+            "confirmed", "confirmed",
+        ])
+        self.assertEqual(
+            resolved[1]["resolution"]["negatedAddendCellIds"],
+            ["t-r2-c2"],
+        )
+
+    def test_a_total_never_counts_a_subtotal_and_part_of_its_block(self) -> None:
+        built = _table([
+            ("Entertainment", "-1155", "-977"),
+            ("Sports", "-3", "-10"),
+            ("Domestic", "-5271", "-2710"),
+            ("International", "-1158", "-949"),
+            ("Total Experiences", "-6429", "-3659"),
+            ("Corporate", "-437", "-766"),
+            ("Total investments", "-8024", "-5412"),
+        ])
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+        totals = [total for total in model["totals"] if total["rowIndex"] == 6]
+        self.assertEqual([total["outcome"] for total in totals], [
+            "confirmed", "confirmed",
+        ])
+        self.assertTrue(all(total["resolution"]["basis"] == "subtotals" for total in totals))
+        self.assertTrue(all(len(total["resolution"]["addendCellIds"]) == 4 for total in totals))
+
+    def test_a_nested_structure_propagates_the_deepest_owned_top(self) -> None:
+        built = _table([
+            ("Equipment", "82", "76"),
+            ("Accumulated depreciation", "(49)", "(45)"),
+            ("Property and equipment", "33", "31"),
+            ("Projects", "7", "5"),
+            ("Land", "1", "1"),
+            ("Property, projects and land", "41", "37"),
+        ])
+
+        resolved, _ = structures.resolve(built)
+
+        parents = [entry for entry in resolved if entry["cell"]["rowIndex"] == 5]
+        self.assertEqual([entry["top"] for entry in parents], [0, 0])
+
+    def test_total_assets_is_a_boundary_not_an_addend_of_the_other_side(self) -> None:
+        built = _table([
+            ("Total assets", "100", "110"),
+            ("Current liabilities", "40", "50"),
+            ("Long-term liabilities", "20", "20"),
+            ("Total liabilities", "60", "70"),
+            ("Total equity", "40", "40"),
+            ("Total liabilities and equity", "100", "110"),
+        ])
+
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+
+        by_id = {cell["id"]: cell for cell in model["cells"]}
+        totals = [
+            total
+            for total in model["totals"]
+            if by_id[total["cellId"]].get("rowLabel")
+            == "Total liabilities and equity"
+        ]
+        self.assertEqual([total["outcome"] for total in totals], [
+            "confirmed",
+            "confirmed",
+        ])
+        self.assertTrue(all(
+            "t-r0-c1" not in total["resolution"]["addendCellIds"]
+            and "t-r0-c2" not in total["resolution"]["addendCellIds"]
+            for total in totals
+        ))
+
+    def test_one_unlabelled_witness_cannot_accuse_an_established_column(self) -> None:
+        built = _table([
+            ("A", "1", "2"),
+            ("B", "2", "5"),
+            ("First ending", "3", "7"),
+            ("C", "10", "4"),
+            ("D", "20", "6"),
+            ("Second ending", "31", "10"),
+        ])
+        resolved, _ = structures.resolve(built)
+        accused = [
+            entry for entry in resolved
+            if entry["cell"]["rowIndex"] == 5
+            and entry["cell"]["columnIndex"] == 1
+        ]
+        self.assertEqual(accused, [])
+
+    def test_an_exact_permitted_structure_defeats_a_different_missing_one(self) -> None:
+        built = _table([
+            ("Opening", "1", "2", "5", "8"),
+            ("First movement", "2", "3", "2", "4"),
+            ("Second movement", "4", "6", "3", "7"),
+            ("Total", "7", "11", "5", "11"),
+        ])
+        resolved, _ = structures.resolve(built)
+        totals = [entry for entry in resolved if entry["cell"]["rowIndex"] == 3]
+        self.assertEqual(len(totals), 4)
+        self.assertTrue(all(entry["outcome"] == "confirmed" for entry in totals))
+        self.assertEqual(
+            len(next(entry for entry in totals if entry["cell"]["columnIndex"] == 3)["resolution"]["addendCellIds"]),
+            2,
+        )
+
+    def test_the_hypothesis_cap_reduces_lookback_not_later_row_coverage(self) -> None:
+        built = _table([
+            ("A", "100"),
+            ("B", "100"),
+            ("C", "100"),
+            ("D", "2"),
+            ("E", "3"),
+            ("Ending", "5"),
+        ])
+        original = structures.MAX_HYPOTHESES_PER_BLOCK
+        structures.MAX_HYPOTHESES_PER_BLOCK = 4
+        try:
+            discovered, tested = structures.discover(built)
+        finally:
+            structures.MAX_HYPOTHESES_PER_BLOCK = original
+        self.assertEqual(tested, 4)
+        self.assertIn(5, [structure.total_row for structure in discovered])
+
     def test_rate_headers_are_not_accused(self) -> None:
         built = _table([
             ("Opening", "10", "7", "20"),
@@ -876,6 +1343,64 @@ class ParallelColumnCorroboration(unittest.TestCase):
         self.assertEqual(replaced, {"lattice-total"})
         self.assertEqual(lattice["totals"], [])
 
+    def test_an_exact_grid_total_replaces_a_lattice_break(self) -> None:
+        cell = {"id": "lattice-cell", "spanId": "shared-span"}
+        lattice = {
+            "cells": [cell],
+            "totals": [{"id": "lattice-total", "cellId": cell["id"], "outcome": "break"}],
+        }
+        grid_cell = {"id": "grid-cell", "spanId": "shared-span"}
+        grid_total = {"id": "grid-total", "cellId": grid_cell["id"], "outcome": "confirmed"}
+        selected, replaced = _select_grid_totals(
+            {"cells": [grid_cell], "totals": [grid_total]},
+            [lattice],
+        )
+        self.assertEqual(selected, [grid_total])
+        self.assertEqual(replaced, {"lattice-total"})
+        self.assertEqual(lattice["totals"], [])
+
+    def test_a_composed_tie_requires_independent_column_structure(self) -> None:
+        exact = {"id": "single", "outcome": "confirmed", "signals": [{"name": "label-total"}]}
+        supported = {
+            "id": "corroborated",
+            "outcome": "confirmed",
+            "signals": [{"name": "column-corroboration"}],
+        }
+
+        self.assertFalse(_is_supported_composed_total(exact))
+        self.assertTrue(_is_supported_composed_total(supported))
+        self.assertFalse(_is_supported_composed_total({
+            "id": "miss",
+            "outcome": "unresolved",
+            "signals": [{"name": "column-corroboration"}],
+        }))
+
+    def test_parallel_exact_columns_support_a_composed_total(self) -> None:
+        block = {
+            "cells": [
+                {"id": "a1", "rowIndex": 0, "normalizedValue": "40"},
+                {"id": "b1", "rowIndex": 1, "normalizedValue": "60"},
+                {"id": "a2", "rowIndex": 0, "normalizedValue": "45"},
+                {"id": "b2", "rowIndex": 1, "normalizedValue": "65"},
+            ],
+            "totals": [
+                {
+                    "id": "t1", "rowIndex": 2, "columnIndex": 1,
+                    "axis": "vertical", "outcome": "confirmed",
+                    "resolution": {"addendCellIds": ["a1", "b1"], "negatedAddendCellIds": []},
+                },
+                {
+                    "id": "t2", "rowIndex": 2, "columnIndex": 2,
+                    "axis": "vertical", "outcome": "confirmed",
+                    "resolution": {"addendCellIds": ["a2", "b2"], "negatedAddendCellIds": []},
+                },
+            ],
+        }
+
+        supported = _composed_parallel_total_ids(block)
+
+        self.assertEqual(supported, frozenset({"t1", "t2"}))
+
 
 class HeaderSemantics(unittest.TestCase):
     """Reconcile owns what a label means; table detection owns what it says."""
@@ -884,14 +1409,28 @@ class HeaderSemantics(unittest.TestCase):
         self.assertTrue(labels.is_total_column("Total"))
         self.assertTrue(labels.is_total_column("Consolidated"))
         self.assertFalse(labels.is_total_column("Percentage of total"))
-        # "Net" heading a column means net of something, not the sum of its
-        # neighbours, which is why the column lexicon is narrower than the row's.
-        self.assertFalse(labels.is_total_column("Net"))
+        # A result can be additive or subtractive; the cross-foot search handles
+        # both while the period guard still refuses comparative year columns.
+        self.assertTrue(labels.is_total_column("Net"))
 
     def test_a_period_column_is_recognized_however_the_filing_writes_it(self) -> None:
         for label in ("2025", "FY 2024", "Q1 2025", "September 28, 2024"):
             self.assertTrue(labels.is_period_column(label), label)
         self.assertFalse(labels.is_period_column("Adjusted Cost"))
+
+    def test_amount_text_resists_a_concatenated_rate_header(self) -> None:
+        self.assertFalse(labels.is_clearly_non_additive_column(
+            "2024 Amount Effective (in millions) Interest Rate"
+        ))
+        self.assertTrue(labels.is_clearly_non_additive_column(
+            "Weighted Average Exercise Price Per Share"
+        ))
+        self.assertTrue(labels.is_clearly_non_additive_column(
+            "Maximum Number of Shares that May Yet Be Purchased"
+        ))
+        self.assertTrue(labels.is_clearly_non_additive_column(
+            "Approximate Dollar Value of Shares That May Yet Be Purchased"
+        ))
 
 
 if __name__ == "__main__":

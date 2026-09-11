@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from engines.financial_table import labels
 
-from . import sums
+from . import nominate, sums
 
 
 MAX_HYPOTHESES_PER_BLOCK = 5000
@@ -39,10 +39,27 @@ class Evaluation:
         return bool(self.tied_runs)
 
     def tied_on(self, negated_indices: tuple[int, ...]) -> sums.Run | None:
+        # A dash or numeric zero has no sign.  Two columns still describe the
+        # same signed row structure when a reversed suffix contains a zero in
+        # one of them, so compare only the indices that contribute a value in
+        # this column.  The published run follows the same canonical form.
+        effective = tuple(
+            index
+            for index in negated_indices
+            if sums.value_of(self.run.cells[index]) != 0
+        )
         return next(
-            (run for run in self.tied_runs if run.negated_indices == negated_indices),
+            (run for run in self.tied_runs if run.negated_indices == effective),
             None,
         )
+
+    def with_pattern(self, negated_indices: tuple[int, ...]) -> sums.Run:
+        effective = tuple(
+            index
+            for index in negated_indices
+            if sums.value_of(self.run.cells[index]) != 0
+        )
+        return self.run.with_negated(effective)
 
 
 @dataclass(frozen=True)
@@ -101,15 +118,40 @@ def _independent(evaluations: list[Evaluation]) -> list[Evaluation]:
     return representatives
 
 
+def _independent_witnesses(
+    evaluation: Evaluation, tied: list[Evaluation]
+) -> list[Evaluation]:
+    """Tying columns that independently corroborate this particular column.
+
+    Independence is relative to the column being judged.  Computing one set of
+    representatives for the whole table lets a proportional column borrow the
+    representative it was collapsed into and call that independent evidence.
+    Putting the judged column first, then discarding its representative, makes
+    that impossible while still collapsing witnesses proportional to each
+    other.
+    """
+    representatives = _independent(
+        [evaluation] + [item for item in tied if item.column != evaluation.column]
+    )
+    return [item for item in representatives if item.column != evaluation.column]
+
+
 def discover(block) -> tuple[list[Structure], int]:
-    """Return hypotheses retained by at least one exact, non-degenerate tie."""
+    """Return hypotheses retained by at least one exact, non-degenerate tie.
+
+    Short spans are visited across the whole block before longer ones.  The
+    safety cap therefore reduces maximum look-back evenly instead of silently
+    making the bottom of a long table unreachable after the upper rows consume
+    the entire budget.
+    """
     retained: list[Structure] = []
     tested = 0
-    for total_row in range(2, block.row_count):
-        for top in range(total_row - 2, -1, -1):
+    for span_length in range(2, block.row_count):
+        for total_row in range(span_length, block.row_count):
             if tested >= MAX_HYPOTHESES_PER_BLOCK:
                 return retained, tested
             tested += 1
+            top = total_row - span_length
             evaluations = [
                 evaluation
                 for column in range(1, block.column_count)
@@ -127,25 +169,7 @@ def discover(block) -> tuple[list[Structure], int]:
 def resolve(block) -> tuple[list[dict], dict]:
     """Publish the strongest proven structure for each candidate total cell."""
     structures, tested = discover(block)
-    established_columns = {
-        evaluation.column
-        for structure in structures
-        for evaluation in structure.evaluations
-        if not evaluation.degenerate
-        for pattern in {
-            run.negated_indices
-            for item in structure.evaluations
-            if not item.degenerate
-            for run in item.tied_runs
-        }
-        if evaluation.tied_on(pattern) is not None
-        and len(_independent([
-            item
-            for item in structure.evaluations
-            if not item.degenerate and item.tied_on(pattern) is not None
-        ])) >= 2
-    }
-    proposals: dict[str, list[tuple[tuple[int, int, int, int], dict]]] = {}
+    proposals: dict[str, list[tuple[tuple[bool, int, int, int, int], dict]]] = {}
     for structure in structures:
         patterns = {
             run.negated_indices
@@ -161,23 +185,37 @@ def resolve(block) -> tuple[list[dict], dict]:
                 and evaluation.tied_on(pattern) is not None
             ]
             agreeing = _independent(tied)
-            agreeing_columns = {evaluation.column for evaluation in agreeing}
             for evaluation in structure.evaluations:
                 own_label = labels.is_total_label(evaluation.total_cell.get("rowLabel", ""))
                 own_tie = evaluation.tied_on(pattern)
-                assessed = own_tie or evaluation.run.with_negated(pattern)
-                other_agreement = len([column for column in agreeing_columns if column != evaluation.column])
+                assessed = own_tie or evaluation.with_pattern(pattern)
+                witnesses = (
+                    _independent_witnesses(evaluation, tied)
+                    if own_tie is not None
+                    else _independent(tied)
+                )
+                witness_columns = {item.column for item in witnesses}
+                other_agreement = len(witnesses)
                 if evaluation.degenerate:
                     # Rides on a structure two independent columns established,
                     # and only ever to confirm. A degenerate column that misses
                     # says nothing, so it never speaks.
                     publish = own_tie is not None and len(agreeing) >= 2
                 elif own_tie is not None:
-                    publish = len(agreeing) >= 2 or (len(agreeing) >= 1 and own_label)
+                    # The structure route contributes only when another
+                    # non-proportional column corroborates this one. A labelled
+                    # run of three or more remains independently admissible,
+                    # but a two-addend coincidence must not bypass the label
+                    # route's explicit floor.
+                    publish = other_agreement >= 1 or (
+                        own_label
+                        and len(evaluation.run.cells)
+                        >= nominate.MIN_ADDENDS_ON_ONE_SIGNAL
+                    )
                 else:
                     publish = other_agreement >= 2 or (
                         other_agreement >= 1
-                        and (own_label or evaluation.column in established_columns)
+                        and own_label
                     )
                 if own_tie is None and evaluation.crossed_caption:
                     # A caption is the statement separating one block from the
@@ -192,7 +230,7 @@ def resolve(block) -> tuple[list[dict], dict]:
                     label = evaluation.total_cell.get("rowLabel", "")
                     signals.append({"name": "label-total", "evidence": f'row label reads "{label}"'})
                 if other_agreement:
-                    columns = ", ".join(str(column) for column in sorted(agreeing_columns - {evaluation.column}))
+                    columns = ", ".join(str(column) for column in sorted(witness_columns))
                     signals.append({
                         "name": "column-corroboration",
                         "evidence": f"the same signed rows foot independently in column{'s' if other_agreement != 1 else ''} {columns}",
@@ -211,12 +249,103 @@ def resolve(block) -> tuple[list[dict], dict]:
                 # available, preferring the longest algebraic identity can hide
                 # the statement's immediate subtotal relationship through
                 # cancellation.
-                score = (other_agreement, -len(pattern), -len(evaluation.run.cells), structure.top)
+                # A break means no permitted run ties.  If another retained
+                # structure for this same cell does tie, publishing the miss
+                # would contradict that definition however many columns support
+                # the alternative.  Exact resolutions therefore rank first;
+                # evidence strength and the nearest relationship break ties.
+                score = (
+                    outcome == "confirmed",
+                    other_agreement,
+                    -len(pattern),
+                    -len(evaluation.run.cells),
+                    structure.top,
+                )
                 proposals.setdefault(evaluation.total_cell["id"], []).append((score, payload))
-    chosen = [max(candidates, key=lambda item: item[0])[1] for candidates in proposals.values()]
+    chosen = _choose_non_overlapping_proposals(block, proposals)
     chosen.extend(_resolve_subtotal_pairs(block, chosen))
     chosen.sort(key=lambda item: (item["cell"]["rowIndex"], item["cell"]["columnIndex"]))
-    return chosen, {"hypotheses": tested, "retained": len(structures)}
+    possible = max(0, (block.row_count - 1) * (block.row_count - 2) // 2)
+    return chosen, {
+        "hypotheses": tested,
+        "retained": len(structures),
+        "truncated": tested < possible,
+    }
+
+
+def _choose_non_overlapping_proposals(block, proposals: dict) -> list[dict]:
+    """Choose totals top-down without counting part of a known subtotal twice.
+
+    `sums.double_counts` catches the arithmetic form when every constituent is
+    inside the candidate.  A candidate may start halfway through the block,
+    however, and then the partial constituents no longer add to the subtotal.
+    The established structure supplies the missing geometric fact: taking any
+    row from a subtotal's owned interval alongside that subtotal still counts
+    part of the block twice.
+
+    Totals are chosen in row order so only already-finalized subtotals constrain
+    a parent.  Filtering candidates before ranking also preserves a valid
+    alternative for the same cell instead of dropping the cell wholesale when
+    its initially strongest candidate overlaps.
+    """
+    established: dict[tuple[int, int], int] = {}
+    chosen: list[dict] = []
+    ordered = sorted(
+        proposals.values(),
+        key=lambda candidates: (
+            int(candidates[0][1]["cell"]["rowIndex"]),
+            int(candidates[0][1]["cell"]["columnIndex"]),
+        ),
+    )
+    for candidates in ordered:
+        valid = []
+        for score, entry in candidates:
+            column = int(entry["cell"]["columnIndex"])
+            rows = {
+                int(block.by_id[cell_id]["rowIndex"])
+                for cell_id in entry["resolution"]["addendCellIds"]
+                if cell_id in block.by_id
+            }
+            overlaps = any(
+                subtotal_row in rows
+                and any(top <= row < subtotal_row for row in rows)
+                for (subtotal_column, subtotal_row), top in established.items()
+                if subtotal_column == column
+            )
+            if not overlaps:
+                valid.append((score, entry))
+        if not valid:
+            continue
+        selected = max(valid, key=lambda item: item[0])[1]
+        column = int(selected["cell"]["columnIndex"])
+        rows = {
+            int(block.by_id[cell_id]["rowIndex"])
+            for cell_id in selected["resolution"]["addendCellIds"]
+            if cell_id in block.by_id
+        }
+        # A subtotal built from another subtotal owns the deepest interval it
+        # consumed, not merely the visible rows in its immediate equation. The
+        # parent walk must resume above that whole interval or it will add part
+        # of the nested subtotal a second time. Disney's property-and-equipment
+        # total is 33,152 + projects + land; 33,152 itself owns attractions less
+        # depreciation, so the 41,255 block begins at attractions, not 33,152.
+        selected["top"] = min(
+            [int(selected["top"])]
+            + [
+                top
+                for (subtotal_column, subtotal_row), top in established.items()
+                if subtotal_column == column and subtotal_row in rows
+            ]
+        )
+        chosen.append(selected)
+        if selected["outcome"] == "confirmed":
+            established[
+                (
+                    column,
+                    int(selected["cell"]["rowIndex"]),
+                )
+            ] = int(selected["top"])
+    return chosen
 
 
 def _resolve_subtotal_pairs(block, chosen: list[dict]) -> list[dict]:

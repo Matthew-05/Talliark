@@ -3,10 +3,12 @@
 This engine is the seam between document-neutral recognition and financial
 analysis.  It never publishes `table-structure-v1` and it never decides whether
 arithmetic is correct.  It reads the cached general table model as corroborating
-geometry, then builds two private views for Reconcile:
+geometry, then builds three private views for Reconcile:
 
 * a value-alignment lattice, which can recover statement structure when the
   conservative general detector missed or fragmented a table; and
+* a composed lattice fallback that rejoins caption- and spacing-separated value
+  fragments when a general table independently places them together; and
 * a cell join over every accepted general grid, retained as a precise fallback
   where the lattice lost a row or column.
 
@@ -29,10 +31,10 @@ from engines.table.handoff import (
 from schemas.models import Stage
 
 from .cells import TableCells, build_table_cells
-from .lattice import build_page_lattice
+from .lattice import build_page_composed_lattice, build_page_lattice
 
 
-DETECTOR_VERSION = "financial-table-detector-2"
+DETECTOR_VERSION = "financial-table-detector-4"
 
 
 class FinancialTableInvariantError(RuntimeError):
@@ -59,6 +61,7 @@ class FinancialTablePage:
 
     page_index: int
     lattice_blocks: tuple[TableCells, ...]
+    composed_lattice_fallbacks: tuple[TableCells, ...]
     grid_fallbacks: tuple[TableCells, ...]
     disagreements: tuple[BoundaryDisagreement, ...]
 
@@ -90,6 +93,10 @@ class FinancialTableScan:
     @property
     def grid_fallbacks(self) -> int:
         return sum(len(page.grid_fallbacks) for page in self.pages)
+
+    @property
+    def composed_lattice_fallbacks(self) -> int:
+        return sum(len(page.composed_lattice_fallbacks) for page in self.pages)
 
 
 def detect_financial_tables(
@@ -137,6 +144,14 @@ def detect_financial_tables(
                 detected_tables=tables,
             )
         )
+        composed = tuple(
+            build_page_composed_lattice(
+                layout,
+                values_by_page.get(page_index),
+                page_index=page_index,
+                detected_tables=tables,
+            )
+        )
         grids = tuple(
             build_table_cells(
                 table,
@@ -150,6 +165,7 @@ def detect_financial_tables(
             FinancialTablePage(
                 page_index=page_index,
                 lattice_blocks=lattice,
+                composed_lattice_fallbacks=composed,
                 grid_fallbacks=grids,
                 disagreements=_boundary_disagreements(
                     page_index, lattice, grids, tables
@@ -292,7 +308,10 @@ def _assert_handoff_invariants(
             raise FinancialTableInvariantError(
                 f"page {source_page.page_index}: grid fallback lineage or geometry drifted"
             )
-        for block in financial_page.lattice_blocks:
+        for block in (
+            *financial_page.lattice_blocks,
+            *financial_page.composed_lattice_fallbacks,
+        ):
             has_source = block.source_general_table_id is not None
             if (block.provenance == "lattice") == has_source:
                 raise FinancialTableInvariantError(

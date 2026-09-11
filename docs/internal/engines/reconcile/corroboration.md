@@ -73,10 +73,16 @@ nearest label column to its left, never column 0 (§6).
 | | Test |
 |---|---|
 | **Confirm** column *c* (it ties) | `A ≥ 2`, or `A ≥ 1` and `L(c)` |
-| **Accuse** column *c* (it misses) | `A ≥ 2`, or `A ≥ 1` and (`L(c)` or *c* foots exactly on another established structure in this table) |
+| **Accuse** column *c* (it misses) | `A ≥ 2`, or `A ≥ 1` and `L(c)` |
 
 `A` never counts a missing column, so the accusation test already rests on
 evidence excluding the accused figure.
+
+The earlier implementation also allowed one agreeing column when the accused
+column happened to foot somewhere else in the same table. Corpus review removed
+that table-wide shortcut: it let one signed coincidence in a debt-maturity year
+nominate an unrelated note row as a total. Additivity elsewhere is not local
+evidence that this row asserts a total.
 
 ### 2.3 R1 still holds, and is sharper for it
 
@@ -185,7 +191,7 @@ Each was written after a concrete failure or a measurement, not in advance.
 
 | Guard | Why |
 |---|---|
-| **Independence** — identical or proportional columns count as one | A *% of total* column beside its amounts, or the same figures restated in another unit, is the same tie written twice. Cross-multiply the addend vectors; equal ratios throughout means one column, not two. |
+| **Independence** — identical or proportional columns count as one | A *% of total* column beside its amounts, or the same figures restated in another unit, is the same tie written twice. Cross-multiply the addend vectors; equal ratios throughout means one column, not two. Independence is recomputed with the judged column as the representative, so a proportional column cannot borrow the representative it collapsed into as its own witness. |
 | **Non-degenerate** — the total is non-zero and at least two addends are non-zero | 0 + 0 = 0 corroborates every structure ever proposed. |
 | **The label is the cell's own** — taken from the nearest label column to its left | The prototype read it from column 0 and immediately accused `Sample-Financial-Statements-1`: on a two-panel balance sheet the left panel's *Total current assets* sat beside the right panel's income taxes payable, and the statement was reported as failing to add up. The cell layer already assigns the right label; the rule is to use it. |
 | **Commensurability** — a column may be accused only where its printed decimal specificity matches the agreeing columns' and its header does not name a rate, an average or a per-unit amount | The RSU rollforward: its share counts foot, its *Weighted-Average Grant-Date Fair Value Per RSU* column never will. Header semantics is already Reconcile's to own (R9). |

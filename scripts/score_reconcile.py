@@ -11,8 +11,8 @@ a number rather than on judgement. So it measures two different things:
 * **Without a golden**, the watch lists. Where a run was found, rejected, and
   came close enough that a looser guard would have turned it into a break; where
   a run was refused for containing its own subtotal; and how the unresolved
-  totals divide by reason, which is what says whether the next signal to enable
-  is `ruling-above` or `outdent`.
+  totals and withheld internal candidates divide by reason, which distinguishes
+  arithmetic reach from the statement-aware presentation policy.
 
 The scorer never blesses its own output. `--propose-golden` writes candidates
 marked unapproved, and scoring refuses a golden that a person has not marked
@@ -289,6 +289,12 @@ def report_for(pdf: Path, golden: Path | None) -> dict:
         "detectorVersion": DETECTOR_VERSION,
         "pages": model["source"]["pageCount"],
         **summary,
+        "withheldCandidates": diagnostics.get("reconcile_candidates_withheld", 0),
+        "withheldByReason": {
+            key[len("reconcile_withheld_") :].replace("_", "-"): value
+            for key, value in sorted(diagnostics.items())
+            if key.startswith("reconcile_withheld_")
+        },
         "unresolvedByReason": {
             key[len("reconcile_unresolved_") :].replace("_", "-"): value
             for key, value in sorted(diagnostics.items())
