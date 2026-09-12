@@ -1,0 +1,1257 @@
+{
+  "document": "RoyCarver-2014-Rpt-Final.pdf",
+  "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
+  "approved": false,
+  "pages": [
+    5,
+    6,
+    7,
+    10,
+    11,
+    12,
+    14,
+    15,
+    16
+  ],
+  "note": "Candidate update, not approved. Verified against the rendered page. Changes: p15 235354066: label 'Net Assets, unrestricted Total liabilities and net' -> 'Net Assets, unrestricted'. Set approved to true to score.",
+  "totals": [
+    {
+      "page": 5,
+      "column": "",
+      "label": "1,681,258",
+      "value": "1681258",
+      "outcome": "confirmed",
+      "sum": "1681258",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2924125",
+        "1242867"
+      ],
+      "negatedAddends": [
+        "1242867"
+      ]
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "1,748,476",
+      "value": "1748476",
+      "outcome": "confirmed",
+      "sum": "1748476",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2920920",
+        "1172444"
+      ],
+      "negatedAddends": [
+        "1172444"
+      ]
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "2,920,920",
+      "value": "2920920",
+      "outcome": "confirmed",
+      "sum": "2920920",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "567038",
+        "2126812",
+        "227070"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "2,924,125",
+      "value": "2924125",
+      "outcome": "confirmed",
+      "sum": "2924125",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "567038",
+        "2126812",
+        "230275"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Net assets, unrestricted",
+      "value": "266915297",
+      "outcome": "confirmed",
+      "sum": "266915297",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "286567469",
+        "19652172"
+      ],
+      "negatedAddends": [
+        "19652172"
+      ]
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Net assets, unrestricted",
+      "value": "297351644",
+      "outcome": "confirmed",
+      "sum": "297351644",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "309244888",
+        "11893244"
+      ],
+      "negatedAddends": [
+        "11893244"
+      ]
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total assets",
+      "value": "286567469",
+      "outcome": "confirmed",
+      "sum": "286567469",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "3486584",
+        "280955105",
+        "377304",
+        "1748476"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total assets",
+      "value": "309244888",
+      "outcome": "confirmed",
+      "sum": "309244888",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "3569185",
+        "303571366",
+        "423079",
+        "1681258"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total cash and cash equivalents",
+      "value": "3486584",
+      "outcome": "confirmed",
+      "sum": "3486584",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "726128",
+        "2760456"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total cash and cash equivalents",
+      "value": "3569185",
+      "outcome": "confirmed",
+      "sum": "3569185",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "964769",
+        "2604416"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total liabilities",
+      "value": "11893244",
+      "outcome": "confirmed",
+      "sum": "11893244",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10298515",
+        "75929",
+        "41000",
+        "1477800"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total liabilities",
+      "value": "19652172",
+      "outcome": "confirmed",
+      "sum": "19652172",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "18550549",
+        "70323",
+        "24000",
+        "1007300"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total liabilities and net assets",
+      "value": "286567469",
+      "outcome": "confirmed",
+      "sum": "286567469",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "19652172",
+        "266915297"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "",
+      "label": "Total liabilities and net assets",
+      "value": "309244888",
+      "outcome": "confirmed",
+      "sum": "309244888",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11893244",
+        "297351644"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2013",
+      "label": "Ending",
+      "value": "266915297",
+      "outcome": "confirmed",
+      "sum": "266915297",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "23590074",
+        "243325223"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2014",
+      "label": "Ending",
+      "value": "297351644",
+      "outcome": "confirmed",
+      "sum": "297351644",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "30436347",
+        "266915297"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2013",
+      "label": "Increase in unrestricted net assets",
+      "value": "23590074",
+      "outcome": "confirmed",
+      "sum": "23590074",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "36535538",
+        "12945464"
+      ],
+      "negatedAddends": [
+        "12945464"
+      ]
+    },
+    {
+      "page": 6,
+      "column": "2014",
+      "label": "Increase in unrestricted net assets",
+      "value": "30436347",
+      "outcome": "confirmed",
+      "sum": "30436347",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "38702800",
+        "8266453"
+      ],
+      "negatedAddends": [
+        "8266453"
+      ]
+    },
+    {
+      "page": 6,
+      "column": "2013",
+      "label": "Total unrestricted expenses",
+      "value": "12945464",
+      "outcome": "confirmed",
+      "sum": "12945464",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11188778",
+        "140800",
+        "755727",
+        "97663",
+        "585092",
+        "71114",
+        "57593",
+        "1304",
+        "22964",
+        "11162",
+        "5899",
+        "7368"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2014",
+      "label": "Total unrestricted expenses",
+      "value": "8266453",
+      "outcome": "confirmed",
+      "sum": "8266453",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6489136",
+        "139200",
+        "768334",
+        "92999",
+        "589353",
+        "70423",
+        "63511",
+        "3049",
+        "22097",
+        "11669",
+        "6005",
+        "10677"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2013",
+      "label": "Total unrestricted revenue",
+      "value": "36535538",
+      "outcome": "confirmed",
+      "sum": "36535538",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1798900",
+        "3601725",
+        "31134913"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "2014",
+      "label": "Total unrestricted revenue",
+      "value": "38702800",
+      "outcome": "confirmed",
+      "sum": "38702800",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1863870",
+        "3423178",
+        "33415752"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Ending",
+      "value": "3486584",
+      "outcome": "confirmed",
+      "sum": "3486584",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-1752267",
+        "5238851"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Ending",
+      "value": "3569185",
+      "outcome": "confirmed",
+      "sum": "3569185",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "82601",
+        "3486584"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Increase (decrease) in cash and cash equivalents",
+      "value": "-1752267",
+      "outcome": "confirmed",
+      "sum": "-1752267",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-9844323",
+        "8092056"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Increase (decrease) in cash and cash equivalents",
+      "value": "82601",
+      "outcome": "confirmed",
+      "sum": "82601",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-11662956",
+        "11745557"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Net cash (used in) operating activities",
+      "value": "-11662956",
+      "outcome": "confirmed",
+      "sum": "-11662956",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "30436347",
+        "70423",
+        "-9534",
+        "470500",
+        "-34355489",
+        "-45775",
+        "5606",
+        "-8252034",
+        "17000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Net cash (used in) operating activities",
+      "value": "-9844323",
+      "outcome": "confirmed",
+      "sum": "-9844323",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "23590074",
+        "71114",
+        "-33753",
+        "445300",
+        "-31935465",
+        "12691",
+        "-5940",
+        "-2011344",
+        "23000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Net cash provided by investing activities",
+      "value": "11745557",
+      "outcome": "confirmed",
+      "sum": "11745557",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-3205",
+        "-54191941",
+        "65940703"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "",
+      "label": "Net cash provided by investing activities",
+      "value": "8092056",
+      "outcome": "confirmed",
+      "sum": "8092056",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-62686",
+        "-51629730",
+        "59784472"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Original Cost",
+      "label": "230,029,539",
+      "value": "230029539",
+      "outcome": "confirmed",
+      "sum": "230029539",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "47946617",
+        "69017056",
+        "12369358",
+        "5557802",
+        "1876189",
+        "5949675",
+        "16401555",
+        "12399635",
+        "3725409",
+        "2615260",
+        "159818",
+        "16011165",
+        "36000000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Original Cost",
+      "label": "230,897,834",
+      "value": "230897834",
+      "outcome": "confirmed",
+      "sum": "230897834",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "48005857",
+        "33368167",
+        "36663620",
+        "5960926",
+        "3330812",
+        "4517001",
+        "13888712",
+        "13179292",
+        "2310564",
+        "2029001",
+        "215205",
+        "824547",
+        "16134651",
+        "14469479",
+        "36000000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Fair Value",
+      "label": "280,955,105",
+      "value": "280955105",
+      "outcome": "confirmed",
+      "sum": "280955105",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "70846129",
+        "44762597",
+        "44954381",
+        "6318036",
+        "3524361",
+        "4846548",
+        "15223560",
+        "13723948",
+        "2426467",
+        "2074474",
+        "151798",
+        "1037473",
+        "16262445",
+        "13163921",
+        "41638967"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Fair Value",
+      "label": "303,571,366",
+      "value": "303571366",
+      "outcome": "confirmed",
+      "sum": "303571366",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "81945423",
+        "98261901",
+        "18065161",
+        "5454447",
+        "1942824",
+        "5979610",
+        "17039917",
+        "12454321",
+        "3780580",
+        "2594051",
+        "167074",
+        "16605034",
+        "39281023"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "2013",
+      "label": "31,134,913",
+      "value": "31134913",
+      "outcome": "confirmed",
+      "sum": "31134913",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "8845901",
+        "22289012"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "2014",
+      "label": "33,415,752",
+      "value": "33415752",
+      "outcome": "confirmed",
+      "sum": "33415752",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "9931197",
+        "23484555"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "2014",
+      "label": "10,298,515",
+      "value": "10298515",
+      "outcome": "confirmed",
+      "sum": "10298515",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10527804",
+        "229289"
+      ],
+      "negatedAddends": [
+        "229289"
+      ]
+    },
+    {
+      "page": 11,
+      "column": "2014",
+      "label": "10,527,804",
+      "value": "10527804",
+      "outcome": "confirmed",
+      "sum": "10527804",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6051117",
+        "4476687"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "2013",
+      "label": "18,550,549",
+      "value": "18550549",
+      "outcome": "confirmed",
+      "sum": "18550549",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "19342741",
+        "792192"
+      ],
+      "negatedAddends": [
+        "792192"
+      ]
+    },
+    {
+      "page": 11,
+      "column": "2013",
+      "label": "19,342,741",
+      "value": "19342741",
+      "outcome": "confirmed",
+      "sum": "19342741",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "7851133",
+        "11491608"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "2013",
+      "label": "585,092",
+      "value": "585092",
+      "outcome": "confirmed",
+      "sum": "585092",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "115000",
+        "470092"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "2014",
+      "label": "589,353",
+      "value": "589353",
+      "outcome": "confirmed",
+      "sum": "589353",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "118853",
+        "470500"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "2013",
+      "label": "145,358,165",
+      "value": "145358165",
+      "outcome": "confirmed",
+      "sum": "145358165",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "8924768",
+        "3308364",
+        "7687970",
+        "16831507",
+        "7559041",
+        "10070168",
+        "10473877",
+        "3407095",
+        "2583339",
+        "29538257",
+        "15224340",
+        "29749439"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "2014",
+      "label": "180,207,324",
+      "value": "180207324",
+      "outcome": "confirmed",
+      "sum": "180207324",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10276325",
+        "3215627",
+        "7146971",
+        "19032470",
+        "11291786",
+        "10387973",
+        "13342513",
+        "3718871",
+        "610470",
+        "2922417",
+        "15840661",
+        "32959751",
+        "16795530",
+        "32665959"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 14,
+      "column": "$ 243,325,223",
+      "label": "Net assets, April 30, 2013",
+      "value": "266915297",
+      "outcome": "confirmed",
+      "sum": "266915297",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "243325223",
+        "36535538",
+        "-12945464"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 14,
+      "column": "$ 243,325,223",
+      "label": "Net assets, April 30, 2014",
+      "value": "297351644",
+      "outcome": "confirmed",
+      "sum": "297351644",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "266915297",
+        "38702800",
+        "-8266453"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 14,
+      "column": "$ 243,325,223",
+      "label": "Total investment return",
+      "value": "36535538",
+      "outcome": "confirmed",
+      "sum": "36535538",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5400625",
+        "31134913"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 14,
+      "column": "$ 243,325,223",
+      "label": "Total investment return",
+      "value": "38702800",
+      "outcome": "confirmed",
+      "sum": "38702800",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5287048",
+        "33415752"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "Net Assets, unrestricted",
+      "value": "235354066",
+      "outcome": "confirmed",
+      "sum": "235354066",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "235354066"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "Net Assets, unrestricted",
+      "value": "297351644",
+      "outcome": "confirmed",
+      "sum": "297351644",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "309244888",
+        "11893244"
+      ],
+      "negatedAddends": [
+        "11893244"
+      ]
+    },
+    {
+      "page": 15,
+      "column": "Adjustments",
+      "label": "Net Assets, unrestricted",
+      "value": "61997578",
+      "outcome": "confirmed",
+      "sum": "61997578",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "73890822",
+        "11893244"
+      ],
+      "negatedAddends": [
+        "11893244"
+      ]
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "Total assets",
+      "value": "235354066",
+      "outcome": "confirmed",
+      "sum": "235354066",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "233598880",
+        "3505",
+        "1751681"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "Total assets",
+      "value": "309244888",
+      "outcome": "confirmed",
+      "sum": "309244888",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "307140551",
+        "423079",
+        "1681258"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "Adjustments",
+      "label": "Total assets",
+      "value": "73890822",
+      "outcome": "confirmed",
+      "sum": "73890822",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "73541671",
+        "419574",
+        "-70423"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "Adjustments",
+      "label": "Total liabilities",
+      "value": "11893244",
+      "outcome": "confirmed",
+      "sum": "11893244",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10298515",
+        "75929",
+        "1518800"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "Total liabilities",
+      "value": "11893244",
+      "outcome": "confirmed",
+      "sum": "11893244",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "10298515",
+        "75929",
+        "1518800"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "assets",
+      "value": "235354066",
+      "outcome": "confirmed",
+      "sum": "235354066",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "235354066"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "April 30, 2014",
+      "label": "assets",
+      "value": "309244888",
+      "outcome": "confirmed",
+      "sum": "309244888",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11893244",
+        "297351644"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 15,
+      "column": "Adjustments",
+      "label": "assets",
+      "value": "73890822",
+      "outcome": "confirmed",
+      "sum": "73890822",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11893244",
+        "61997578"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Ending",
+      "value": "235354066",
+      "outcome": "confirmed",
+      "sum": "235354066",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-790291",
+        "236144357"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Ending",
+      "value": "297351644",
+      "outcome": "confirmed",
+      "sum": "297351644",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "30436347",
+        "266915297"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "Adjustments",
+      "label": "Ending",
+      "value": "61997578",
+      "outcome": "confirmed",
+      "sum": "61997578",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "31226638",
+        "30770940"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "Adjustments",
+      "label": "Total unrestricted expenses",
+      "value": "-7686890",
+      "outcome": "confirmed",
+      "sum": "-7686890",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-8252034",
+        "487500",
+        "70423",
+        "7221"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Total unrestricted expenses",
+      "value": "15953343",
+      "outcome": "confirmed",
+      "sum": "15953343",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "14741170",
+        "139200",
+        "768334",
+        "92999",
+        "101853",
+        "63511",
+        "3049",
+        "22097",
+        "11669",
+        "6005",
+        "3456"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Total unrestricted expenses",
+      "value": "8266453",
+      "outcome": "confirmed",
+      "sum": "8266453",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6489136",
+        "139200",
+        "768334",
+        "92999",
+        "589353",
+        "70423",
+        "63511",
+        "3049",
+        "22097",
+        "11669",
+        "6005",
+        "10677"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Total unrestricted revenue",
+      "value": "15163052",
+      "outcome": "confirmed",
+      "sum": "15163052",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1816858",
+        "3416622",
+        "9929572"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "Adjustments",
+      "label": "Total unrestricted revenue",
+      "value": "23539748",
+      "outcome": "confirmed",
+      "sum": "23539748",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "47012",
+        "6556",
+        "23486180"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "Total unrestricted revenue",
+      "value": "38702800",
+      "outcome": "confirmed",
+      "sum": "38702800",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1863870",
+        "3423178",
+        "33415752"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "unrestricted net assets",
+      "value": "-790291",
+      "outcome": "confirmed",
+      "sum": "-790291",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "15163052",
+        "15953343"
+      ],
+      "negatedAddends": [
+        "15953343"
+      ]
+    },
+    {
+      "page": 16,
+      "column": "April 30, 2014",
+      "label": "unrestricted net assets",
+      "value": "30436347",
+      "outcome": "confirmed",
+      "sum": "30436347",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "38702800",
+        "8266453"
+      ],
+      "negatedAddends": [
+        "8266453"
+      ]
+    },
+    {
+      "page": 16,
+      "column": "Adjustments",
+      "label": "unrestricted net assets",
+      "value": "31226638",
+      "outcome": "confirmed",
+      "sum": "31226638",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "23539748",
+        "-7686890"
+      ],
+      "negatedAddends": [
+        "-7686890"
+      ]
+    }
+  ]
+}

@@ -264,6 +264,18 @@ prints *Total Disney Shareholders' Equity* and then *Total Equity*, and the
 second is the first plus noncontrolling interests, not the first plus every
 component the first already consumed.
 
+**The row is walked twice, as the column is.** A fund-column total prints a
+figure only in the funds that carry the item, and the columns in between hold
+nothing; the bounded walk stops at the first of those and never reaches the
+earlier funds. The walk is therefore run again crossing every absent cell
+inside the row, and the crossing reading may confirm and may never accuse —
+the same rule as the vertical walk, for the same reason. It needs at least two
+figures, because *778 + dash = 778* proves nothing however many absent cells
+were crossed, and the repeated-row guard still applies. The bounded reading is
+offered first, so a page-drawn boundary always wins when it ties. This is what
+lets a CAFR fund-column total foot across General Fund and Other Governmental
+Funds with the empty Public Safety Fund between them.
+
 **A cross-foot confirms and never breaks** (`sums.CROSS_FOOT_MAY_BREAK`, off).
 This is a decision about evidence, not about the code. The vertical pass has two
 signals — a label announcing a total, and the same row structure footing
@@ -541,6 +553,27 @@ not proof. The pass never nominates: a row with no total's mark in any column
 gets no hypothesis, so a figure that should foot only because of a hidden
 lexicon stays unresolved until the lexicon is widened.
 
+### 7.10 A total is not derived from a row carrying its own label
+
+A running balance prints the same row label once per period — Boeing's
+*Cumulative deliveries* for each year — and each older figure is the newer one
+less that period's movement. A run above such a row can then read the older
+balance as the total and the newer balance as its addend: `8,528 − 396 = 8,132`
+ties exactly, and on the corpus it tied in every column, so the structure search
+confirmed ten running balances as totals. The page never meant them that way;
+the footing it presents is the other direction, which a walk that only looks
+above the total cannot reach. A total is therefore never derived from a row
+whose label it shares.
+
+The guard ignores a row with no label, because there is nothing to compare, and
+it ignores a bare *Total*, *Net* or *Subtotal*: those are markers rather than
+names, and a table legitimately sets one total over another. It is a refusal,
+not a repair — like §7.1, arithmetic may say a proposed run cannot be the
+addends of anything, and this one cannot be the addends of a same-named row.
+The bounded run is still offered to the parallel-column floor, so a two-addend
+run the guard removed from the crossing reading can still confirm on the
+columns that agree.
+
 ## 8. Plausibility
 
 `PLAUSIBLE_DELTA_FRACTION = 0.5`. A run that misses by more than half of the
@@ -635,6 +668,13 @@ to financial result phrases rather than component labels.
 
 Over the same span, real confirmations went from 1,003 to 1,314 and breaks from
 35 to 5.
+
+The detector-11 composed and gap-crossing admissions report 217 false ties from
+1,657 nominations (**13.10%**) on seed 1 of the same five-document run. That
+seed is not the one the earlier rows used, so the number is a fresh baseline
+for the next comparison rather than a regression or an improvement; the
+corpus-wide effect of the same changes is +33 confirmations against the
+goldens with no new false tie.
 
 **What it does not measure.** Nomination recall — a total nobody proposes never
 appears in either column of the table. And it says nothing about whether a

@@ -1,0 +1,3585 @@
+{
+  "document": "cafr1112bfs.pdf",
+  "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
+  "approved": false,
+  "pages": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "note": "Candidate update, not approved. Verified against the rendered page. Changes: p5 163879: label 'Other purposes (restricted for)' -> 'Other purposes'; p7 969818: label 'Federal (aid from other governmental agencies)' -> 'Federal'; p7 94320: label 'Interest (debt service)' -> 'Interest'; p7 104647: label 'Other (revenues)' -> 'Other'; p7 82292: label 'Other (aid from other governmental agencies)' -> 'Other'; p7 61241: label 'Principal (debt service)' -> 'Principal'. Set approved to true to score.",
+  "totals": [
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Accounts payable",
+      "value": "190668",
+      "outcome": "confirmed",
+      "sum": "190668",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "189675",
+        "993"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Accrued payroll",
+      "value": "48999",
+      "outcome": "confirmed",
+      "sum": "48999",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "48766",
+        "233"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Due in more than one year",
+      "value": "1896431",
+      "outcome": "confirmed",
+      "sum": "1896431",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1895136",
+        "1295"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Due within one year",
+      "value": "154208",
+      "outcome": "confirmed",
+      "sum": "154208",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "153769",
+        "439"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Inventories",
+      "value": "14388",
+      "outcome": "confirmed",
+      "sum": "14388",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "14386",
+        "2"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Invested in capital assets, net of related debt",
+      "value": "2933430",
+      "outcome": "confirmed",
+      "sum": "2933430",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2770556",
+        "162874"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Land, easements and construction in progress",
+      "value": "618791",
+      "outcome": "confirmed",
+      "sum": "618791",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "595586",
+        "23205"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Pooled cash and investments",
+      "value": "2070233",
+      "outcome": "confirmed",
+      "sum": "2070233",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1988951",
+        "81282"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Receivables, net",
+      "value": "631916",
+      "outcome": "confirmed",
+      "sum": "631916",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "623939",
+        "7977"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Component Unit First 5 Commission of San Diego",
+      "label": "Total assets",
+      "value": "159520",
+      "outcome": "confirmed",
+      "sum": "159520",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "142595",
+        "10447",
+        "5918",
+        "2",
+        "558"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Primary Government Business-type Activities",
+      "label": "Total assets",
+      "value": "253257",
+      "outcome": "confirmed",
+      "sum": "253257",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "81282",
+        "7977",
+        "-191",
+        "2",
+        "23205",
+        "140982"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Governmental Activities",
+      "label": "Total assets",
+      "value": "6352696",
+      "outcome": "confirmed",
+      "sum": "6352696",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1988951",
+        "109",
+        "369689",
+        "623939",
+        "135721",
+        "191",
+        "14386",
+        "16",
+        "430",
+        "12310",
+        "242",
+        "63352",
+        "12685",
+        "595586",
+        "2535089"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Total assets",
+      "value": "6605953",
+      "outcome": "confirmed",
+      "sum": "6605953",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2070233",
+        "109",
+        "369689",
+        "631916",
+        "135721",
+        "14388",
+        "16",
+        "430",
+        "12310",
+        "242",
+        "63352",
+        "12685",
+        "618791",
+        "2676071"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Component Unit First 5 Commission of San Diego",
+      "label": "Total liabilities",
+      "value": "15415",
+      "outcome": "confirmed",
+      "sum": "15415",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "15290",
+        "83",
+        "42"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Governmental Activities",
+      "label": "Total liabilities",
+      "value": "2574326",
+      "outcome": "confirmed",
+      "sum": "2574326",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "189675",
+        "48766",
+        "25344",
+        "261636",
+        "153769",
+        "1895136"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Total liabilities",
+      "value": "2577361",
+      "outcome": "confirmed",
+      "sum": "2577361",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "190668",
+        "48999",
+        "25344",
+        "261711",
+        "154208",
+        "1896431"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Primary Government Business-type Activities",
+      "label": "Total liabilities",
+      "value": "3035",
+      "outcome": "confirmed",
+      "sum": "3035",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "993",
+        "233",
+        "75",
+        "439",
+        "1295"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Component Unit First 5 Commission of San Diego",
+      "label": "Total net assets",
+      "value": "144105",
+      "outcome": "confirmed",
+      "sum": "144105",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "159520",
+        "-15415"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Primary Government Business-type Activities",
+      "label": "Total net assets",
+      "value": "250222",
+      "outcome": "confirmed",
+      "sum": "250222",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "162874",
+        "87348"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Governmental Activities",
+      "label": "Total net assets",
+      "value": "3778370",
+      "outcome": "confirmed",
+      "sum": "3778370",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2770556",
+        "5422",
+        "84552",
+        "2949",
+        "125904",
+        "50825",
+        "16532",
+        "14643",
+        "11344",
+        "13918",
+        "17327",
+        "26166",
+        "42361",
+        "141306",
+        "454565"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Total net assets",
+      "value": "4028592",
+      "outcome": "confirmed",
+      "sum": "4028592",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2933430",
+        "5422",
+        "84552",
+        "2949",
+        "125904",
+        "50825",
+        "16532",
+        "14643",
+        "11344",
+        "13918",
+        "17327",
+        "26166",
+        "42361",
+        "141306",
+        "541913"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Unearned revenue",
+      "value": "261711",
+      "outcome": "confirmed",
+      "sum": "261711",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "261636",
+        "75"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "Unrestricted",
+      "value": "541913",
+      "outcome": "confirmed",
+      "sum": "541913",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "454565",
+        "87348"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Total",
+      "label": "amortization",
+      "value": "2676071",
+      "outcome": "confirmed",
+      "sum": "2676071",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2535089",
+        "140982"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Component Unit First 5 Commission of San Diego",
+      "label": "Net (expense) revenue (First 5 Commission row)",
+      "value": "-14408",
+      "outcome": "confirmed",
+      "addends": [
+        "35424",
+        "-49832"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Revenue and Government Business-type Activities",
+      "label": "Total primary government",
+      "value": "-4036",
+      "outcome": "confirmed",
+      "sum": "-4036",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-629",
+        "-3929",
+        "522"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Net (Expense) Primary Governmental Activities",
+      "label": "Total primary government",
+      "value": "-888304",
+      "outcome": "confirmed",
+      "sum": "-888304",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-105090",
+        "-502875",
+        "-21720",
+        "-84873",
+        "-11501",
+        "-31855",
+        "-28052",
+        "-102338"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Changes in Total",
+      "label": "Total primary government",
+      "value": "-892340",
+      "outcome": "confirmed",
+      "sum": "-892340",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-888304",
+        "-4036"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Capital Grants and Contributions",
+      "label": "Total primary government",
+      "value": "11005",
+      "outcome": "confirmed",
+      "sum": "11005",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5300",
+        "304",
+        "5339",
+        "62"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Program Revenues Operating Grants and Contributions",
+      "label": "Total primary government",
+      "value": "2318061",
+      "outcome": "confirmed",
+      "sum": "2318061",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2317522",
+        "539"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "2012",
+      "label": "Total primary government",
+      "value": "3764237",
+      "outcome": "confirmed",
+      "sum": "3764237",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "3723186",
+        "41051"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Thousands) Charges for Services",
+      "label": "Total primary government",
+      "value": "542831",
+      "outcome": "confirmed",
+      "sum": "542831",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "506355",
+        "36476"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Changes in Total",
+      "label": "activities",
+      "value": "-4036",
+      "outcome": "confirmed",
+      "sum": "-4036",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-629",
+        "-3929",
+        "522"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Revenue and Government Business-type Activities",
+      "label": "activities",
+      "value": "-4036",
+      "outcome": "confirmed",
+      "sum": "-4036",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-629",
+        "-3929",
+        "522"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Changes in Total",
+      "label": "activities",
+      "value": "-888304",
+      "outcome": "confirmed",
+      "sum": "-888304",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-105090",
+        "-502875",
+        "-21720",
+        "-84873",
+        "-11501",
+        "-31855",
+        "-28052",
+        "-102338"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Net (Expense) Primary Governmental Activities",
+      "label": "activities",
+      "value": "-888304",
+      "outcome": "confirmed",
+      "sum": "-888304",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-105090",
+        "-502875",
+        "-21720",
+        "-84873",
+        "-11501",
+        "-31855",
+        "-28052",
+        "-102338"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Capital Grants and Contributions",
+      "label": "activities",
+      "value": "11005",
+      "outcome": "confirmed",
+      "sum": "11005",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5300",
+        "304",
+        "5339",
+        "62"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Program Revenues Operating Grants and Contributions",
+      "label": "activities",
+      "value": "2317522",
+      "outcome": "confirmed",
+      "sum": "2317522",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "61223",
+        "439004",
+        "85658",
+        "589669",
+        "1139851",
+        "1858",
+        "259"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Thousands) Charges for Services",
+      "label": "activities",
+      "value": "36476",
+      "outcome": "confirmed",
+      "sum": "36476",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11568",
+        "18406",
+        "6502"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "2012",
+      "label": "activities",
+      "value": "3723186",
+      "outcome": "confirmed",
+      "sum": "3723186",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "271485",
+        "1179815",
+        "132166",
+        "790907",
+        "1175678",
+        "34669",
+        "36128",
+        "102338"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "2012",
+      "label": "activities",
+      "value": "41051",
+      "outcome": "confirmed",
+      "sum": "41051",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "12736",
+        "22335",
+        "5980"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Thousands) Charges for Services",
+      "label": "activities",
+      "value": "506355",
+      "outcome": "confirmed",
+      "sum": "506355",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "99872",
+        "237632",
+        "19449",
+        "116365",
+        "24326",
+        "894",
+        "7817"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Program Revenues Operating Grants and Contributions",
+      "label": "activities",
+      "value": "539",
+      "outcome": "confirmed",
+      "sum": "539",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "539"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Component Unit First 5 Commission of San Diego",
+      "label": "Change in net assets",
+      "value": "-13618",
+      "outcome": "confirmed",
+      "addends": [
+        "-14408",
+        "790"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Primary Government Business-type Activities",
+      "label": "Change in net assets",
+      "value": "-2648",
+      "outcome": "confirmed",
+      "addends": [
+        "-4036",
+        "1388"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Total",
+      "label": "Change in net assets",
+      "value": "205509",
+      "outcome": "confirmed",
+      "addends": [
+        "208157",
+        "-2648"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Governmental Activities",
+      "label": "Change in net assets",
+      "value": "208157",
+      "outcome": "confirmed",
+      "addends": [
+        "-888304",
+        "1096461"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Total",
+      "label": "Investment earnings",
+      "value": "13489",
+      "outcome": "confirmed",
+      "addends": [
+        "12338",
+        "1151"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Assets Component Unit First 5 Commission of San Diego",
+      "label": "Net assets at end of year",
+      "value": "144105",
+      "outcome": "confirmed",
+      "sum": "144105",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-13618",
+        "157723"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "(Expense) Revenue Primary Government Business-type Activities",
+      "label": "Net assets at end of year",
+      "value": "250222",
+      "outcome": "confirmed",
+      "sum": "250222",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-2648",
+        "252870"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Net Governmental Activities",
+      "label": "Net assets at end of year",
+      "value": "3778370",
+      "outcome": "confirmed",
+      "sum": "3778370",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "208157",
+        "3570213"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "and Changes in Net Total",
+      "label": "Net assets at end of year",
+      "value": "4028592",
+      "outcome": "confirmed",
+      "sum": "4028592",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "205509",
+        "3823083"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Total",
+      "label": "Other",
+      "value": "110885",
+      "outcome": "confirmed",
+      "addends": [
+        "110676",
+        "209"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Net Governmental Activities",
+      "label": "Total general revenues",
+      "value": "1086066",
+      "outcome": "confirmed",
+      "sum": "1086066",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "963052",
+        "12338",
+        "110676"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "and Changes in Net Total",
+      "label": "Total general revenues",
+      "value": "1087426",
+      "outcome": "confirmed",
+      "sum": "1087426",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "963052",
+        "13489",
+        "110885"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "(Expense) Revenue Primary Government Business-type Activities",
+      "label": "Total general revenues",
+      "value": "1360",
+      "outcome": "confirmed",
+      "sum": "1360",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1151",
+        "209"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Assets Component Unit First 5 Commission of San Diego",
+      "label": "Total general revenues",
+      "value": "790",
+      "outcome": "confirmed",
+      "sum": "790",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "790"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Net Governmental Activities",
+      "label": "Total general revenues, extraordinary gain and transfers",
+      "value": "1096461",
+      "outcome": "confirmed",
+      "sum": "1096461",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1086066",
+        "10423",
+        "-28"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "and Changes in Net Total",
+      "label": "Total general revenues, extraordinary gain and transfers",
+      "value": "1097849",
+      "outcome": "confirmed",
+      "sum": "1097849",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "1087426",
+        "10423"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "(Expense) Revenue Primary Government Business-type Activities",
+      "label": "Total general revenues, extraordinary gain and transfers",
+      "value": "1388",
+      "outcome": "confirmed",
+      "sum": "1388",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "1360",
+        "28"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Assets Component Unit First 5 Commission of San Diego",
+      "label": "Total general revenues, extraordinary gain and transfers",
+      "value": "790",
+      "outcome": "confirmed",
+      "sum": "790",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "790"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "Net Governmental Activities",
+      "label": "Total general tax revenues",
+      "value": "963052",
+      "outcome": "confirmed",
+      "sum": "963052",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "616183",
+        "17200",
+        "304614",
+        "25055"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 4,
+      "column": "and Changes in Net Total",
+      "label": "Total general tax revenues",
+      "value": "963052",
+      "outcome": "confirmed",
+      "sum": "963052",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "616183",
+        "17200",
+        "304614",
+        "25055"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Accounts payable",
+      "value": "154855",
+      "outcome": "confirmed",
+      "addends": [
+        "118055",
+        "36800"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Accrued payroll",
+      "value": "47579",
+      "outcome": "confirmed",
+      "addends": [
+        "44996",
+        "2583"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Capital projects' funding",
+      "value": "344973",
+      "outcome": "confirmed",
+      "sum": "344973",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "339453",
+        "5520"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Cash with fiscal agents",
+      "value": "242",
+      "outcome": "confirmed",
+      "sum": "242",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "157",
+        "85"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Deferred revenues",
+      "value": "158575",
+      "outcome": "confirmed",
+      "addends": [
+        "123144",
+        "35431"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Due from other funds",
+      "value": "87424",
+      "outcome": "confirmed",
+      "addends": [
+        "63218",
+        "24206"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Due to other funds",
+      "value": "102045",
+      "outcome": "confirmed",
+      "sum": "102045",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "36162",
+        "38204",
+        "4401",
+        "23278"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Fund purpose",
+      "value": "131630",
+      "outcome": "confirmed",
+      "addends": [
+        "42311",
+        "89319"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Grantors - Housing assistance",
+      "value": "85707",
+      "outcome": "confirmed",
+      "addends": [
+        "54360",
+        "31347"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Inventories",
+      "value": "12827",
+      "outcome": "confirmed",
+      "addends": [
+        "11369",
+        "1458"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Inventories and deposits with others",
+      "value": "12843",
+      "outcome": "confirmed",
+      "addends": [
+        "11369",
+        "1474"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Investments with fiscal agents",
+      "value": "369689",
+      "outcome": "confirmed",
+      "addends": [
+        "2",
+        "369687"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Lease receivable",
+      "value": "12685",
+      "outcome": "confirmed",
+      "sum": "12685",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "5568",
+        "7117"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Loans, due from other funds and prepaids",
+      "value": "4881",
+      "outcome": "confirmed",
+      "addends": [
+        "1074",
+        "3807"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Other purposes",
+      "value": "119353",
+      "outcome": "confirmed",
+      "sum": "119353",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "54984",
+        "64369"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Other purposes",
+      "value": "163879",
+      "outcome": "confirmed",
+      "addends": [
+        "137579",
+        "26300"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Pooled cash and investments",
+      "value": "1778626",
+      "outcome": "confirmed",
+      "sum": "1778626",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1321049",
+        "39151",
+        "955",
+        "417471"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Prepaid items",
+      "value": "430",
+      "outcome": "confirmed",
+      "addends": [
+        "40",
+        "390"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Property taxes receivables, net",
+      "value": "135721",
+      "outcome": "confirmed",
+      "addends": [
+        "135292",
+        "429"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Receivables, net",
+      "value": "621393",
+      "outcome": "confirmed",
+      "sum": "621393",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "516727",
+        "41364",
+        "4637",
+        "58665"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "General Fund",
+      "label": "Total assets",
+      "value": "2053531",
+      "outcome": "confirmed",
+      "sum": "2053531",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1321049",
+        "109",
+        "2",
+        "516727",
+        "135292",
+        "63218",
+        "11369",
+        "40",
+        "157",
+        "5568"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Total assets",
+      "value": "3082514",
+      "outcome": "confirmed",
+      "sum": "3082514",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2053531",
+        "80515",
+        "375279",
+        "573189"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total assets",
+      "value": "375279",
+      "outcome": "confirmed",
+      "sum": "375279",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "955",
+        "369687",
+        "4637"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Other Governmental Funds",
+      "label": "Total assets",
+      "value": "573189",
+      "outcome": "confirmed",
+      "sum": "573189",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "417471",
+        "58665",
+        "429",
+        "24206",
+        "1458",
+        "16",
+        "390",
+        "85",
+        "63352",
+        "7117"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Public Safety Fund",
+      "label": "Total assets",
+      "value": "80515",
+      "outcome": "confirmed",
+      "sum": "80515",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "39151",
+        "41364"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "General Fund",
+      "label": "Total fund balances",
+      "value": "1487847",
+      "outcome": "confirmed",
+      "sum": "1487847",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1074",
+        "11369",
+        "54360",
+        "2949",
+        "50825",
+        "137579",
+        "65297",
+        "55500",
+        "339453",
+        "54984",
+        "51325",
+        "663132"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Total fund balances",
+      "value": "2358407",
+      "outcome": "confirmed",
+      "sum": "2358407",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "4881",
+        "12843",
+        "74738",
+        "34593",
+        "85707",
+        "2949",
+        "125904",
+        "50825",
+        "131630",
+        "163879",
+        "65297",
+        "55500",
+        "344973",
+        "370878",
+        "119353",
+        "51325",
+        "663132"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total fund balances",
+      "value": "370878",
+      "outcome": "confirmed",
+      "sum": "370878",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "370878"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Public Safety Fund",
+      "label": "Total fund balances",
+      "value": "42311",
+      "outcome": "confirmed",
+      "sum": "42311",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "42311"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Other Governmental Funds",
+      "label": "Total fund balances",
+      "value": "457371",
+      "outcome": "confirmed",
+      "sum": "457371",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3807",
+        "1474",
+        "74738",
+        "34593",
+        "31347",
+        "125904",
+        "89319",
+        "26300",
+        "5520",
+        "64369"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Other Governmental Funds",
+      "label": "Total liabilities",
+      "value": "115818",
+      "outcome": "confirmed",
+      "sum": "115818",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "36800",
+        "2583",
+        "23278",
+        "35431",
+        "17726"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Public Safety Fund",
+      "label": "Total liabilities",
+      "value": "38204",
+      "outcome": "confirmed",
+      "sum": "38204",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "38204"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total liabilities",
+      "value": "4401",
+      "outcome": "confirmed",
+      "sum": "4401",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "4401"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "General Fund",
+      "label": "Total liabilities",
+      "value": "565684",
+      "outcome": "confirmed",
+      "sum": "565684",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "118055",
+        "44996",
+        "36162",
+        "123144",
+        "243327"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Total liabilities",
+      "value": "724107",
+      "outcome": "confirmed",
+      "sum": "724107",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "565684",
+        "38204",
+        "4401",
+        "115818"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "General Fund",
+      "label": "Total liabilities and fund balances",
+      "value": "2053531",
+      "outcome": "confirmed",
+      "sum": "2053531",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "565684",
+        "1487847"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Total liabilities and fund balances",
+      "value": "3082514",
+      "outcome": "confirmed",
+      "sum": "3082514",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2053531",
+        "80515",
+        "375279",
+        "573189"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total liabilities and fund balances",
+      "value": "375279",
+      "outcome": "confirmed",
+      "sum": "375279",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "4401",
+        "370878"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Other Governmental Funds",
+      "label": "Total liabilities and fund balances",
+      "value": "573189",
+      "outcome": "confirmed",
+      "sum": "573189",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "115818",
+        "457371"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Public Safety Fund",
+      "label": "Total liabilities and fund balances",
+      "value": "80515",
+      "outcome": "confirmed",
+      "sum": "80515",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "38204",
+        "42311"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 5,
+      "column": "Total Governmental Funds",
+      "label": "Unearned revenue",
+      "value": "261053",
+      "outcome": "confirmed",
+      "addends": [
+        "243327",
+        "17726"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 6,
+      "column": "",
+      "label": "Net assets of governmental activities",
+      "value": "3778370",
+      "outcome": "confirmed",
+      "sum": "3778370",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2358407",
+        "3080565",
+        "12310",
+        "-25340",
+        "158575",
+        "-1903840",
+        "97693"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Capital outlay",
+      "value": "212304",
+      "outcome": "confirmed",
+      "sum": "212304",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "33249",
+        "179055"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Charges for current services",
+      "value": "369586",
+      "outcome": "confirmed",
+      "addends": [
+        "336057",
+        "33529"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Education",
+      "value": "32210",
+      "outcome": "confirmed",
+      "sum": "32210",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "844",
+        "31366"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Excess (deficiency) of revenues over (under) expenditures",
+      "value": "-194787",
+      "outcome": "confirmed",
+      "sum": "-194787",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "396023",
+        "590810"
+      ],
+      "negatedAddends": [
+        "590810"
+      ]
+    },
+    {
+      "page": 7,
+      "column": "Public Safety Fund",
+      "label": "Excess (deficiency) of revenues over (under) expenditures",
+      "value": "223728",
+      "outcome": "confirmed",
+      "addends": [
+        "223728"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Excess (deficiency) of revenues over (under) expenditures",
+      "value": "2465",
+      "outcome": "confirmed",
+      "sum": "2465",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2594",
+        "129"
+      ],
+      "negatedAddends": [
+        "129"
+      ]
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Excess (deficiency) of revenues over (under) expenditures",
+      "value": "60355",
+      "outcome": "confirmed",
+      "sum": "60355",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "3282205",
+        "3221850"
+      ],
+      "negatedAddends": [
+        "3221850"
+      ]
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Excess (deficiency) of revenues over (under) expenditures",
+      "value": "91761",
+      "outcome": "confirmed",
+      "sum": "91761",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "60355",
+        "223728",
+        "2465",
+        "-194787"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Federal",
+      "value": "969818",
+      "outcome": "confirmed",
+      "addends": [
+        "831859",
+        "137959"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Fines, forfeitures and penalties",
+      "value": "53818",
+      "outcome": "confirmed",
+      "sum": "53818",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "50905",
+        "2913"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Fund balances at beginning of year",
+      "value": "2240208",
+      "outcome": "confirmed",
+      "sum": "2240208",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1394380",
+        "21689",
+        "392613",
+        "431526"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Fund balances at end of year",
+      "value": "1487847",
+      "outcome": "confirmed",
+      "sum": "1487847",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "92285",
+        "1394380",
+        "1182"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Fund balances at end of year",
+      "value": "2358407",
+      "outcome": "confirmed",
+      "sum": "2358407",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1487847",
+        "42311",
+        "370878",
+        "457371"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Fund balances at end of year",
+      "value": "370878",
+      "outcome": "confirmed",
+      "addends": [
+        "392613",
+        "-21735"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Public Safety Fund",
+      "label": "Fund balances at end of year",
+      "value": "42311",
+      "outcome": "confirmed",
+      "addends": [
+        "21689",
+        "20622"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Fund balances at end of year",
+      "value": "457371",
+      "outcome": "confirmed",
+      "sum": "457371",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "25772",
+        "431526",
+        "73"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "General government",
+      "value": "210375",
+      "outcome": "confirmed",
+      "addends": [
+        "203179",
+        "129",
+        "7067"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Health and sanitation",
+      "value": "782504",
+      "outcome": "confirmed",
+      "sum": "782504",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "735916",
+        "46588"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Increase (decrease) in nonspendable inventories",
+      "value": "1255",
+      "outcome": "confirmed",
+      "addends": [
+        "1182",
+        "73"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Interest",
+      "value": "94320",
+      "outcome": "confirmed",
+      "addends": [
+        "17308",
+        "77012"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Licenses, permits and franchise fees",
+      "value": "51823",
+      "outcome": "confirmed",
+      "sum": "51823",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "42552",
+        "9271"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Net change in fund balances",
+      "value": "-21735",
+      "outcome": "confirmed",
+      "sum": "-21735",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2465",
+        "-24200"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Net change in fund balances",
+      "value": "116944",
+      "outcome": "confirmed",
+      "sum": "116944",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "92285",
+        "20622",
+        "-21735",
+        "25772"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Public Safety Fund",
+      "label": "Net change in fund balances",
+      "value": "20622",
+      "outcome": "confirmed",
+      "sum": "20622",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "223728",
+        "-203106"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Net change in fund balances",
+      "value": "25772",
+      "outcome": "confirmed",
+      "sum": "25772",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-194787",
+        "223685",
+        "-3126"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Net change in fund balances",
+      "value": "92285",
+      "outcome": "confirmed",
+      "sum": "92285",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "60355",
+        "31930"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Other",
+      "value": "104647",
+      "outcome": "confirmed",
+      "addends": [
+        "54161",
+        "50486"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Other",
+      "value": "82292",
+      "outcome": "confirmed",
+      "addends": [
+        "65542",
+        "16750"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Principal",
+      "value": "61241",
+      "outcome": "confirmed",
+      "addends": [
+        "23200",
+        "38041"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Public assistance",
+      "value": "1171662",
+      "outcome": "confirmed",
+      "sum": "1171662",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1034961",
+        "136701"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Public protection",
+      "value": "1149575",
+      "outcome": "confirmed",
+      "sum": "1149575",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1140718",
+        "8857"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Public ways and facilities",
+      "value": "64922",
+      "outcome": "confirmed",
+      "sum": "64922",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1300",
+        "63622"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Recreation and cultural",
+      "value": "33302",
+      "outcome": "confirmed",
+      "sum": "33302",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "31175",
+        "2127"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Revenue from use of money and property",
+      "value": "29765",
+      "outcome": "confirmed",
+      "sum": "29765",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "17099",
+        "46",
+        "2594",
+        "10026"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Sale of capital assets",
+      "value": "740",
+      "outcome": "confirmed",
+      "addends": [
+        "360",
+        "380"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "State",
+      "value": "1276289",
+      "outcome": "confirmed",
+      "sum": "1276289",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "958169",
+        "223682",
+        "94438"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Taxes",
+      "value": "966512",
+      "outcome": "confirmed",
+      "sum": "966512",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "925861",
+        "40651"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total expenditures",
+      "value": "129",
+      "outcome": "confirmed",
+      "sum": "129",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "129"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Total expenditures",
+      "value": "3221850",
+      "outcome": "confirmed",
+      "sum": "3221850",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "203179",
+        "1140718",
+        "1300",
+        "735916",
+        "1034961",
+        "844",
+        "31175",
+        "33249",
+        "23200",
+        "17308"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Total expenditures",
+      "value": "3812789",
+      "outcome": "confirmed",
+      "sum": "3812789",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "210375",
+        "1149575",
+        "64922",
+        "782504",
+        "1171662",
+        "32210",
+        "33302",
+        "212304",
+        "61241",
+        "94320",
+        "374"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Total expenditures",
+      "value": "590810",
+      "outcome": "confirmed",
+      "sum": "590810",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "7067",
+        "8857",
+        "63622",
+        "46588",
+        "136701",
+        "31366",
+        "2127",
+        "179055",
+        "38041",
+        "77012",
+        "374"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Public Safety Fund",
+      "label": "Total other financing sources (uses)",
+      "value": "-203106",
+      "outcome": "confirmed",
+      "sum": "-203106",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-203106"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total other financing sources (uses)",
+      "value": "-24200",
+      "outcome": "confirmed",
+      "sum": "-24200",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-24200"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Total other financing sources (uses)",
+      "value": "223685",
+      "outcome": "confirmed",
+      "sum": "223685",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "380",
+        "32665",
+        "-182",
+        "216044",
+        "-25222"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Total other financing sources (uses)",
+      "value": "28309",
+      "outcome": "confirmed",
+      "sum": "28309",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "31930",
+        "-203106",
+        "-24200",
+        "223685"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Total other financing sources (uses)",
+      "value": "31930",
+      "outcome": "confirmed",
+      "sum": "31930",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "360",
+        "244148",
+        "-212578"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Public Safety Fund",
+      "label": "Total revenues",
+      "value": "223728",
+      "outcome": "confirmed",
+      "sum": "223728",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "46",
+        "223682"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Tobacco Endowment Fund",
+      "label": "Total revenues",
+      "value": "2594",
+      "outcome": "confirmed",
+      "sum": "2594",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2594"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "General Fund",
+      "label": "Total revenues",
+      "value": "3282205",
+      "outcome": "confirmed",
+      "sum": "3282205",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "925861",
+        "42552",
+        "50905",
+        "17099",
+        "958169",
+        "831859",
+        "65542",
+        "336057",
+        "54161"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Total revenues",
+      "value": "3904550",
+      "outcome": "confirmed",
+      "sum": "3904550",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "3282205",
+        "223728",
+        "2594",
+        "396023"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Other Governmental Funds",
+      "label": "Total revenues",
+      "value": "396023",
+      "outcome": "confirmed",
+      "sum": "396023",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "40651",
+        "9271",
+        "2913",
+        "10026",
+        "94438",
+        "137959",
+        "16750",
+        "33529",
+        "50486"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Transfers in",
+      "value": "460192",
+      "outcome": "confirmed",
+      "addends": [
+        "244148",
+        "216044"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 7,
+      "column": "Total Governmental Funds",
+      "label": "Transfers out",
+      "value": "-465106",
+      "outcome": "confirmed",
+      "sum": "-465106",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "-212578",
+        "-203106",
+        "-24200",
+        "-25222"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 8,
+      "column": "BALANCES OF",
+      "label": "Change in net assets - governmental activities",
+      "value": "208157",
+      "outcome": "confirmed",
+      "sum": "208157",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "116944",
+        "-3460",
+        "-13567",
+        "1255",
+        "960",
+        "-7904",
+        "100614",
+        "-21930",
+        "33721",
+        "-14122",
+        "13549",
+        "6733",
+        "-4636"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "",
+      "label": "Net assets of business-type activities",
+      "value": "250222",
+      "outcome": "confirmed",
+      "sum": "250222",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "249871",
+        "351"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total assets",
+      "value": "253743",
+      "outcome": "confirmed",
+      "sum": "253743",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "85718",
+        "168025"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total assets",
+      "value": "286987",
+      "outcome": "confirmed",
+      "sum": "286987",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "236832",
+        "50155"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total current assets",
+      "value": "236832",
+      "outcome": "confirmed",
+      "sum": "236832",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "210325",
+        "1511",
+        "23437",
+        "1559"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total current assets",
+      "value": "85718",
+      "outcome": "confirmed",
+      "sum": "85718",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "81282",
+        "4139",
+        "295",
+        "2"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total current liabilities",
+      "value": "2577",
+      "outcome": "confirmed",
+      "sum": "2577",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "993",
+        "233",
+        "837",
+        "75",
+        "267",
+        "172"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total current liabilities",
+      "value": "81573",
+      "outcome": "confirmed",
+      "sum": "81573",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "34820",
+        "1187",
+        "4",
+        "7284",
+        "583",
+        "892",
+        "31",
+        "930",
+        "35842"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total liabilities",
+      "value": "188943",
+      "outcome": "confirmed",
+      "sum": "188943",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "81573",
+        "107370"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total liabilities",
+      "value": "3872",
+      "outcome": "confirmed",
+      "sum": "3872",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2577",
+        "1295"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total net assets",
+      "value": "249871",
+      "outcome": "confirmed",
+      "sum": "249871",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "162874",
+        "86997"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total net assets",
+      "value": "98044",
+      "outcome": "confirmed",
+      "sum": "98044",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "49925",
+        "48119"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total noncurrent assets",
+      "value": "168025",
+      "outcome": "confirmed",
+      "sum": "168025",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3838",
+        "11565",
+        "11640",
+        "113990",
+        "1110",
+        "6449",
+        "91038",
+        "-71605"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total noncurrent assets",
+      "value": "50155",
+      "outcome": "confirmed",
+      "sum": "50155",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "45",
+        "87",
+        "129655",
+        "11657",
+        "-91289"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total noncurrent liabilities",
+      "value": "107370",
+      "outcome": "confirmed",
+      "sum": "107370",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2874",
+        "154",
+        "1345",
+        "102997"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 9,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total noncurrent liabilities",
+      "value": "1295",
+      "outcome": "confirmed",
+      "sum": "1295",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1046",
+        "249"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Change in net assets",
+      "value": "-2601",
+      "outcome": "confirmed",
+      "sum": "-2601",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-2629",
+        "360",
+        "-332"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Change in net assets",
+      "value": "-4683",
+      "outcome": "confirmed",
+      "sum": "-4683",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-3436",
+        "600",
+        "9918",
+        "-11765"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Change in net assets of business-type activities",
+      "value": "-2648",
+      "outcome": "confirmed",
+      "sum": "-2648",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-2601",
+        "-47"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Income (loss) before capital contributions and transfers",
+      "value": "-2629",
+      "outcome": "confirmed",
+      "sum": "-2629",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-4204",
+        "1575"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Income (loss) before capital contributions and transfers",
+      "value": "-3436",
+      "outcome": "confirmed",
+      "sum": "-3436",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-8253",
+        "4817"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Net assets (deficits) at end of year",
+      "value": "249871",
+      "outcome": "confirmed",
+      "sum": "249871",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-2601",
+        "252472"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Net assets (deficits) at end of year",
+      "value": "98044",
+      "outcome": "confirmed",
+      "sum": "98044",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-4683",
+        "102727"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Operating income (loss)",
+      "value": "-4204",
+      "outcome": "confirmed",
+      "sum": "-4204",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "36712",
+        "40916"
+      ],
+      "negatedAddends": [
+        "40916"
+      ]
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Operating income (loss)",
+      "value": "-8253",
+      "outcome": "confirmed",
+      "sum": "-8253",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "319990",
+        "328243"
+      ],
+      "negatedAddends": [
+        "328243"
+      ]
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total nonoperating revenues (expenses)",
+      "value": "1575",
+      "outcome": "confirmed",
+      "sum": "1575",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "539",
+        "1151",
+        "-88",
+        "-28",
+        "1"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total nonoperating revenues (expenses)",
+      "value": "4817",
+      "outcome": "confirmed",
+      "sum": "4817",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3977",
+        "828",
+        "-198",
+        "210"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total operating expenses",
+      "value": "328243",
+      "outcome": "confirmed",
+      "sum": "328243",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "36786",
+        "31776",
+        "1053",
+        "164269",
+        "15468",
+        "21697",
+        "6067",
+        "32302",
+        "13272",
+        "5553"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total operating expenses",
+      "value": "40916",
+      "outcome": "confirmed",
+      "sum": "40916",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "7169",
+        "5913",
+        "1068",
+        "14130",
+        "4934",
+        "5430",
+        "291",
+        "1981"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total operating revenues",
+      "value": "319990",
+      "outcome": "confirmed",
+      "sum": "319990",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "312269",
+        "7721"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 10,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total operating revenues",
+      "value": "36712",
+      "outcome": "confirmed",
+      "sum": "36712",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "36476",
+        "236"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Cash and cash equivalents - end of year",
+      "value": "210325",
+      "outcome": "confirmed",
+      "sum": "210325",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "19464",
+        "190861"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Cash and cash equivalents - end of year",
+      "value": "81282",
+      "outcome": "confirmed",
+      "sum": "81282",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-1138",
+        "82420"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Net cash provided (used) by capital and related financing activities",
+      "value": "-4832",
+      "outcome": "confirmed",
+      "sum": "-4832",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-4491",
+        "1",
+        "-254",
+        "-88"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Net cash provided (used) by capital and related financing activities",
+      "value": "-8571",
+      "outcome": "confirmed",
+      "sum": "-8571",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "567",
+        "-9782",
+        "681",
+        "-27",
+        "-10"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Net cash provided (used) by noncapital financing activities",
+      "value": "1496",
+      "outcome": "confirmed",
+      "sum": "1496",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1467",
+        "360",
+        "-332",
+        "1"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Net cash provided (used) by noncapital financing activities",
+      "value": "7639",
+      "outcome": "confirmed",
+      "sum": "7639",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3759",
+        "9918",
+        "-5032",
+        "38",
+        "-855",
+        "-189"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Net cash provided (used) by operating activities",
+      "value": "1633",
+      "outcome": "confirmed",
+      "sum": "1633",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "31211",
+        "6343",
+        "-27273",
+        "-7163",
+        "-1485"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Net cash provided (used) by operating activities",
+      "value": "19513",
+      "outcome": "confirmed",
+      "sum": "19513",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-8253",
+        "27766"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Net increase (decrease) in cash and cash equivalents",
+      "value": "-1138",
+      "outcome": "confirmed",
+      "sum": "-1138",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "1633",
+        "1496",
+        "-4832",
+        "565"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Net increase (decrease) in cash and cash equivalents",
+      "value": "19464",
+      "outcome": "confirmed",
+      "sum": "19464",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "19513",
+        "7639",
+        "-8571",
+        "883"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Governmental Activities Internal Service Funds",
+      "label": "Total adjustments",
+      "value": "27766",
+      "outcome": "confirmed",
+      "sum": "27766",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2516",
+        "-589",
+        "-228",
+        "4832",
+        "102",
+        "2340",
+        "82",
+        "2",
+        "3241",
+        "15468"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 11,
+      "column": "Business-type Activities Enterprise Funds",
+      "label": "Total adjustments",
+      "value": "5837",
+      "outcome": "confirmed",
+      "sum": "5837",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1327",
+        "-511",
+        "-1",
+        "-223",
+        "14",
+        "-218",
+        "26",
+        "-7",
+        "5430"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "Agency Funds",
+      "label": "Total assets",
+      "value": "352495",
+      "outcome": "confirmed",
+      "sum": "352495",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "345407",
+        "1502",
+        "2056",
+        "3530"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "Investment Trust Funds",
+      "label": "Total assets",
+      "value": "3601935",
+      "outcome": "confirmed",
+      "sum": "3601935",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3598411",
+        "3524"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total assets",
+      "value": "8391",
+      "outcome": "confirmed",
+      "sum": "8391",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6795",
+        "1155",
+        "6",
+        "120",
+        "315"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total held in trust (deficit)",
+      "value": "-12779",
+      "outcome": "confirmed",
+      "sum": "-12779",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-12779"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "Investment Trust Funds",
+      "label": "Total held in trust (deficit)",
+      "value": "3601935",
+      "outcome": "confirmed",
+      "sum": "3601935",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3601935"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total liabilities",
+      "value": "21170",
+      "outcome": "confirmed",
+      "sum": "21170",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2214",
+        "213",
+        "393",
+        "13477",
+        "4873"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 12,
+      "column": "Agency Funds",
+      "label": "Total liabilities",
+      "value": "352495",
+      "outcome": "confirmed",
+      "sum": "352495",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "19375",
+        "167292",
+        "8",
+        "165820"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Change in net assets",
+      "value": "-12779",
+      "outcome": "confirmed",
+      "sum": "-12779",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "964",
+        "-3320",
+        "-10423"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Change in net assets",
+      "value": "170984",
+      "outcome": "confirmed",
+      "sum": "170984",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "5746468",
+        "-5575484"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Change in net assets before extraordinary loss",
+      "value": "-2356",
+      "outcome": "confirmed",
+      "addends": [
+        "964",
+        "-3320"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Change in net assets before extraordinary loss",
+      "value": "170984",
+      "outcome": "confirmed",
+      "addends": [
+        "5746468",
+        "-5575484"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Net assets (deficit) at end of year",
+      "value": "-12779",
+      "outcome": "confirmed",
+      "sum": "-12779",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-12779"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Net assets (deficit) at end of year",
+      "value": "3601935",
+      "outcome": "confirmed",
+      "sum": "3601935",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "170984",
+        "3430951"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Total additions",
+      "value": "5746468",
+      "outcome": "confirmed",
+      "sum": "5746468",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "5729257",
+        "17211"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total additions",
+      "value": "964",
+      "outcome": "confirmed",
+      "sum": "964",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "30",
+        "914",
+        "20"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Total contributions",
+      "value": "5729257",
+      "outcome": "confirmed",
+      "sum": "5729257",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5729257"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total deductions",
+      "value": "3320",
+      "outcome": "confirmed",
+      "sum": "3320",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "25",
+        "2214",
+        "1081"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Total deductions",
+      "value": "5575484",
+      "outcome": "confirmed",
+      "sum": "5575484",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5575484"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "Investment Trust Funds",
+      "label": "Total investment earnings",
+      "value": "17211",
+      "outcome": "confirmed",
+      "sum": "17211",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-929",
+        "18140"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 13,
+      "column": "County of San Diego Successor Agency Private Purpose Trust Fund",
+      "label": "Total investment earnings",
+      "value": "30",
+      "outcome": "confirmed",
+      "sum": "30",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "17",
+        "13"
+      ],
+      "negatedAddends": []
+    }
+  ]
+}

@@ -1,81 +1,203 @@
 {
   "document": "Sample-Financial-Statements-1.pdf",
-  "detectorVersion": "reconcile-detector-1",
-  "approved": false,
-  "pages": [],
-  "note": "Candidate, not a golden. Check every entry against the printed page, correct the outcomes the scan got wrong, list in `pages` the page numbers you checked in full, then set `approved` to true. Any total confirmed on a listed page that is absent from `totals` scores as a false tie, which is what makes the hard bar mean anything.",
+  "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
+  "approved": true,
+  "pages": [
+    1,
+    2,
+    3
+  ],
+  "note": "Hand-approved full-document golden. Every entry on a listed page was read against the printed page; confirmed addends were checked by hand. Merged from: sample-primary-approved.json Independently re-verified against the printed pages; non-total nominations removed and footable omissions added.",
   "totals": [
     {
       "page": 1,
       "column": "2021",
       "label": "Net income",
       "value": "945",
-      "outcome": "unresolved",
-      "unresolvedReason": "no-candidate-run"
+      "outcome": "confirmed",
+      "addends": [
+        "1350",
+        "405"
+      ],
+      "basis": "subtotals",
+      "negatedAddends": [
+        "405"
+      ]
     },
     {
       "page": 1,
-      "column": "Retained Earnings",
-      "label": "Net income",
-      "value": "945",
-      "outcome": "unresolved",
-      "unresolvedReason": "run-too-short"
+      "column": "2021",
+      "label": "Operating Income",
+      "value": "1390",
+      "outcome": "confirmed",
+      "sum": "1390",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2750",
+        "1360"
+      ],
+      "negatedAddends": [
+        "1360"
+      ]
+    },
+    {
+      "page": 1,
+      "column": "2021",
+      "label": "Pretax income",
+      "value": "1350",
+      "outcome": "confirmed",
+      "sum": "1350",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "1390",
+        "40"
+      ],
+      "negatedAddends": [
+        "40"
+      ]
     },
     {
       "page": 1,
       "column": "2021",
       "label": "Total operating expenses",
       "value": "1360",
-      "outcome": "unresolved",
-      "unresolvedReason": "no-candidate-run"
+      "outcome": "confirmed",
+      "addends": [
+        "100",
+        "1200",
+        "60"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 1,
+      "column": "Retained Earnings",
+      "label": "Balance, September 30, 2021",
+      "value": "1265",
+      "outcome": "confirmed",
+      "sum": "1265",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "820",
+        "945",
+        "500"
+      ],
+      "negatedAddends": [
+        "500"
+      ]
     },
     {
       "page": 2,
       "column": "$6,875",
       "label": "Gross Profit",
       "value": "2750",
-      "outcome": "unresolved",
-      "unresolvedReason": "run-too-short"
+      "outcome": "confirmed",
+      "addends": [
+        "6875",
+        "4125"
+      ],
+      "negatedAddends": [
+        "4125"
+      ]
     },
     {
       "page": 2,
       "column": "$6,875",
       "label": "Net income",
       "value": "945",
-      "outcome": "unresolved",
-      "unresolvedReason": "no-candidate-run"
+      "outcome": "confirmed",
+      "addends": [
+        "1350",
+        "405"
+      ],
+      "basis": "subtotals",
+      "negatedAddends": [
+        "405"
+      ]
     },
     {
       "page": 2,
-      "column": "Retained Earnings",
-      "label": "Net income",
-      "value": "945",
-      "outcome": "unresolved",
-      "unresolvedReason": "run-too-short"
+      "column": "$6,875",
+      "label": "Operating Income",
+      "value": "1390",
+      "outcome": "confirmed",
+      "sum": "1390",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2750",
+        "1360"
+      ],
+      "negatedAddends": [
+        "1360"
+      ]
+    },
+    {
+      "page": 2,
+      "column": "$6,875",
+      "label": "Pretax income",
+      "value": "1350",
+      "outcome": "confirmed",
+      "sum": "1350",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "1390",
+        "40"
+      ],
+      "negatedAddends": [
+        "40"
+      ]
     },
     {
       "page": 2,
       "column": "$6,875",
       "label": "Total operating expenses",
       "value": "1360",
-      "outcome": "unresolved",
-      "unresolvedReason": "no-candidate-run"
+      "outcome": "confirmed",
+      "addends": [
+        "100",
+        "1200",
+        "60"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 2,
+      "column": "Retained Earnings",
+      "label": "Balance, September 30, 2021",
+      "value": "1265",
+      "outcome": "confirmed",
+      "sum": "1265",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "820",
+        "945",
+        "500"
+      ],
+      "negatedAddends": [
+        "500"
+      ]
     },
     {
       "page": 3,
       "column": "",
-      "label": "Total Current Liabilities",
-      "value": "895",
+      "label": "10,700",
+      "value": "10700",
       "outcome": "confirmed",
-      "sum": "895",
+      "sum": "10700",
       "delta": "0",
       "basis": "leaves",
       "addends": [
-        "60",
-        "80",
-        "100",
-        "405",
-        "250"
+        "12000",
+        "1300"
+      ],
+      "negatedAddends": [
+        "1300"
       ]
     },
     {
@@ -83,8 +205,15 @@
       "column": "",
       "label": "Total assets",
       "value": "13060",
-      "outcome": "unresolved",
-      "unresolvedReason": "no-candidate-run"
+      "outcome": "confirmed",
+      "sum": "13060",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2360",
+        "10700"
+      ],
+      "negatedAddends": []
     },
     {
       "page": 3,
@@ -99,7 +228,57 @@
         "1550",
         "770",
         "40"
-      ]
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Equity",
+      "label": "Total Current Liabilities",
+      "value": "895",
+      "outcome": "confirmed",
+      "sum": "895",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "60",
+        "80",
+        "100",
+        "405",
+        "250"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Equity",
+      "label": "Total equity",
+      "value": "4165",
+      "outcome": "confirmed",
+      "sum": "4165",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2900",
+        "1265"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 3,
+      "column": "Equity",
+      "label": "Total liabilities and owners' equity",
+      "value": "13060",
+      "outcome": "confirmed",
+      "sum": "13060",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "895",
+        "8000",
+        "4165"
+      ],
+      "negatedAddends": []
     }
   ]
 }

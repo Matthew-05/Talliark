@@ -206,7 +206,13 @@ def is_noncontrolling_allocation_label(text: str) -> bool:
 
 
 def is_non_total_net_measure(text: str) -> bool:
-    """Whether Net modifies the name of a component rather than a result row."""
+    """Whether Net modifies the name of a component rather than a result row.
+
+    *Net appreciation*, *Net realized*, *Net unrealized* and *Net change in
+    unrealized* are investment-return components, not totals; a total's label
+    reads *Total investment return* over them. They open with "Net" like a
+    result row, so the lexicon has to say explicitly that they are not one.
+    """
     label = normalize(text)
     return _opens_with(
         label,
@@ -217,6 +223,10 @@ def is_non_total_net_measure(text: str) -> bool:
             "net product sales",
             "net service sales",
             "net of tax",
+            "net appreciation",
+            "net realized",
+            "net unrealized",
+            "net change in unrealized",
         ),
     )
 

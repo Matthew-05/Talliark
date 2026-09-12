@@ -91,7 +91,7 @@ def _evaluation(block, column: int, top: int, total_row: int) -> Evaluation | No
     if len(concrete) < 2:
         return None
     run = sums.Run("leaves", tuple(concrete), sums.value_of(total), decimals)
-    if sums.double_counts(run):
+    if sums.double_counts(run) or sums.derives_from_same_label(total, concrete):
         return None
     return Evaluation(
         column,
@@ -471,4 +471,6 @@ def _sparse_evaluation(
     if any(sums.value_of(cell) is None or not sums._eligible(cell, decimals) for cell in concrete):
         return None
     run = sums.Run("subtotals", tuple(concrete), sums.value_of(total), decimals)
+    if sums.derives_from_same_label(total, concrete):
+        return None
     return Evaluation(column, total, run, sums.tied_variants(run))

@@ -119,11 +119,17 @@ implemented.
    results, peer cash-flow summaries, equity movements, allocation components,
    component uses of Net, and high-confidence non-additive columns remain
    diagnostic.
-7. Composed lattice results are admitted only when they tie exactly and the same
-   row/sign structure ties in at least two non-proportional columns. They never
-   enlarge Not checked. Lattice, composed, and grid totals are then deduplicated
-   by value span and axis. Exact confirmation outranks a break, a break outranks
-   unresolved, and substrate order settles equal outcomes.
+7. Composed lattice results are admitted when they tie exactly and the same
+   row/sign structure ties in at least two non-proportional columns, or when
+   the document's own label nominated the row and the run holds three or more
+   addends — the ordinary one-signal floor. A two-addend composed run still
+   needs the parallel columns. A composed run holding a figure and its exact
+   negation is refused: composition rejoins fragments the page separated, and
+   a pair that adds to zero is not evidence for the total above it. Composed
+   results never enlarge Not checked. Lattice, composed, and grid totals are
+   then deduplicated by value span and axis. Exact confirmation outranks a
+   break, a break outranks unresolved, and substrate order settles equal
+   outcomes.
 8. `findings.py` publishes confirmed evidence silently and turns supported
    breaks or selected unresolved cases into reviewer-checkable sentences.
 
@@ -234,31 +240,47 @@ by diagnostics so loss of recognition is still visible to development tooling.
 
 ## 7. Tests and corpus
 
-`test_reconcile.py` has 101 tests pinning nomination independence, relative
+`test_reconcile.py` has 112 tests pinning nomination independence, relative
 column independence, zero-insensitive signed patterns, subtotal block
 protection and deepest-top propagation, balance-sheet side boundaries,
 incomplete-run safety, printed-rounding classification, bounded sign reversal,
-repeated two-addend cross-foots, unresolved admission, composed/grid/lattice
+repeated two-addend cross-foots, gap-crossing cross-foots, composed admission
+and its cancelling-pair refusal, unresolved admission, composed/grid/lattice
 precedence, findings, progress stages, and contract validation.
 Candidate real-document goldens are never accepted automatically; the
 whole-document scorer's hard bar is zero false ties.
 
-The eight-document corpus currently publishes 2,188 totals: 2,034 confirmed,
-two breaks, and 152 Not checked. Before statement-aware unresolved admission it
+The eight-document corpus currently publishes 2,204 totals: 2,060 confirmed,
+two breaks, and 142 Not checked. Before statement-aware unresolved admission it
 published 2,978 totals with 1,081 Not checked; the crossing walk, the subtotal
 reduction, the statement-region merge, relative-offset parallel corroboration,
-and verified-structure propagation have since moved recall from 1,887 to 2,034
-confirmations without adding a break. Apple publishes 249 confirmations and
-nothing Not checked; Quest two, Disney three, while retaining 141 and 694. The
-two Amazon breaks remain. Every newly confirmed total was read against the
-printed page; the sampled set — the two commercial-paper subtotals, the
-fair-value hierarchy totals, the reclassification total, the Amazon
-balance-sheet grand total, and the RoyCarver conversion total — is
-arithmetically correct. The admission pass itself cannot reduce confirmed or
-break outcomes. No structure block reaches the hypothesis cap. The version is
-`reconcile-detector-9+financial-table-detector-5`. These are regression
-observations rather than hand-approved correctness goldens: the corpus still has
-no approved golden, and building one is the next phase.
+verified-structure propagation, the same-label running-balance refusal, and
+the composed and gap-crossing admissions of detector 11 have since moved recall
+from 1,887 to 2,060 confirmations without adding a break. Apple publishes 249
+confirmations and nothing Not checked; Quest two, Disney three, while retaining
+141 and 694. The two Amazon breaks remain. The admission pass itself cannot
+reduce confirmed or break outcomes. No structure block reaches the hypothesis
+cap. The version is
+`reconcile-detector-11+financial-table-detector-5`.
+
+The detector-11 confirmations are measured against golden updates proposed with
+them -- a label corrected to the page's own words, or one real total added.
+Those three goldens are marked unapproved until a person reviews the proposal;
+approving them restores the zero-false-tie bar at the higher recall.
+
+**The corpus carries full-document goldens.** Each of the eight
+documents in `src/python/tests/fixtures/reconcile/` lists every total on every
+page that nominated one, with its outcome and, for a confirmation, the printed
+rows it foots on. They were built by rendering every page, then re-verified by
+an independent pass that re-derived the totals from the page before opening the
+golden. Against the detector-11 proposal they score **zero false ties** and
+expose 207 missed totals — the nomination recall worklist — of which 152 are
+not nominated at all and 55 are unresolved. Two engine defects the audit caught
+are fixed here: the ten `Cumulative deliveries` running balances that the
+structure search confirmed as totals (§7.10), and a coincidental addend set on
+Boeing p109 that the golden corrects. One soft disagreement remains: the
+Boeing p109 addend set, where the golden records the statement's three rows and
+the engine a longer coincidental run.
 
 The recall gain was measured with the null instrument (`sums`/crossing added
 about 0.8 points to the one-seed five-document false-tie rate, 11.66% to

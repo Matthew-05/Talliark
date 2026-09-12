@@ -130,6 +130,12 @@ def label_total(cell: dict) -> dict | None:
     label = cell.get("rowLabel", "")
     if not labels.is_total_label(label):
         return None
+    if labels.is_non_total_net_measure(label):
+        # "Net appreciation", "Net realized", "Net unrealized" open with "Net"
+        # like a result row but name an investment-return component. Nominating
+        # one also makes it a barrier to the total above it, which then cannot
+        # reach the component it actually foots on.
+        return None
     return {"name": "label-total", "evidence": f'row label reads "{label}"'}
 
 

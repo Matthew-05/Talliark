@@ -326,6 +326,12 @@ def model_bytes(model: dict) -> bytes:
 
 
 def main() -> int:
+    # A report quotes the document's own text, which on Windows is routinely
+    # outside the console's cp1252 code page. Without this the scorer dies
+    # printing a result it has already computed.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pdf", nargs="+", type=Path)
     parser.add_argument("--golden", type=Path, help="score against this hand-approved golden")

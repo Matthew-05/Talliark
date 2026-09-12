@@ -513,8 +513,11 @@ class Decisions(unittest.TestCase):
                     built, page_index=0, findings=[]
                 )
 
+                # A Net-named component is not nominated at all, so it is not a
+                # boundary to the total above it and never reaches the Not
+                # checked queue.
                 self.assertFalse(model["totals"])
-                self.assertEqual(diagnostics["withheld"], {"net-component": 1})
+                self.assertEqual(diagnostics["withheld"], {})
 
     def test_a_net_result_carried_into_a_new_statement_is_not_not_checked(self) -> None:
         built = _table([
@@ -666,6 +669,32 @@ class Decisions(unittest.TestCase):
         model, _ = _reconcile_block(built, page_index=0, findings=[])
 
         self.assertFalse([total for total in model["totals"] if total.get("axis") == "cross"])
+
+    def test_a_cross_foot_crosses_a_blank_fund_column(self) -> None:
+        # A fund-column total row prints a figure only in the funds that carry
+        # the item; the bounded walk stops at the first fund that does not and
+        # never reaches the earlier one. The crossing reading reaches it, and
+        # the repeated row supplies the evidence the pair needs.
+        built = _table([
+            ("Total assets", "60", "", "40", "100"),
+            ("Total liabilities", "30", "", "70", "100"),
+        ])
+        built.header_labels = [
+            {"columnIndex": 1, "text": "General Fund", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "Public Safety Fund", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Other Governmental Funds", "isPeriodColumn": False, "isTotalColumn": False},
+            {"columnIndex": 4, "text": "Total Governmental Funds", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+
+        model, _ = _reconcile_block(built, page_index=0, findings=[])
+
+        cross = [total for total in model["totals"] if total.get("axis") == "cross"]
+        self.assertEqual(len(cross), 2)
+        self.assertTrue(all(total["outcome"] == "confirmed" for total in cross))
+        self.assertEqual(
+            [total["resolution"]["addendCellIds"] for total in cross],
+            [["t-r0-c1", "t-r0-c3"], ["t-r1-c1", "t-r1-c3"]],
+        )
 
     def test_a_net_header_checks_a_subtractive_row(self) -> None:
         built = _table([
@@ -910,6 +939,34 @@ class SumTree(unittest.TestCase):
         # leaves as well would count the same principal twice.
         self.assertEqual(resolved[1]["resolution"]["basis"], "subtotals")
         self.assertEqual(len(resolved[1]["resolution"]["addendCellIds"]), 3)
+
+    def test_a_running_balance_is_not_derived_from_a_same_labelled_row(self) -> None:
+        # Boeing's Cumulative deliveries prints the same row label once per
+        # year, each older figure the newer one less that year's deliveries.
+        # The reverse reading 8,528 - 396 = 8,132 ties, but the page never
+        # meant the older balance as a total.
+        built = _table([
+            ("Alpha", "8,528"),
+            ("Beta", "396"),
+            ("Cumulative deliveries", "8,132"),
+        ])
+        built.ruled_above = frozenset({2})
+        self.assertEqual(_resolve(built)[0]["outcome"], "unresolved")
+
+    def test_a_bare_total_marker_over_another_total_is_still_allowed(self) -> None:
+        # "Total" is a marker, not a name: a table legitimately sets one total
+        # over another, so the same-label refusal does not apply to it.
+        self.assertFalse(
+            sums.derives_from_same_label(
+                {"rowLabel": "Total"}, [{"rowLabel": "Total"}]
+            )
+        )
+        self.assertTrue(
+            sums.derives_from_same_label(
+                {"rowLabel": "Cumulative deliveries"},
+                [{"rowLabel": "Cumulative deliveries"}],
+            )
+        )
 
     def test_a_run_that_hides_a_subtotal_is_refused_rather_than_reported(self) -> None:
         # Apple's commercial-paper table: proceeds, repayments, and the net of
@@ -1429,6 +1486,47 @@ class ParallelColumnCorroboration(unittest.TestCase):
             "outcome": "unresolved",
             "signals": [{"name": "column-corroboration"}],
         }))
+
+    def test_a_labelled_three_addend_composed_tie_is_admitted(self) -> None:
+        # The ordinary pass accepts a labelled run of three anywhere else; a
+        # composed tie over the same shape is not the coincidence composition
+        # has to fear. A pair still needs the parallel columns.
+        total = {
+            "id": "composed",
+            "outcome": "confirmed",
+            "signals": [{"name": "label-total"}],
+            "resolution": {"addendCellIds": ["a", "b", "c"]},
+        }
+        self.assertTrue(_is_supported_composed_total(total))
+        self.assertFalse(
+            _is_supported_composed_total(
+                {**total, "resolution": {"addendCellIds": ["a", "b"]}}
+            )
+        )
+
+    def test_a_composed_run_with_a_cancelling_pair_is_refused(self) -> None:
+        # Composition rejoins fragments the page separated, so a run can hold a
+        # figure and its exact negation. A pair that adds to zero is not
+        # evidence for the total above it.
+        cells = {
+            "a": {"id": "a", "normalizedValue": "21401"},
+            "b": {"id": "b", "normalizedValue": "-21401"},
+            "c": {"id": "c", "normalizedValue": "291"},
+        }
+        total = {
+            "id": "composed",
+            "outcome": "confirmed",
+            "signals": [{"name": "label-total"}],
+            "resolution": {"addendCellIds": ["a", "b", "c"]},
+        }
+        self.assertFalse(_is_supported_composed_total(total, frozenset(), cells))
+        self.assertTrue(
+            _is_supported_composed_total(
+                total,
+                frozenset(),
+                {**cells, "b": {"id": "b", "normalizedValue": "5"}},
+            )
+        )
 
     def test_parallel_exact_columns_support_a_composed_total(self) -> None:
         block = {

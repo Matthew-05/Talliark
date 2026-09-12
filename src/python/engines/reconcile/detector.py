@@ -35,7 +35,7 @@ from . import sums
 from . import structures
 
 
-DETECTOR_VERSION = f"reconcile-detector-9+{FINANCIAL_TABLE_VERSION}"
+DETECTOR_VERSION = f"reconcile-detector-11+{FINANCIAL_TABLE_VERSION}"
 
 
 def geometry_fingerprint(geometry: dict) -> str:
@@ -139,10 +139,11 @@ def detect_reconcile(
                 # coincidence is admitted only where independent parallel
                 # columns also establish the row structure that was composed.
                 parallel_ids = _composed_parallel_total_ids(reconciled)
+                cells_by_id = {cell["id"]: cell for cell in reconciled["cells"]}
                 reconciled["totals"] = [
                     total
                     for total in reconciled["totals"]
-                    if _is_supported_composed_total(total, parallel_ids)
+                    if _is_supported_composed_total(total, parallel_ids, cells_by_id)
                 ]
             selected, replaced_ids = _select_grid_totals(reconciled, published)
             if not selected:
@@ -161,6 +162,8 @@ def detect_reconcile(
                 for finding in fallback_findings
                 if finding["totalId"] in selected_ids
             )
+
+    _dedupe_published(published, findings)
 
     model = {
         "version": 1,
@@ -716,15 +719,61 @@ def _composed_parallel_total_ids(block: dict) -> frozenset[str]:
 def _is_supported_composed_total(
     total: dict,
     parallel_ids: frozenset[str] = frozenset(),
+    cells: dict[str, dict] | None = None,
 ) -> bool:
-    """Whether a caption-spanning exact tie has independent structure evidence."""
-    return total.get("outcome") == "confirmed" and (
-        total.get("id") in parallel_ids
-        or any(
-            signal.get("name") == "column-corroboration"
-            for signal in total.get("signals", [])
-        )
+    """Whether a caption-spanning exact tie has independent structure evidence.
+
+    Parallel columns remain the strongest support, and a propagated
+    confirmation carries its own. A composed tie is also admitted when the
+    document's own label nominated the row and the run holds three or more
+    addends: that is exactly the evidence the ordinary pass accepts anywhere
+    else, and an exact tie over a long labelled run is not the coincidence
+    composition has to fear. A two-addend composed run still needs the parallel
+    columns, because a pair that happens to sum is nearly evidence-free however
+    it was reached.
+
+    One refusal belongs here and not in `sums`: composition rejoins fragments
+    the page separated, so a run can hold a figure and its exact negation --
+    Quest's tax note printed total deferred tax assets beside its valuation
+    allowance, and the joined run counted both. A pair that adds to zero is not
+    evidence for the total above it, and refusing it only ever removes a tie
+    composition created; the ordinary lattice keeps its own runs untouched.
+    """
+    if total.get("outcome") != "confirmed":
+        return False
+    if cells and _resolution_cancels(total, cells):
+        return False
+    if total.get("id") in parallel_ids or any(
+        signal.get("name") == "column-corroboration"
+        for signal in total.get("signals", [])
+    ):
+        return True
+    resolution = total.get("resolution") or {}
+    addends = resolution.get("addendCellIds") or []
+    signals = {signal.get("name") for signal in total.get("signals", [])}
+    return (
+        "label-total" in signals
+        and len(addends) >= nominate_module.MIN_ADDENDS_ON_ONE_SIGNAL
     )
+
+
+def _resolution_cancels(total: dict, cells: dict[str, dict]) -> bool:
+    """Whether a run holds a figure and its exact negation."""
+    values: list[Decimal] = []
+    for cell_id in (total.get("resolution") or {}).get("addendCellIds") or []:
+        cell = cells.get(cell_id)
+        if cell is None or "normalizedValue" not in cell:
+            continue
+        values.append(Decimal(cell["normalizedValue"]))
+    for index, value in enumerate(values):
+        if value == 0:
+            continue
+        if any(
+            other != index and values[other] == -value
+            for other in range(len(values))
+        ):
+            return True
+    return False
 
 
 # The signals strong enough for a nominated row to stop another total's walk.
@@ -939,6 +988,46 @@ def _span_for_total(block: dict, total: dict) -> str | None:
     if cell is None or "spanId" not in cell:
         return None
     return "{}:{}".format(total.get("axis", "vertical"), cell["spanId"])
+
+
+def _dedupe_published(published: list[dict], findings: list[dict]) -> None:
+    """Keep one total per printed figure and axis, strongest outcome first.
+
+    The same figure is examined through more than one substrate -- an ordinary
+    lattice block, a merged lattice view, a composed fallback, a grid fallback --
+    and the substrates disagree where one could reach rows another could not. A
+    reviewer must not see the same cell twice with two different verdicts, and a
+    weaker duplicate must not sit beside the exact confirmation of the same
+    figure: exact resolution outranks a break, a break outranks unresolved, and
+    equal outcomes keep the first, so the result stays deterministic in
+    substrate order. `axis` is part of the identity, because a segment
+    schedule's grand total is both the total of its column and the total of its
+    row -- two assertions about one figure, not a duplicate of the first.
+    """
+    rank = {"unresolved": 0, "break": 1, "confirmed": 2}
+    best: dict[str, tuple[dict, dict]] = {}
+    for block in published:
+        for total in block["totals"]:
+            span = _span_for_total(block, total)
+            if span is None:
+                continue
+            prior = best.get(span)
+            if prior is None or rank[total["outcome"]] > rank[prior[1]["outcome"]]:
+                best[span] = (block, total)
+    kept = {id(total) for _, total in best.values()}
+    removed: set[str] = set()
+    for block in published:
+        retained = []
+        for total in block["totals"]:
+            if id(total) in kept:
+                retained.append(total)
+            else:
+                removed.add(total["id"])
+        block["totals"] = retained
+    if removed:
+        findings[:] = [
+            finding for finding in findings if finding["totalId"] not in removed
+        ]
 
 
 def _select_grid_totals(grid: dict, published: list[dict]) -> tuple[list[dict], set[str]]:

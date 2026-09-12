@@ -1,0 +1,2359 @@
+{
+  "document": "quest 10k.pdf",
+  "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
+  "approved": true,
+  "pages": [
+    29,
+    31,
+    33,
+    43,
+    49,
+    50,
+    52,
+    63,
+    64,
+    65,
+    66,
+    68,
+    72,
+    73,
+    74,
+    75,
+    77,
+    78,
+    79,
+    81,
+    82,
+    83,
+    84,
+    85
+  ],
+  "note": "Hand-approved full-document golden. Every entry on a listed page was read against the printed page; confirmed addends were checked by hand. Merged from: quest-p29-52-approved.json, quest-p68-85-approved.json, quest-primary-approved.json Independently re-verified against the printed pages; non-total nominations removed and footable omissions added.",
+  "totals": [
+    {
+      "page": 29,
+      "column": "2024",
+      "label": "Gross profit",
+      "value": "49995",
+      "outcome": "confirmed",
+      "sum": "49995",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "288532",
+        "238537"
+      ],
+      "negatedAddends": [
+        "238537"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2024",
+      "label": "Loss before taxes",
+      "value": "-14772",
+      "outcome": "confirmed",
+      "sum": "-14772",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-4460",
+        "-10312"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 29,
+      "column": "2024",
+      "label": "Net loss",
+      "value": "-15063",
+      "outcome": "confirmed",
+      "sum": "-15063",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-14772",
+        "291"
+      ],
+      "negatedAddends": [
+        "291"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2024",
+      "label": "Operating loss",
+      "value": "-4460",
+      "outcome": "confirmed",
+      "sum": "-4460",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "49995",
+        "54455"
+      ],
+      "negatedAddends": [
+        "54455"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2024",
+      "label": "Total operating expenses",
+      "value": "54455",
+      "outcome": "confirmed",
+      "sum": "54455",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "39543",
+        "9401",
+        "5511"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 29,
+      "column": "2025",
+      "label": "Gross profit",
+      "value": "42544",
+      "outcome": "confirmed",
+      "sum": "42544",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "250217",
+        "207673"
+      ],
+      "negatedAddends": [
+        "207673"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2025",
+      "label": "Loss before taxes",
+      "value": "-15366",
+      "outcome": "confirmed",
+      "sum": "-15366",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-6157",
+        "-9209"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 29,
+      "column": "2025",
+      "label": "Net loss",
+      "value": "-15382",
+      "outcome": "confirmed",
+      "sum": "-15382",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15366",
+        "16"
+      ],
+      "negatedAddends": [
+        "16"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2025",
+      "label": "Operating loss",
+      "value": "-6157",
+      "outcome": "confirmed",
+      "sum": "-6157",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "42544",
+        "48701"
+      ],
+      "negatedAddends": [
+        "48701"
+      ]
+    },
+    {
+      "page": 29,
+      "column": "2025",
+      "label": "Total operating expenses",
+      "value": "48701",
+      "outcome": "confirmed",
+      "sum": "48701",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "37634",
+        "5276",
+        "4084",
+        "1707"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 31,
+      "column": "2024",
+      "label": "Adjusted EBITDA",
+      "value": "14469",
+      "outcome": "confirmed",
+      "sum": "14469",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15063",
+        "10272",
+        "10312",
+        "1563",
+        "112",
+        "5511",
+        "1471",
+        "291"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 31,
+      "column": "2025",
+      "label": "Adjusted EBITDA",
+      "value": "9297",
+      "outcome": "confirmed",
+      "sum": "9297",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15382",
+        "6051",
+        "9209",
+        "1617",
+        "4084",
+        "1707",
+        "1995",
+        "16"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 33,
+      "column": "2024",
+      "label": "Net increase in cash and cash equivalents",
+      "value": "72",
+      "outcome": "confirmed",
+      "sum": "72",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-6085",
+        "-5970",
+        "12127"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 33,
+      "column": "2025",
+      "label": "Net increase in cash and cash equivalents",
+      "value": "618",
+      "outcome": "confirmed",
+      "sum": "618",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "9557",
+        "4585",
+        "-13524"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 33,
+      "column": "Change",
+      "label": "Net increase in cash and cash equivalents",
+      "value": "546",
+      "outcome": "confirmed",
+      "sum": "546",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "15642",
+        "10555",
+        "-25651"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "Brett W. Johnston",
+      "value": "795978",
+      "outcome": "confirmed",
+      "sum": "795978",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "317369",
+        "68060",
+        "369224",
+        "41325"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "David P. Sweitzer (5)",
+      "value": "839188",
+      "outcome": "confirmed",
+      "sum": "839188",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "293725",
+        "166819",
+        "378644"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "Former Executive Vice President",
+      "value": "679176",
+      "outcome": "confirmed",
+      "sum": "679176",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "348534",
+        "303313",
+        "27329"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "Former President, Chief Executive",
+      "value": "784161",
+      "outcome": "confirmed",
+      "sum": "784161",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "390014",
+        "363975",
+        "30172"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "Perry W. Moss President, Chief Executive Officer",
+      "value": "1518958",
+      "outcome": "confirmed",
+      "sum": "1518958",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "378077",
+        "124853",
+        "996210",
+        "19818"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "S. Ray Hatch (4)",
+      "value": "756261",
+      "outcome": "confirmed",
+      "sum": "756261",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "105000",
+        "34650",
+        "616611"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "Total",
+      "label": "Senior Vice President and Chief Financial Officer",
+      "value": "591361",
+      "outcome": "confirmed",
+      "sum": "591361",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "313206",
+        "242650",
+        "35505"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Audrey P. Dunning",
+      "value": "93063",
+      "outcome": "confirmed",
+      "sum": "93063",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "54141",
+        "38922"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Daniel M. Friedberg",
+      "value": "393038",
+      "outcome": "confirmed",
+      "sum": "393038",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "299179",
+        "93859"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Glenn A. Culpepper",
+      "value": "96997",
+      "outcome": "confirmed",
+      "sum": "96997",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "47250",
+        "49747"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Robert J. Lipstein",
+      "value": "66311",
+      "outcome": "confirmed",
+      "sum": "66311",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "32311",
+        "34000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "S. Ray Hatch",
+      "value": "16639",
+      "outcome": "confirmed",
+      "sum": "16639",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "16639"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Sarah R. Tomolonius",
+      "value": "93038",
+      "outcome": "confirmed",
+      "sum": "93038",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "15641",
+        "77397"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Total",
+      "label": "Stephen A. Nolan",
+      "value": "94350",
+      "outcome": "confirmed",
+      "sum": "94350",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "16844",
+        "77506"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 50,
+      "column": "Number of securities remaining available for future issuance under equity compensation plans",
+      "label": "Total",
+      "value": "672200",
+      "outcome": "confirmed",
+      "sum": "672200",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "672200"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 50,
+      "column": "Number of securities to be issued upon exercise of outstanding options, warrants, and rights",
+      "label": "Total",
+      "value": "3421325",
+      "outcome": "confirmed",
+      "sum": "3421325",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2216555",
+        "927670",
+        "277100"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 52,
+      "column": "2024",
+      "label": "Total",
+      "value": "733321",
+      "outcome": "confirmed",
+      "sum": "733321",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "683214",
+        "16914",
+        "33193"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 52,
+      "column": "2025",
+      "label": "Total",
+      "value": "653614",
+      "outcome": "confirmed",
+      "sum": "653614",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "624094",
+        "29520"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "",
+      "label": "Total liabilities and stockholders’ equity",
+      "value": "145551",
+      "outcome": "confirmed",
+      "sum": "145551",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "105039",
+        "40512"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "",
+      "label": "Total liabilities and stockholders’ equity",
+      "value": "175645",
+      "outcome": "confirmed",
+      "sum": "175645",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "121489",
+        "54156"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "",
+      "label": "Total stockholders’ equity",
+      "value": "40512",
+      "outcome": "confirmed",
+      "sum": "40512",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "21",
+        "180984",
+        "-140493"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "",
+      "label": "Total stockholders’ equity",
+      "value": "54156",
+      "outcome": "confirmed",
+      "sum": "54156",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "21",
+        "179246",
+        "-125111"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2024",
+      "label": "Total assets",
+      "value": "175645",
+      "outcome": "confirmed",
+      "sum": "175645",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "75139",
+        "81065",
+        "12946",
+        "6495"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2024",
+      "label": "Total current assets",
+      "value": "75139",
+      "outcome": "confirmed",
+      "sum": "75139",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "396",
+        "62252",
+        "2601",
+        "9890"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2024",
+      "label": "Total current liabilities",
+      "value": "44391",
+      "outcome": "confirmed",
+      "sum": "44391",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "39899",
+        "1001",
+        "1651",
+        "1840"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2024",
+      "label": "Total liabilities",
+      "value": "121489",
+      "outcome": "confirmed",
+      "sum": "121489",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "44391",
+        "76265",
+        "833"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2025",
+      "label": "Total assets",
+      "value": "145551",
+      "outcome": "confirmed",
+      "sum": "145551",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "51198",
+        "81065",
+        "7650",
+        "5638"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2025",
+      "label": "Total current assets",
+      "value": "51198",
+      "outcome": "confirmed",
+      "sum": "51198",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1014",
+        "49010",
+        "1174"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2025",
+      "label": "Total current liabilities",
+      "value": "39527",
+      "outcome": "confirmed",
+      "sum": "39527",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "38384",
+        "128",
+        "1015"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 63,
+      "column": "2025",
+      "label": "Total liabilities",
+      "value": "105039",
+      "outcome": "confirmed",
+      "sum": "105039",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "39527",
+        "63999",
+        "1513"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 64,
+      "column": "2024",
+      "label": "Gross profit",
+      "value": "49995",
+      "outcome": "confirmed",
+      "sum": "49995",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "288532",
+        "238537"
+      ],
+      "negatedAddends": [
+        "238537"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2024",
+      "label": "Loss before taxes",
+      "value": "-14772",
+      "outcome": "confirmed",
+      "sum": "-14772",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-4460",
+        "-10312"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 64,
+      "column": "2024",
+      "label": "Net loss",
+      "value": "-15063",
+      "outcome": "confirmed",
+      "sum": "-15063",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-14772",
+        "291"
+      ],
+      "negatedAddends": [
+        "291"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2024",
+      "label": "Operating loss",
+      "value": "-4460",
+      "outcome": "confirmed",
+      "sum": "-4460",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "49995",
+        "54455"
+      ],
+      "negatedAddends": [
+        "54455"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2024",
+      "label": "Total operating expenses",
+      "value": "54455",
+      "outcome": "confirmed",
+      "sum": "54455",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "39543",
+        "9401",
+        "5511"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 64,
+      "column": "2025",
+      "label": "Gross profit",
+      "value": "42544",
+      "outcome": "confirmed",
+      "sum": "42544",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "250217",
+        "207673"
+      ],
+      "negatedAddends": [
+        "207673"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2025",
+      "label": "Loss before taxes",
+      "value": "-15366",
+      "outcome": "confirmed",
+      "sum": "-15366",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-6157",
+        "-9209"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 64,
+      "column": "2025",
+      "label": "Net loss",
+      "value": "-15382",
+      "outcome": "confirmed",
+      "sum": "-15382",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15366",
+        "16"
+      ],
+      "negatedAddends": [
+        "16"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2025",
+      "label": "Operating loss",
+      "value": "-6157",
+      "outcome": "confirmed",
+      "sum": "-6157",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "42544",
+        "48701"
+      ],
+      "negatedAddends": [
+        "48701"
+      ]
+    },
+    {
+      "page": 64,
+      "column": "2025",
+      "label": "Total operating expenses",
+      "value": "48701",
+      "outcome": "confirmed",
+      "sum": "48701",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "37634",
+        "5276",
+        "4084",
+        "1707"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Accumulated Deficit",
+      "label": "Balance, December 31, 2024",
+      "value": "-125111",
+      "outcome": "confirmed",
+      "sum": "-125111",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-110048",
+        "-15063"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Accumulated Deficit",
+      "label": "Balance, December 31, 2025",
+      "value": "-140493",
+      "outcome": "confirmed",
+      "sum": "-140493",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-125111",
+        "-15382"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Additional Paid-in Capital",
+      "label": "Balance, December 31, 2024",
+      "value": "179246",
+      "outcome": "confirmed",
+      "sum": "179246",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "176309",
+        "1563",
+        "260",
+        "1114"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Additional Paid-in Capital",
+      "label": "Balance, December 31, 2025",
+      "value": "180984",
+      "outcome": "confirmed",
+      "sum": "180984",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "179246",
+        "1578",
+        "151",
+        "49",
+        "-40"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Common Shares",
+      "label": "Balance, December 31, 2024",
+      "value": "20606",
+      "outcome": "confirmed",
+      "sum": "20606",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20161",
+        "43",
+        "325",
+        "77"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Common Shares",
+      "label": "Balance, December 31, 2025",
+      "value": "20960",
+      "outcome": "confirmed",
+      "sum": "20960",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20606",
+        "97",
+        "38",
+        "239",
+        "-20"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Stock Par Value",
+      "label": "Balance, December 31, 2024",
+      "value": "21",
+      "outcome": "confirmed",
+      "sum": "21",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20",
+        "1"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Stock Par Value",
+      "label": "Balance, December 31, 2025",
+      "value": "21",
+      "outcome": "confirmed",
+      "sum": "21",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "21"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Balance, December 31, 2024",
+      "value": "54156",
+      "outcome": "confirmed",
+      "sum": "54156",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "66281",
+        "1563",
+        "260",
+        "1115",
+        "-15063"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Balance, December 31, 2025",
+      "value": "40512",
+      "outcome": "confirmed",
+      "sum": "40512",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "54156",
+        "1578",
+        "151",
+        "49",
+        "-40",
+        "-15382"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Net loss",
+      "value": "-15063",
+      "outcome": "confirmed",
+      "sum": "-15063",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "-15063"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Net loss",
+      "value": "-15382",
+      "outcome": "confirmed",
+      "sum": "-15382",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "-15382"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Stock-based compensation",
+      "value": "1563",
+      "outcome": "confirmed",
+      "sum": "1563",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1563"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 65,
+      "column": "Total Stockholders’ Equity",
+      "label": "Stock-based compensation",
+      "value": "1578",
+      "outcome": "confirmed",
+      "sum": "1578",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "1578"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Cash and cash equivalents at end of period",
+      "value": "1014",
+      "outcome": "confirmed",
+      "sum": "1014",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "618",
+        "396"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Cash and cash equivalents at end of period",
+      "value": "396",
+      "outcome": "confirmed",
+      "sum": "396",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "72",
+        "324"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) financing activities",
+      "value": "-13524",
+      "outcome": "confirmed",
+      "sum": "-13524",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "99491",
+        "-106961",
+        "390",
+        "-6098",
+        "-506",
+        "49",
+        "-40",
+        "151"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) financing activities",
+      "value": "12127",
+      "outcome": "confirmed",
+      "sum": "12127",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "107524",
+        "-97660",
+        "2873",
+        "-1303",
+        "-682",
+        "1115",
+        "260"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) investing activities",
+      "value": "-5970",
+      "outcome": "confirmed",
+      "sum": "-5970",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-4683",
+        "-1287"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) investing activities",
+      "value": "4585",
+      "outcome": "confirmed",
+      "sum": "4585",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-251",
+        "-1304",
+        "6140"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) operating activities",
+      "value": "-6085",
+      "outcome": "confirmed",
+      "sum": "-6085",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15063",
+        "1033",
+        "9239",
+        "1077",
+        "1913",
+        "1563",
+        "5511",
+        "-9754",
+        "-459",
+        "-58",
+        "383",
+        "-1470"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net cash provided by (used in) operating activities",
+      "value": "9557",
+      "outcome": "confirmed",
+      "sum": "9557",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "-15382",
+        "905",
+        "5146",
+        "782",
+        "1029",
+        "1617",
+        "4084",
+        "1707",
+        "12762",
+        "1175",
+        "69",
+        "-3465",
+        "-872"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net increase in cash and cash equivalents",
+      "value": "618",
+      "outcome": "confirmed",
+      "sum": "618",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "9557",
+        "4585",
+        "-13524"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 66,
+      "column": "",
+      "label": "Net increase in cash and cash equivalents",
+      "value": "72",
+      "outcome": "confirmed",
+      "sum": "72",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-6085",
+        "-5970",
+        "12127"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 68,
+      "column": "2024",
+      "label": "Ending balance",
+      "value": "831",
+      "outcome": "confirmed",
+      "sum": "831",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1582",
+        "1913",
+        "-949",
+        "-1715"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 68,
+      "column": "2025",
+      "label": "Ending balance",
+      "value": "780",
+      "outcome": "confirmed",
+      "sum": "780",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "831",
+        "1029",
+        "-1080"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 72,
+      "column": "December 31, 2024",
+      "label": "Total assets held for sale",
+      "value": "9890",
+      "outcome": "confirmed",
+      "sum": "9890",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3736",
+        "1289",
+        "5154",
+        "5222",
+        "-5511"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 72,
+      "column": "December 31, 2024",
+      "label": "Total liabilities held for sale",
+      "value": "1840",
+      "outcome": "confirmed",
+      "sum": "1840",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "251",
+        "1589"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2024",
+      "label": "Property and equipment, gross",
+      "value": "7999",
+      "outcome": "confirmed",
+      "sum": "7999",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6183",
+        "592",
+        "758",
+        "466"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2024",
+      "label": "Property and equipment, net",
+      "value": "4507",
+      "outcome": "confirmed",
+      "sum": "4507",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "7999",
+        "-3492"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2024",
+      "label": "Property and equipment, net, and other assets",
+      "value": "6495",
+      "outcome": "confirmed",
+      "sum": "6495",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "4507",
+        "1305",
+        "683"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2025",
+      "label": "Property and equipment, gross",
+      "value": "6330",
+      "outcome": "confirmed",
+      "sum": "6330",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "5097",
+        "417",
+        "327",
+        "489"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2025",
+      "label": "Property and equipment, net",
+      "value": "2883",
+      "outcome": "confirmed",
+      "sum": "2883",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "6330",
+        "-3447"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "2025",
+      "label": "Property and equipment, net, and other assets",
+      "value": "5638",
+      "outcome": "confirmed",
+      "sum": "5638",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2883",
+        "2112",
+        "643"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Accumulated Amortization",
+      "label": "Total finite lived intangible assets",
+      "value": "20941",
+      "outcome": "confirmed",
+      "sum": "20941",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "17979",
+        "1586",
+        "1236",
+        "140"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Accumulated Amortization",
+      "label": "Total finite lived intangible assets",
+      "value": "22653",
+      "outcome": "confirmed",
+      "sum": "22653",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "17188",
+        "2271",
+        "947",
+        "2247"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Gross Carrying Amount",
+      "label": "Total finite lived intangible assets",
+      "value": "28591",
+      "outcome": "confirmed",
+      "sum": "28591",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20685",
+        "5740",
+        "2026",
+        "140"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Gross Carrying Amount",
+      "label": "Total finite lived intangible assets",
+      "value": "35599",
+      "outcome": "confirmed",
+      "sum": "35599",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "25805",
+        "5518",
+        "2026",
+        "2250"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "3 years",
+      "value": "3",
+      "outcome": "confirmed",
+      "sum": "3",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2250",
+        "2247"
+      ],
+      "negatedAddends": [
+        "2247"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "5 years",
+      "value": "2706",
+      "outcome": "confirmed",
+      "sum": "2706",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "20685",
+        "17979"
+      ],
+      "negatedAddends": [
+        "17979"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "5 years",
+      "value": "8617",
+      "outcome": "confirmed",
+      "sum": "8617",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "25805",
+        "17188"
+      ],
+      "negatedAddends": [
+        "17188"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "7 years",
+      "value": "1079",
+      "outcome": "confirmed",
+      "sum": "1079",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2026",
+        "947"
+      ],
+      "negatedAddends": [
+        "947"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "7 years",
+      "value": "3247",
+      "outcome": "confirmed",
+      "sum": "3247",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "5518",
+        "2271"
+      ],
+      "negatedAddends": [
+        "2271"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "7 years",
+      "value": "4154",
+      "outcome": "confirmed",
+      "sum": "4154",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "5740",
+        "1586"
+      ],
+      "negatedAddends": [
+        "1586"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "7 years",
+      "value": "790",
+      "outcome": "confirmed",
+      "sum": "790",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "2026",
+        "1236"
+      ],
+      "negatedAddends": [
+        "1236"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "Balance at December 31, 2024 and 2025",
+      "value": "81065",
+      "outcome": "confirmed",
+      "sum": "81065",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "85828",
+        "459",
+        "-5222"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "Total finite lived intangible assets",
+      "value": "12946",
+      "outcome": "confirmed",
+      "sum": "12946",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "35599",
+        "22653"
+      ],
+      "negatedAddends": [
+        "22653"
+      ]
+    },
+    {
+      "page": 73,
+      "column": "Net",
+      "label": "Total finite lived intangible assets",
+      "value": "7650",
+      "outcome": "confirmed",
+      "sum": "7650",
+      "delta": "0",
+      "basis": "row",
+      "addends": [
+        "28591",
+        "20941"
+      ],
+      "negatedAddends": [
+        "20941"
+      ]
+    },
+    {
+      "page": 74,
+      "column": "2024",
+      "label": "39,899",
+      "value": "39899",
+      "outcome": "confirmed",
+      "sum": "39899",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "37068",
+        "626",
+        "1323",
+        "434",
+        "20",
+        "428"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 74,
+      "column": "2025",
+      "label": "38,384",
+      "value": "38384",
+      "outcome": "confirmed",
+      "sum": "38384",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "34105",
+        "382",
+        "2049",
+        "621",
+        "532",
+        "695"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 74,
+      "column": "Amount",
+      "label": "Total",
+      "value": "7650",
+      "outcome": "confirmed",
+      "sum": "7650",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3718",
+        "1092",
+        "986",
+        "761",
+        "686",
+        "407"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2024",
+      "label": "Debt issuance costs, net of accumulated amortization",
+      "value": "2171",
+      "outcome": "confirmed",
+      "sum": "2171",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1345",
+        "1513",
+        "-687"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2024",
+      "label": "Notes payable, net",
+      "value": "76265",
+      "outcome": "confirmed",
+      "sum": "76265",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "80402",
+        "-1651",
+        "-2171",
+        "-83",
+        "-232"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2024",
+      "label": "Total notes payable",
+      "value": "80402",
+      "outcome": "confirmed",
+      "sum": "80402",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "54000",
+        "23109",
+        "2729",
+        "564"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2025",
+      "label": "Debt issuance costs, net of accumulated amortization",
+      "value": "2210",
+      "outcome": "confirmed",
+      "sum": "2210",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2171",
+        "506",
+        "-467"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2025",
+      "label": "Notes payable, net",
+      "value": "63999",
+      "outcome": "confirmed",
+      "sum": "63999",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "67224",
+        "-1015",
+        "-2210"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "2025",
+      "label": "Total notes payable",
+      "value": "67224",
+      "outcome": "confirmed",
+      "sum": "67224",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "51093",
+        "15639",
+        "345",
+        "147"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 75,
+      "column": "Amount",
+      "label": "Total",
+      "value": "67224",
+      "outcome": "confirmed",
+      "sum": "67224",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1015",
+        "557",
+        "540",
+        "16179",
+        "48933"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 77,
+      "column": "Amount",
+      "label": "Present value of lease payments",
+      "value": "2134",
+      "outcome": "confirmed",
+      "sum": "2134",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2416",
+        "-282"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 77,
+      "column": "Amount",
+      "label": "Total lease payments",
+      "value": "2416",
+      "outcome": "confirmed",
+      "sum": "2416",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "809",
+        "712",
+        "325",
+        "325",
+        "245"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 78,
+      "column": "2024",
+      "label": "Total operating lease liabilities",
+      "value": "1267",
+      "outcome": "confirmed",
+      "sum": "1267",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "434",
+        "833"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 78,
+      "column": "2024",
+      "label": "Total revenue",
+      "value": "288532",
+      "outcome": "confirmed",
+      "sum": "288532",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "277257",
+        "11275"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 78,
+      "column": "2025",
+      "label": "Total operating lease liabilities",
+      "value": "2134",
+      "outcome": "confirmed",
+      "sum": "2134",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "621",
+        "1513"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 78,
+      "column": "2025",
+      "label": "Total revenue",
+      "value": "250217",
+      "outcome": "confirmed",
+      "sum": "250217",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "237585",
+        "12632"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2024",
+      "label": "Total",
+      "value": "291",
+      "outcome": "confirmed",
+      "sum": "291",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "291"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2024",
+      "label": "Total deferred tax assets, net",
+      "value": "21401",
+      "outcome": "confirmed",
+      "sum": "21401",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "1258",
+        "9271",
+        "4637",
+        "6005",
+        "-21",
+        "131",
+        "218",
+        "-98"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2025",
+      "label": "Total",
+      "value": "16",
+      "outcome": "confirmed",
+      "sum": "16",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "16"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2025",
+      "label": "Total deferred tax assets, net",
+      "value": "25349",
+      "outcome": "confirmed",
+      "sum": "25349",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "3333",
+        "8821",
+        "4621",
+        "8153",
+        "180",
+        "-46",
+        "205",
+        "82"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 81,
+      "column": "",
+      "label": "Total warrants issued and outstanding",
+      "value": "850000",
+      "outcome": "confirmed",
+      "sum": "850000",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "500000",
+        "350000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 82,
+      "column": "Number of Shares",
+      "label": "Outstanding at December 31, 2024",
+      "value": "2511449",
+      "outcome": "confirmed",
+      "sum": "2511449",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "2869013",
+        "15000",
+        "-324736",
+        "-47828"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 82,
+      "column": "Number of Shares",
+      "label": "Outstanding at December 31, 2025",
+      "value": "2311272",
+      "outcome": "confirmed",
+      "sum": "2311272",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "2511449",
+        "-37500",
+        "-162677"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 83,
+      "column": "Number of Units",
+      "label": "Outstanding and unvested at December 31, 2024",
+      "value": "218045",
+      "outcome": "confirmed",
+      "sum": "218045",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "61056",
+        "219045",
+        "-61056",
+        "-1000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 83,
+      "column": "Number of Units",
+      "label": "Outstanding at December 31, 2024",
+      "value": "251101",
+      "outcome": "confirmed",
+      "sum": "251101",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "231635",
+        "35519",
+        "-16053"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 83,
+      "column": "Number of Units",
+      "label": "Outstanding at December 31, 2025",
+      "value": "214440",
+      "outcome": "confirmed",
+      "sum": "214440",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "251101",
+        "76016",
+        "-112677"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 83,
+      "column": "Number of Units",
+      "label": "Outstanding at December 31, 2025",
+      "value": "634463",
+      "outcome": "confirmed",
+      "sum": "634463",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "218045",
+        "639800",
+        "-126715",
+        "-96667"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 84,
+      "column": "2024",
+      "label": "Weighted average common shares outstanding, diluted",
+      "value": "20617",
+      "outcome": "confirmed",
+      "sum": "20617",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20617"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 84,
+      "column": "2025",
+      "label": "Weighted average common shares outstanding, diluted",
+      "value": "20998",
+      "outcome": "confirmed",
+      "sum": "20998",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "20998"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 84,
+      "column": "Number of Units",
+      "label": "Outstanding at December 31, 2024",
+      "value": "130000",
+      "outcome": "confirmed",
+      "sum": "130000",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "130000"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 84,
+      "column": "Number of Units",
+      "label": "Outstanding at December 31, 2025",
+      "value": "261150",
+      "outcome": "confirmed",
+      "sum": "261150",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "130000",
+        "313650",
+        "-182500"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 85,
+      "column": "",
+      "label": "Total income taxes paid (refunded), net",
+      "value": "789",
+      "outcome": "confirmed",
+      "sum": "789",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "507",
+        "282"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 85,
+      "column": "",
+      "label": "Total state and local",
+      "value": "282",
+      "outcome": "confirmed",
+      "sum": "282",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "120",
+        "65",
+        "2",
+        "95"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 85,
+      "column": "2025",
+      "label": "Total income taxes paid (refunded), net",
+      "value": "-623",
+      "outcome": "confirmed",
+      "sum": "-623",
+      "delta": "0",
+      "basis": "subtotals",
+      "addends": [
+        "-502",
+        "-121"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 85,
+      "column": "2025",
+      "label": "Total state and local",
+      "value": "-121",
+      "outcome": "confirmed",
+      "sum": "-121",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "92",
+        "-103",
+        "-30",
+        "-80"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 49,
+      "column": "Number",
+      "label": "All directors and executive officers as a group (8 persons)",
+      "value": "4252189",
+      "outcome": "confirmed",
+      "addends": [
+        "27942",
+        "75917",
+        "3447917",
+        "83214",
+        "34378",
+        "17500",
+        "358626",
+        "206695"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2025",
+      "label": "Total (income tax rate reconciliation)",
+      "value": "16",
+      "outcome": "confirmed",
+      "addends": [
+        "-3227",
+        "13",
+        "-802",
+        "47",
+        "20",
+        "17",
+        "3948"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 79,
+      "column": "2024",
+      "label": "Total (income tax rate reconciliation)",
+      "value": "291",
+      "outcome": "confirmed",
+      "addends": [
+        "-3102",
+        "291",
+        "-808",
+        "-171",
+        "30",
+        "63",
+        "3988"
+      ],
+      "negatedAddends": []
+    }
+  ]
+}

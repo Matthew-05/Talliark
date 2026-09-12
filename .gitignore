@@ -171,3 +171,4 @@ installer/talliark-files.wxs
 **/.tmp-*/
 ~$*
 /tmp
+opencode.json

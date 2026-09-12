@@ -424,6 +424,8 @@ def cross_run(
     decimals: int,
     total_columns,
     excluded_columns=frozenset(),
+    *,
+    cross_gaps: bool = False,
 ):
     """The contiguous cells to the left of a row's total, and what stopped them.
 
@@ -438,6 +440,13 @@ def cross_run(
     "Total Disney Shareholders' Equity" and then "Total Equity", and the second
     is the first plus noncontrolling interests -- not the first plus every
     component the first already consumed.
+
+    With `cross_gaps`, an absent cell is stepped over instead of ending the run.
+    A fund-column total row prints a figure only in the funds that carry the
+    item, and the columns in between hold nothing; the bounded walk stops at the
+    first of those and never reaches the earlier funds. The crossing reading
+    reaches them, and -- like every reading whose extent the arithmetic chose --
+    it may confirm and may never accuse.
     """
     cells: list[dict] = []
     stopped = "edge-of-table"
@@ -448,11 +457,10 @@ def cross_run(
         if column in excluded_columns:
             continue
         cell = table_cells.cell(row_index, column)
-        if cell is None:
-            stopped = "blank"
-            break
-        if value_of(cell) is None:
-            stopped = "no-value"
+        if cell is None or value_of(cell) is None:
+            if cross_gaps:
+                continue
+            stopped = "blank" if cell is None else "no-value"
             break
         if not _eligible(cell, decimals):
             stopped = "mixed-decimals"
@@ -495,22 +503,50 @@ def resolve_cross(table_cells, total_cell: dict, signal_count: int, total_column
     if total is None:
         return {"outcome": "unresolved", "unresolvedReason": "no-candidate-run"}
 
-    cells, stopped = cross_run(
-        table_cells,
-        int(total_cell["rowIndex"]),
-        int(total_cell["columnIndex"]),
-        decimals,
-        total_columns,
-        frozenset(
-            int(header["columnIndex"])
-            for header in table_cells.header_labels
-            if labels.is_non_additive_column(header.get("text", ""))
-        ),
+    excluded = frozenset(
+        int(header["columnIndex"])
+        for header in table_cells.header_labels
+        if labels.is_non_additive_column(header.get("text", ""))
     )
-    # A result header applies deliberately to every row beneath it.  Two-addend
-    # runs are resolved here so the caller can test whether the same equation
-    # shape repeats in another row; an isolated pair is never published.
-    if len(cells) < nominate.MIN_ADDENDS:
+
+    def reading(cross_gaps: bool) -> tuple[Run | None, list[dict], str]:
+        cells, stopped = cross_run(
+            table_cells,
+            int(total_cell["rowIndex"]),
+            int(total_cell["columnIndex"]),
+            decimals,
+            total_columns,
+            excluded,
+            cross_gaps=cross_gaps,
+        )
+        # A result header applies deliberately to every row beneath it.
+        # Two-addend runs are resolved here so the caller can test whether the
+        # same equation shape repeats in another row; an isolated pair is never
+        # published.
+        if len(cells) < nominate.MIN_ADDENDS:
+            return None, cells, stopped
+        run = Run("row", tuple(cells), total, decimals)
+        if double_counts(run):
+            return None, cells, stopped
+        return preferred_tied_variant(run) or run, cells, stopped
+
+    chosen, cells, stopped = reading(False)
+    # The page's own reading first. When it does not tie, the walk is run again
+    # across every absent cell inside the row -- a fund-column total prints a
+    # figure only in the funds that carry the item, and the bounded walk stops
+    # at the first fund that does not. The crossing reading may confirm and may
+    # never accuse, like every reading whose extent the arithmetic chose, and it
+    # needs at least two figures or it proves nothing.
+    if chosen is None or chosen.delta != TOLERANCE:
+        crossing, crossing_cells, _ = reading(True)
+        if (
+            crossing is not None
+            and crossing.delta == TOLERANCE
+            and tuple(crossing.cells) != tuple(cells)
+            and figure_count(crossing) >= 2
+        ):
+            chosen, cells = crossing, crossing_cells
+    if chosen is None:
         return {
             "outcome": "unresolved",
             "unresolvedReason": (
@@ -519,11 +555,6 @@ def resolve_cross(table_cells, total_cell: dict, signal_count: int, total_column
                 else "run-too-short"
             ),
         }
-
-    run = Run("row", tuple(cells), total, decimals)
-    if double_counts(run):
-        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
-    chosen = preferred_tied_variant(run) or run
     if chosen.delta == TOLERANCE:
         return {"outcome": "confirmed", "resolution": chosen.as_dict()}
     if not CROSS_FOOT_MAY_BREAK or not _plausible(chosen):
@@ -777,12 +808,30 @@ def resolve(
     bounded_formed = bool(bounded)
     bounded = _expand(bounded)
     crossing = _expand(crossing)
+    bounded = [
+        entry
+        for entry in bounded
+        if not derives_from_same_label(total_cell, entry[0].cells)
+    ]
+    crossing = [
+        entry
+        for entry in crossing
+        if not derives_from_same_label(total_cell, entry[0].cells)
+    ]
     candidates = bounded + crossing
     if not candidates:
-        # A run that contains its own subtotal is not a candidate at all, and
-        # this is the one place arithmetic is allowed near nomination: it
-        # refutes a run it may not propose.
-        return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+        # A run that contains its own subtotal, or that derives a row from a
+        # same-labelled row, is not a candidate at all -- and this is the one
+        # place arithmetic is allowed near nomination: it refutes a run it may
+        # not propose. A bounded run too short to offer reports the walk's own
+        # limit instead, so the parallel-column upgrade can still reconsider the
+        # two-addend case the same-label guard removed from the crossing reading.
+        if bounded_formed:
+            return {"outcome": "unresolved", "unresolvedReason": "no-plausible-run"}
+        return {
+            "outcome": "unresolved",
+            "unresolvedReason": _why(leaves, nested, leaf_stop),
+        }
 
     evaluated = [
         (preferred_tied_variant(run) or run, stop, quiet)
@@ -839,6 +888,34 @@ def resolve(
     if others and others[0].cells != chosen.cells:
         published["leafResolution"] = others[0].as_dict()
     return published
+
+
+# Row labels that carry no meaning beyond "this is a total". Two rows sharing
+# one of these are two different totals, not a running balance, so the
+# same-label refusal below does not apply to them.
+_GENERIC_TOTAL_MARKERS = frozenset({"total", "net", "subtotal", "sub-total"})
+
+
+def derives_from_same_label(total_cell: dict, cells) -> bool:
+    """Whether a run derives a row from another row carrying its own label.
+
+    A running balance prints the same row label once per period -- Boeing's
+    *Cumulative deliveries* for each year -- and each older figure is the newer
+    one less a movement. A run above such a row can then read the older balance
+    as the total and the newer balance as its addend, which is the reverse of the
+    footing the statement presents: it ties, but the page never meant it as a
+    total. A total is not derived from a same-labelled row.
+
+    An empty label is ignored, because a row with no label cannot be compared,
+    and a bare *Total*, *Net* or *Subtotal* is ignored too: those are markers,
+    not names, and a table legitimately sets one total over another.
+    """
+    label = labels.normalize(total_cell.get("rowLabel", ""))
+    if not label or label in _GENERIC_TOTAL_MARKERS:
+        return False
+    return any(
+        labels.normalize(cell.get("rowLabel", "")) == label for cell in cells
+    )
 
 
 def double_counts(run: Run) -> bool:
