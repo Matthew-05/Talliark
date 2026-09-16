@@ -35,7 +35,7 @@ from . import sums
 from . import structures
 
 
-DETECTOR_VERSION = f"reconcile-detector-11+{FINANCIAL_TABLE_VERSION}"
+DETECTOR_VERSION = f"reconcile-detector-12+{FINANCIAL_TABLE_VERSION}"
 
 
 def geometry_fingerprint(geometry: dict) -> str:

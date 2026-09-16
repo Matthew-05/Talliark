@@ -6,6 +6,19 @@ import re
 
 _NUMBER = re.compile(r"^[\s($+\-]*[\d,.%]+[)\s]*$")
 
+# A dash is the accounting zero, often with its floated currency marker. It
+# belongs to the numeric body when a period band is being tested against the row
+# below it: the first row of a maturity schedule is mostly dashes, and refusing
+# to count them made the year band look like a row over non-numeric text.
+_DASH = re.compile(r"^[\s$€£¥—–-]+$")
+
+# The tail of a date whose head was wrapped onto an earlier line: the
+# "31, 2017" that finishes "Estimated Fair Value as of December". It shares a
+# visual line with the period band -- the wrapped label is set to the right of
+# the years -- so the band reads as years plus one stray fragment. The fragment
+# is a continuation of the header label above, not a member of the period band.
+_DATE_TAIL = re.compile(r"^\d{1,2},?\s+(?:19|20)\d{2}$")
+
 
 # A period as it appears inside a longer label. `_PERIOD` matches a cell that is
 # nothing but a period; this one finds the period within "Years ended September
@@ -79,9 +92,13 @@ def _is_offset_period_band(values: list[str], below: list[str]) -> bool:
     if len(filled) < 2:
         return False
     # "2025 | Change | 2024 | Change | 2023" is one band: a comparison column
-    # labelled in words sits between the periods.
+    # labelled in words sits between the periods. A date tail such as
+    # "31, 2017" is the continuation of a wrapped label, not a member of the
+    # band, and is ignored rather than read as an amount.
     if not all(
-        _PERIOD.match(value) or any(character.isalpha() for character in value)
+        _PERIOD.match(value)
+        or _DATE_TAIL.match(value)
+        or any(character.isalpha() for character in value)
         for _index, value in filled
     ):
         return False
@@ -90,7 +107,9 @@ def _is_offset_period_band(values: list[str], below: list[str]) -> bool:
     numeric_below = [
         index
         for index, _value in filled
-        if index < len(below) and below[index] and _is_number(below[index])
+        if index < len(below)
+        and below[index]
+        and (_is_number(below[index]) or _DASH.match(below[index]))
     ]
     return len(numeric_below) >= max(2, len(filled) - 1)
 

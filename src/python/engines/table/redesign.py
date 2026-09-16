@@ -24,7 +24,7 @@ from engines.table.rulings import PageRulings, detect_page_ruling_segments
 from engines.table.scoring import CandidateFeatures, evaluate
 
 
-DETECTOR_VERSION = "table-detector-8"
+DETECTOR_VERSION = "table-detector-9"
 
 # Period analysis — reporting what span of time a table's data is dated to — is
 # early alpha. It is off unless a caller asks for it, so production output keeps

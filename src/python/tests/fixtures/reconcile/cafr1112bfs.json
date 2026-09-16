@@ -1,7 +1,7 @@
 {
   "document": "cafr1112bfs.pdf",
   "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
-  "approved": false,
+  "approved": true,
   "pages": [
     2,
     3,

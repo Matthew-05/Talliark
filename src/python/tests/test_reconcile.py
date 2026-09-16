@@ -422,13 +422,24 @@ class Decisions(unittest.TestCase):
         self.assertIsNone(nominate.total_column({"isTotalColumn": False, "text": "Europe"}))
         self.assertIsNone(nominate.total_column(None))
 
-    def test_two_period_headers_disable_cross_footing_for_the_table(self) -> None:
+    def test_period_headers_do_not_by_themselves_disable_cross_footing(self) -> None:
+        # A comparative statement has no result-headed column, so nothing is
+        # proposed for it. A maturity or credit schedule prints its years as
+        # columns and its Total is the sum of them: refusing the table on the
+        # sight of two years left every one of those row totals unfooted.
         comparative = [
             {"columnIndex": 1, "text": "2025", "isPeriodColumn": True, "isTotalColumn": False},
             {"columnIndex": 2, "text": "2024", "isPeriodColumn": True, "isTotalColumn": False},
-            {"columnIndex": 3, "text": "Total", "isPeriodColumn": False, "isTotalColumn": True},
         ]
         self.assertEqual(nominate.cross_foot_columns(comparative), [])
+
+        maturity = [
+            {"columnIndex": 1, "text": "2027", "isPeriodColumn": True, "isTotalColumn": False},
+            {"columnIndex": 2, "text": "2028", "isPeriodColumn": True, "isTotalColumn": False},
+            {"columnIndex": 3, "text": "Thereafter", "isPeriodColumn": True, "isTotalColumn": False},
+            {"columnIndex": 4, "text": "Total", "isPeriodColumn": False, "isTotalColumn": True},
+        ]
+        self.assertEqual(nominate.cross_foot_columns(maturity), [4])
 
     def test_a_cross_foot_confirms_and_never_accuses(self) -> None:
         # A row carries one signal -- the word in its own column header -- and

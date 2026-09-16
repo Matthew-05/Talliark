@@ -1,7 +1,7 @@
 {
   "document": "Boeing-2023-Annual-Report.pdf",
   "detectorVersion": "reconcile-detector-9+financial-table-detector-5",
-  "approved": false,
+  "approved": true,
   "pages": [
     6,
     28,

@@ -38,7 +38,7 @@
     81,
     82
   ],
-  "note": "Hand-approved full-document golden. Every entry on a listed page was read against the printed page; confirmed addends were checked by hand. Merged from: amazon-p26-43-approved.json, amazon-p53-69-approved.json, amazon-p73-82-approved.json, amazon-primary-approved.json Independently re-verified against the printed pages; non-total nominations removed and footable omissions added.",
+  "note": "Hand-approved full-document golden. The detector-12 p43 updates were read against the rendered page: the maturity schedule's year totals under the page's own column headers, the Total-column grand total, the prior-year fair-value total, and the two cross-foot labels the page wraps onto a second line. p43 1099: column -> '2020'; p43 17960: column -> '2018'; p43 2932: column -> '2019'; p43 22288: column -> 'Total', working -> row totals; p43 26: column -> '2022'; p43 271: column -> '2021'; p43 621: label -> 'securities'; p43 4836: label -> 'securities'; p43 22286: added prior-year fair-value total.",
   "totals": [
     {
       "page": 26,
@@ -611,7 +611,7 @@
     },
     {
       "page": 43,
-      "column": "",
+      "column": "2020",
       "label": "$ 1,099",
       "value": "1099",
       "outcome": "confirmed",
@@ -628,7 +628,7 @@
     },
     {
       "page": 43,
-      "column": "",
+      "column": "2018",
       "label": "$ 17,960",
       "value": "17960",
       "outcome": "confirmed",
@@ -647,7 +647,7 @@
     },
     {
       "page": 43,
-      "column": "",
+      "column": "2019",
       "label": "$ 2,932",
       "value": "2932",
       "outcome": "confirmed",
@@ -665,26 +665,25 @@
     },
     {
       "page": 43,
-      "column": "",
+      "column": "Total",
       "label": "$ 22,288",
       "value": "22288",
       "outcome": "confirmed",
       "sum": "22288",
       "delta": "0",
-      "basis": "leaves",
+      "basis": "row",
       "addends": [
-        "11343",
-        "4249",
-        "4836",
-        "907",
-        "621",
-        "332"
+        "17960",
+        "2932",
+        "1099",
+        "271",
+        "26"
       ],
       "negatedAddends": []
     },
     {
       "page": 43,
-      "column": "",
+      "column": "2022",
       "label": "26",
       "value": "26",
       "outcome": "confirmed",
@@ -699,7 +698,7 @@
     },
     {
       "page": 43,
-      "column": "",
+      "column": "2021",
       "label": "271",
       "value": "271",
       "outcome": "confirmed",
@@ -752,7 +751,7 @@
     {
       "page": 43,
       "column": "Total",
-      "label": "Foreign government and agency securities",
+      "label": "securities",
       "value": "621",
       "outcome": "confirmed",
       "sum": "621",
@@ -798,7 +797,7 @@
     {
       "page": 43,
       "column": "Total",
-      "label": "U.S. government and agency securities",
+      "label": "securities",
       "value": "4836",
       "outcome": "confirmed",
       "sum": "4836",
@@ -5569,6 +5568,25 @@
         "2012",
         "719",
         "1028"
+      ],
+      "negatedAddends": []
+    },
+    {
+      "page": 43,
+      "column": "December 31, 2017",
+      "label": "fixed income securities",
+      "value": "22286",
+      "outcome": "confirmed",
+      "sum": "22286",
+      "delta": "0",
+      "basis": "leaves",
+      "addends": [
+        "11343",
+        "4257",
+        "4823",
+        "905",
+        "620",
+        "338"
       ],
       "negatedAddends": []
     }

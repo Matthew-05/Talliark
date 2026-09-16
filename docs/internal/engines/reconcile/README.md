@@ -250,35 +250,38 @@ precedence, findings, progress stages, and contract validation.
 Candidate real-document goldens are never accepted automatically; the
 whole-document scorer's hard bar is zero false ties.
 
-The eight-document corpus currently publishes 2,204 totals: 2,060 confirmed,
+The eight-document corpus currently publishes 2,220 totals: 2,076 confirmed,
 two breaks, and 142 Not checked. Before statement-aware unresolved admission it
 published 2,978 totals with 1,081 Not checked; the crossing walk, the subtotal
 reduction, the statement-region merge, relative-offset parallel corroboration,
-verified-structure propagation, the same-label running-balance refusal, and
-the composed and gap-crossing admissions of detector 11 have since moved recall
-from 1,887 to 2,060 confirmations without adding a break. Apple publishes 249
-confirmations and nothing Not checked; Quest two, Disney three, while retaining
-141 and 694. The two Amazon breaks remain. The admission pass itself cannot
-reduce confirmed or break outcomes. No structure block reaches the hypothesis
-cap. The version is
-`reconcile-detector-11+financial-table-detector-5`.
+verified-structure propagation, the same-label running-balance refusal, the
+composed and gap-crossing admissions of detector 11, and detector 12's
+cross-foot across period columns have since moved recall from 1,887 to 2,076
+confirmations without adding a break. Apple publishes 249 confirmations and
+nothing Not checked; Quest two, Disney three, while retaining 141 and 694. The
+two Amazon breaks remain. The admission pass itself cannot reduce confirmed or
+break outcomes. No structure block reaches the hypothesis cap. The version is
+`reconcile-detector-12+financial-table-detector-5`, over
+`table-detector-9`.
 
-The detector-11 confirmations are measured against golden updates proposed with
-them -- a label corrected to the page's own words, or one real total added.
-Those three goldens are marked unapproved until a person reviews the proposal;
-approving them restores the zero-false-tie bar at the higher recall.
+The detector-11 confirmations were reviewed against the rendered pages and the
+golden updates approved: a label corrected to the page's own words, or one real
+total added. The detector-12 cross-foots were reviewed the same way: the Amazon
+maturity schedule's year totals and grand total, and the prior-year fair-value
+total, are recorded under the page's own column headers. The corpus scores zero
+false ties across all eight documents at the higher recall.
 
 **The corpus carries full-document goldens.** Each of the eight
 documents in `src/python/tests/fixtures/reconcile/` lists every total on every
 page that nominated one, with its outcome and, for a confirmation, the printed
 rows it foots on. They were built by rendering every page, then re-verified by
 an independent pass that re-derived the totals from the page before opening the
-golden. Against the detector-11 proposal they score **zero false ties** and
-expose 207 missed totals — the nomination recall worklist — of which 152 are
-not nominated at all and 55 are unresolved. Two engine defects the audit caught
-are fixed here: the ten `Cumulative deliveries` running balances that the
-structure search confirmed as totals (§7.10), and a coincidental addend set on
-Boeing p109 that the golden corrects. One soft disagreement remains: the
+golden. Against the approved detector-12 goldens they score **zero false ties**
+and expose 194 missed totals — the nomination recall worklist — of which 139
+are not nominated at all and 55 are unresolved. Two engine defects the audit
+caught are fixed here: the ten `Cumulative deliveries` running balances that
+the structure search confirmed as totals (§7.10), and a coincidental addend set
+on Boeing p109 that the golden corrects. One soft disagreement remains: the
 Boeing p109 addend set, where the golden records the statement's three rows and
 the engine a longer coincidental run.
 

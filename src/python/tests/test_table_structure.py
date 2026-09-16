@@ -169,6 +169,34 @@ class HeaderTests(unittest.TestCase):
 
         self.assertEqual(header, {"rowCount": 1, "labels": ["", "2025", "2024"]})
 
+    def test_a_wrapped_fair_value_label_does_not_hide_the_year_band(self) -> None:
+        # A maturity schedule sets "Estimated Fair Value as of December 31,
+        # 2017" wrapped to the right of the year band, so the band's line
+        # carries the years, a Total and the date tail "31, 2017". The tail is
+        # the label's continuation; reading it as an amount hid every year and
+        # the Total column from the header.
+        matrix = [
+            ["", "", "", "", "Fair Value as of December"],
+            ["", "2018", "2019", "Total", "31, 2017"],
+            ["Money market funds", "$ 11,343", "$ —", "$ 11,343", "$ 11,343"],
+        ]
+
+        header = detect_header_cells(matrix, 5)
+
+        self.assertEqual(
+            header,
+            {
+                "rowCount": 2,
+                "labels": [
+                    "",
+                    "2018",
+                    "2019",
+                    "Total",
+                    "Fair Value as of December 31, 2017",
+                ],
+            },
+        )
+
     def test_value_only_row_below_a_header_is_never_promoted(self) -> None:
         matrix = [
             ["Account", "2025"],

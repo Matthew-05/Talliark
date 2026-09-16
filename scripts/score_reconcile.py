@@ -88,13 +88,23 @@ def scan(pdf: Path) -> tuple[dict, dict, dict]:
     return model, diagnostics, timings
 
 
-def observed(model: dict) -> dict[str, dict]:
-    """Every nominated total, keyed the way a golden entry is keyed."""
+def observed(
+    model: dict, *, prefer_axis: dict[str, str] | None = None
+) -> dict[str, dict]:
+    """Every nominated total, keyed the way a golden entry is keyed.
+
+    One printed figure can be both the total of its column and the total of its
+    row, and those are two assertions: the golden records which one it means in
+    `basis` (`row` is a cross-foot, a vertical basis is a column run). When both
+    reach the same key, `prefer_axis` keeps the one the golden is about; with no
+    preference the last substrate wins, as it always did.
+    """
     cells = {cell["id"]: cell for table in model["tables"] for cell in table["cells"]}
     found: dict[str, dict] = {}
     for table in model["tables"]:
         for total in table["totals"]:
             cell = cells[total["cellId"]]
+            axis = total.get("axis", "vertical")
             entry = {
                 "page": table["pageIndex"] + 1,
                 "column": next(
@@ -106,8 +116,9 @@ def observed(model: dict) -> dict[str, dict]:
                     "",
                 ),
                 "label": cell.get("rowLabel", cell["text"]),
-                "value": cell["normalizedValue"],
+                "value": cell.get("normalizedValue"),
                 "outcome": total["outcome"],
+                "axis": axis,
             }
             resolution = total.get("resolution")
             if resolution:
@@ -126,9 +137,18 @@ def observed(model: dict) -> dict[str, dict]:
                 ]
             if total.get("unresolvedReason"):
                 entry["unresolvedReason"] = total["unresolvedReason"]
-            found[
-                key_of(table["pageIndex"], entry["label"], entry["value"], entry["column"])
-            ] = entry
+            key = key_of(
+                table["pageIndex"], entry["label"], entry["value"], entry["column"]
+            )
+            prior = found.get(key)
+            if prior is None:
+                found[key] = entry
+                continue
+            wanted = (prefer_axis or {}).get(key)
+            if wanted is None or axis == wanted or prior.get("axis") != wanted:
+                # No preference, the preferred axis arrived, or nothing preferred
+                # has been stored yet: the later entry is the one to keep.
+                found[key] = entry
     return found
 
 
@@ -160,9 +180,14 @@ def propose(model: dict, pdf: Path) -> dict:
     }
 
 
-def score(model: dict, golden: dict) -> dict:
-    """The hard bar, the soft bar, and what fell outside the golden's reach."""
-    if not golden.get("approved"):
+def score(model: dict, golden: dict, *, require_approved: bool = True) -> dict:
+    """The hard bar, the soft bar, and what fell outside the golden's reach.
+
+    `require_approved` is the scoring gate: the scorer refuses a golden a person
+    has not marked approved. The review tool passes `False` to compare a
+    candidate before anyone approves it, which is the whole point of review.
+    """
+    if require_approved and not golden.get("approved"):
         raise SystemExit(
             "This golden is not approved. The scorer never blesses its own output: "
             "review the entries against the document and set \"approved\": true."
@@ -174,7 +199,14 @@ def score(model: dict, golden: dict) -> dict:
         ): entry
         for entry in golden["totals"]
     }
-    actual = observed(model)
+    # The axis each key's golden entry is about, so a cell that is both a column
+    # total and a row total compares against the assertion the golden recorded.
+    prefer_axis = {
+        key: ("cross" if entry.get("basis") == "row" else "vertical")
+        for key, entry in expected.items()
+        if entry.get("basis")
+    }
+    actual = observed(model, prefer_axis=prefer_axis)
 
     false_ties: list[dict] = []
     wrong_addends: list[dict] = []

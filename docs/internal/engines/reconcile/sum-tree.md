@@ -250,10 +250,13 @@ Consolidated, Combined, or Net. No result-headed column, no cross-foot.
 `total-column` is that nomination and is declared in the registry beside the
 others.
 
-One guard: if two or more of a table's column headers parse as periods or years,
-cross-footing is disabled for that table entirely. It is a comparative
-statement, not a segment schedule, and adding 2025 to 2024 is nonsense that no
-tolerance model would catch.
+Period headers are not by themselves a veto. A comparative statement carries no
+result-headed column, so nothing is proposed for it either way; where a table
+does carry a Total among its years, the Total is the row's sum of those years —
+a maturity schedule, a credit-rating schedule — and refusing the whole table on
+the sight of two years left every one of those row totals unfooted. The
+arithmetic still has to tie exactly before anything is published, and a
+cross-foot never breaks.
 
 **The run** is the horizontal twin of the leaf run and deliberately the same
 walk — a blank ends it, a dash is an addend worth zero, printed decimals must

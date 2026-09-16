@@ -112,7 +112,7 @@
         "columnIndex": { "type": "integer", "minimum": 0 },
         "text": { "type": "string", "description": "The label as printed, joined across header bands in reading order." },
         "isTotalColumn": { "type": "boolean", "description": "The header names an additive or subtractive result -- Total, Consolidated, Combined, or Net. A cross-foot is attempted only against a column whose own header says so." },
-        "isPeriodColumn": { "type": "boolean", "description": "The header parses as a period or a year. Two or more of these in one table disables cross-footing for the table entirely: it is a comparative statement, and adding 2025 to 2024 is nonsense no tolerance model would catch." },
+        "isPeriodColumn": { "type": "boolean", "description": "The header parses as a period or a year. A comparative statement carries no result-headed column, so no cross-foot is proposed for it either way; where a table does carry a Total among its years, the Total is the row's sum of those years -- a maturity or credit schedule -- and a cross-foot is attempted there, confirming only on an exact tie." },
         "period": { "type": "string", "minLength": 1, "description": "The period the label names, as printed. Absent when it names none." }
       }
     },

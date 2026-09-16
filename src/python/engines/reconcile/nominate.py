@@ -156,12 +156,15 @@ def total_column(header: dict | None) -> dict | None:
 def cross_foot_columns(header_labels: list[dict]) -> list[int]:
     """Which columns a row may be cross-footed against, if any.
 
-    One guard, and it disables the table rather than a column: two or more
-    headers parsing as periods or years make this a comparative statement, where
-    a "Total" column totals something other than the columns beside it.
+    Only a column whose own header names a result is a candidate, and the walk
+    stops at the previous one. Period headers are not by themselves a veto: a
+    maturity or credit schedule prints its years as columns and its Total is
+    the sum of them, and refusing the whole table on the sight of two years
+    left every one of those row totals unfooted. A comparative statement has no
+    result-headed column at all, so nothing is proposed for it here either way;
+    where one does carry a result column, the arithmetic still has to tie
+    exactly before anything is published.
     """
-    if sum(1 for header in header_labels if header.get("isPeriodColumn")) >= 2:
-        return []
     return [
         int(header["columnIndex"])
         for header in header_labels

@@ -106,7 +106,12 @@ below the acceptance threshold is not published.
    removes horizontal header groups while retaining their geometry and column
    coverage; and deduplicates overlapping proposals.
 6. `headers.py` recognizes period bands, stacked titles and complete all-word
-   headers from the fitted cell matrix.
+   headers from the fitted cell matrix. A period band is accepted over a row of
+   dashes -- the accounting zero -- and a date tail such as "31, 2017" left on
+   the band by a wrapped label above it is ignored rather than read as an
+   amount. That is the maturity-schedule shape: "Estimated Fair Value as of
+   December" wrapped to the right of the year band, which used to hide the
+   years and the Total from every reader.
 7. `scoring.py` first requires an affirmative table credential: a coherent cell
    lattice, a repeated value-dominant column, or a compact repeated categorical
    schema. Only then does it measure alignment, repetition, typing, spacing,
@@ -118,7 +123,7 @@ below the acceptance threshold is not published.
    earns positive credit only when body values or rule intersections corroborate
    it. A coherent ruled grid can override the prose ambiguity.
 8. `redesign.py` maps retained header-group coverage onto the final columns and
-   publishes accepted candidates as `table-detector-8`.
+   publishes accepted candidates as `table-detector-9`.
 9. `handoff.py` isolates accepted tables for downstream analysis and fingerprints
    the source geometry. It makes no detection or financial interpretation
    decision.

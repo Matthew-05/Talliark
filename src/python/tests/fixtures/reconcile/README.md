@@ -17,15 +17,21 @@ entry whose addends are not the statement's own rows was corrected or
 downgraded. The goldens score **zero false ties** across the corpus. Their
 `confirmed` entries the engine does not confirm are its recall worklist.
 
-**Three goldens carry proposed detector-11 updates and are marked unapproved
-until a person reviews them.** `cafr1112bfs.json` corrects six labels to the
-page's own words (`Federal`, `Interest`, `Other`, `Principal`, `Other
-purposes`), where the golden had carried an enriched description the engine
-never prints; `boeing-2023-annual-report.json` corrects one label and adds one
-real cross-foot the old engine could not reach; `roycarver-2014.json` corrects
-one label. Each change was read against the rendered page before it was
-written, and approving the three restores the zero-false-tie bar at the higher
-detector-11 recall. The other five remain approved.
+**The detector-11 updates are approved.** `cafr1112bfs.json` records six labels
+in the page's own words (`Federal`, `Interest`, `Other`, `Principal`, `Other
+purposes`) where it had carried an enriched description the engine never
+prints; `boeing-2023-annual-report.json` records the wrapped `net of tax` label
+and the p109 cross-foot the old engine could not reach; `roycarver-2014.json`
+records `Net Assets, unrestricted`. Each was read against the rendered page,
+and the corpus now scores zero false ties across all eight documents at the
+higher detector-11 recall.
+
+**The detector-12 updates are approved too.** `amazon-ar.json` records the
+maturity schedule's year totals under the page's own column headers (`2018`
+through `2022`, `Total`), the two cross-foots whose labels wrap onto a second
+line, and the prior-year fair-value total the old engine could not reach. All
+were read against the rendered page; the page's header row prints exactly those
+years and that Total.
 
 A golden is an **independent oracle or it is nothing**. `scripts/score_reconcile.py`
 can write candidates, but it writes them with `"approved": false`, and it refuses
@@ -60,6 +66,38 @@ Step 2 is what gives the hard bar its teeth: anything the scan confirms on a
 listed page that is absent from `totals` scores as a false tie. Without it the
 scorer can only check the entries it was given, and a total invented on a page
 nobody covered would pass unnoticed.
+
+## Reviewing with the tool
+
+`scripts/review_reconcile_golden.py` renders a **review PDF** — every page that
+carries a golden entry or an engine result, with the total and its addends
+outlined and captioned by what the comparison found — and prints the same facts
+as a terminal sheet and JSON. Green agrees, blue is a golden confirmation the
+engine did not reach, red is an engine assertion the golden does not know
+about, orange is a confirmation reached through different addends.
+
+```powershell
+# Render the sheet and report, change nothing
+py scripts/review_reconcile_golden.py "sample-document-corpus/financial-statements/apple 10k.pdf" `
+  --golden src/python/tests/fixtures/reconcile/apple-10k.json
+
+# Record the pages checked in full, add the engine confirmations reviewed on
+# them, then approve — refused while false ties or wrong addend sets remain
+py scripts/review_reconcile_golden.py "…/apple 10k.pdf" `
+  --golden src/python/tests/fixtures/reconcile/apple-10k.json `
+  --pages 22,25,26-28 --accept-missing --approve
+
+# Replace one entry with the engine's working, or drop one that is wrong
+py scripts/review_reconcile_golden.py "…/apple 10k.pdf" `
+  --golden src/python/tests/fixtures/reconcile/apple-10k.json `
+  --accept-engine "109|(loss)/income|5474" --drop "85|BBB|13"
+```
+
+`--accept-engine` and `--drop` take `PAGE|LABEL|VALUE`. `--dry-run` prints the
+edits without writing, `--no-render` skips the PDF, and `--model`/`--write-model`
+cache the scan so repeated review runs do not re-read the document. The approval
+guard judges the golden as it will be written, so `--accept-missing` can resolve
+the very false ties a first review run reports.
 
 The bar itself: zero false ties anywhere in
 the document is the hard number; every labelled total in the primary statements
