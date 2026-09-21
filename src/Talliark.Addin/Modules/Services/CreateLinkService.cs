@@ -83,6 +83,10 @@ namespace Talliark.Addin.Modules.Services
             }
             Trace($"target cell={cell.Address} (moved={cell.Column != startCell.Column})");
 
+            // Refuse before any side effect: the write, the binding and the cursor move are
+            // all pointless on a cell Excel will not accept, and the caller explains why.
+            EnsureCellWritable(cell);
+
             if (cell.Row != startCell.Row || cell.Column != startCell.Column)
             {
                 Trace("cell moved right – calling Activate+Select");
@@ -182,6 +186,19 @@ namespace Talliark.Addin.Modules.Services
             return null;
         }
 
+        /// <summary>
+        /// Throws <see cref="WorkbookProtectionGuard.ProtectedSheetException"/> when Excel
+        /// would refuse the write, so callers can explain the refusal instead of reporting a
+        /// generic failure after partial work.
+        /// </summary>
+        private static void EnsureCellWritable(Excel.Range cell)
+        {
+            if (!WorkbookProtectionGuard.IsWriteBlocked(cell)) return;
+
+            throw new WorkbookProtectionGuard.ProtectedSheetException(
+                WorkbookProtectionGuard.GetSheetName(cell));
+        }
+
         private (LinkedRectangle LinkedRect, IList<LinkedRectangle> AllRects) CreateTableLink(
             Excel.Range startCell,
             string pdfId,
@@ -196,13 +213,17 @@ namespace Talliark.Addin.Modules.Services
             if (tableGrid == null || tableCells == null)
                 return (null, session.GetLinks());
 
+            // The whole footprint must accept the write. Checked before the overwrite prompt:
+            // there is no point asking the user to confirm a table that cannot land.
+            Excel.Range footprint = TableExcelWriteService.GetFootprint(startCell, tableGrid);
+            EnsureCellWritable(footprint);
+
             var tableWriter = new TableExcelWriteService();
             if (!tableWriter.ConfirmCreate(startCell, tableGrid, tableCells, owner))
                 return (null, session.GetLinks());
 
             // Continuing through a conflict must not leave an older rectangle bound to a
             // cell whose value this table is about to replace.
-            Excel.Range footprint = TableExcelWriteService.GetFootprint(startCell, tableGrid);
             IList<string> replacedIds =
                 new DeleteLinkService().DeleteLinksInSelection(footprint, workbook);
             Globals.ThisAddIn.GetLinkUndoStack(workbook)?.DropEntriesFor(replacedIds);
@@ -383,6 +404,10 @@ namespace Talliark.Addin.Modules.Services
 
             string formula = TextValueFormatter.RebuildSumFormula(sumRectsForCell);
             if (formula == null) formula = "0";
+
+            // The append writes the same cell the sum already occupies; a protected sheet
+            // would swallow the update inside the catch below.
+            EnsureCellWritable(startCell);
 
             string previousNumberFormat = LinkCreationUndoStack.TryReadNumberFormat(startCell);
 

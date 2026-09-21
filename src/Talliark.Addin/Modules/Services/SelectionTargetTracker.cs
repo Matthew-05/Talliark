@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Excel = Microsoft.Office.Interop.Excel;
 
+namespace Talliark.Addin.Modules.Services
 {
     /// <summary>
     /// Remembers the cell the user last selected in each workbook, so a link created from
@@ -38,6 +39,9 @@ using Excel = Microsoft.Office.Interop.Excel;
         {
             public string SheetName { get; set; }
 
+            /// <summary>VBA code name, which survives a worksheet rename.</summary>
+            public string CodeName { get; set; }
+
             public string SelectionAddress { get; set; }
 
             public string ActiveCellAddress { get; set; }
@@ -62,33 +66,45 @@ using Excel = Microsoft.Office.Interop.Excel;
             if (string.IsNullOrEmpty(workbookKey) || sheet == null || selection == null)
                 return;
 
+            string sheetName;
+            string address;
             try
             {
-                string sheetName = sheet.Name;
-                string address = selection.Address;
-                if (string.IsNullOrEmpty(sheetName) || string.IsNullOrEmpty(address))
-                    return;
-
-                _byWorkbook[workbookKey] = new Snapshot
-                {
-                    SheetName = sheetName,
-                    SelectionAddress = address,
-                    ActiveCellAddress = string.IsNullOrEmpty(activeCellAddress)
-                        ? null
-                        : activeCellAddress,
-                };
+                sheetName = sheet.Name;
+                address = selection.Address;
             }
             catch (COMException)
             {
                 // The sheet went away between the event and this read. The previous snapshot
                 // remains the best answer, so leave it in place.
+                return;
             }
+
+            if (string.IsNullOrEmpty(sheetName) || string.IsNullOrEmpty(address))
+                return;
+
+            // Optional: the code name is what lets a renamed sheet still resolve. Losing it
+            // costs the rename fallback, never the record.
+            string codeName = null;
+            try { codeName = sheet.CodeName; }
+            catch (COMException) { }
+
+            _byWorkbook[workbookKey] = new Snapshot
+            {
+                SheetName = sheetName,
+                CodeName = string.IsNullOrEmpty(codeName) ? null : codeName,
+                SelectionAddress = address,
+                ActiveCellAddress = string.IsNullOrEmpty(activeCellAddress)
+                    ? null
+                    : activeCellAddress,
+            };
         }
 
         /// <summary>
         /// Resolves the recorded selection against <paramref name="workbook"/>. Returns
         /// <c>false</c> when nothing was recorded, or when the sheet or address no longer
-        /// resolves — callers treat that as "no recorded target" and fall back.
+        /// resolves — callers treat that as "no recorded target" and fall back. A sheet
+        /// renamed since the record was taken is still found by its code name.
         /// </summary>
         internal bool TryResolve(
             Excel.Workbook workbook,
@@ -101,7 +117,7 @@ using Excel = Microsoft.Office.Interop.Excel;
             if (workbook == null || string.IsNullOrEmpty(workbookKey)) return false;
             if (!_byWorkbook.TryGetValue(workbookKey, out Snapshot snapshot)) return false;
 
-            Excel.Worksheet sheet = FindWorksheet(workbook, snapshot.SheetName);
+            Excel.Worksheet sheet = FindWorksheet(workbook, snapshot.SheetName, snapshot.CodeName);
             if (sheet == null) return false;
 
             // A hidden sheet cannot be the cell the user is looking at, and the add-in's own
@@ -155,25 +171,48 @@ using Excel = Microsoft.Office.Interop.Excel;
                 _byWorkbook.Remove(key);
         }
 
+        /// <summary>
+        /// Drops the record for one workbook. Called when the workbook closes, so a workbook
+        /// later opened at the same path cannot inherit a previous session's selection.
+        /// </summary>
+        internal void Forget(string workbookKey)
+        {
+            if (!string.IsNullOrEmpty(workbookKey))
+                _byWorkbook.Remove(workbookKey);
+        }
+
         internal void Clear() => _byWorkbook.Clear();
 
-        private static Excel.Worksheet FindWorksheet(Excel.Workbook workbook, string sheetName)
+        private static Excel.Worksheet FindWorksheet(
+            Excel.Workbook workbook,
+            string sheetName,
+            string codeName)
         {
-            if (string.IsNullOrEmpty(sheetName)) return null;
+            Excel.Worksheet nameMatch = null;
 
             foreach (Excel.Worksheet worksheet in workbook.Worksheets)
             {
                 try
                 {
-                    if (string.Equals(worksheet.Name, sheetName, StringComparison.OrdinalIgnoreCase))
+                    // The code name is the stronger identity: it survives a rename, while a
+                    // name can be taken over by another sheet after one.
+                    if (!string.IsNullOrEmpty(codeName)
+                        && string.Equals(
+                            worksheet.CodeName, codeName, StringComparison.OrdinalIgnoreCase))
                         return worksheet;
+
+                    if (nameMatch == null
+                        && !string.IsNullOrEmpty(sheetName)
+                        && string.Equals(
+                            worksheet.Name, sheetName, StringComparison.OrdinalIgnoreCase))
+                        nameMatch = worksheet;
                 }
                 catch (COMException)
                 {
                 }
             }
 
-            return null;
+            return nameMatch;
         }
     }
 }

@@ -1511,6 +1511,20 @@ namespace Talliark.Addin
             // the workbook's Custom XML, and GetStorageSession rebuilds it on next use.
             ReleaseStorageSession(wb);
 
+            // The recorded selection must not outlive the workbook instance. Keys are full
+            // paths, so a workbook reopened at the same path would otherwise inherit the
+            // previous session's cell. A cancelled close costs only the record, and the
+            // live-selection fallback still answers correctly.
+            try
+            {
+                _selectionTargets.Forget(GetWorkbookSessionKey(wb));
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"selection target release failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+
             // The pane entry is deliberately left alone.
             //
             // This event fires *before* Excel asks about unsaved changes, so the close can
@@ -2308,16 +2322,23 @@ namespace Talliark.Addin
 
                 // The active cell seeds the table-link anchor. Only record it when it is on
                 // the recorded sheet: resolving a foreign sheet's address here would anchor a
-                // table on a cell the user never chose.
+                // table on a cell the user never chose. Its read is isolated because a COM
+                // failure here must not cost the selection record itself.
                 string activeCellAddress = null;
-                var activeCell = Application?.ActiveCell as Excel.Range;
-                if (activeCell != null
-                    && string.Equals(
-                        (activeCell.Worksheet as Excel.Worksheet)?.Name,
-                        sheet.Name,
-                        StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    activeCellAddress = activeCell.Address;
+                    var activeCell = Application?.ActiveCell as Excel.Range;
+                    if (activeCell != null
+                        && string.Equals(
+                            (activeCell.Worksheet as Excel.Worksheet)?.Name,
+                            sheet.Name,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        activeCellAddress = activeCell.Address;
+                    }
+                }
+                catch (COMException)
+                {
                 }
 
                 _selectionTargets.Note(

@@ -328,29 +328,45 @@ namespace Talliark.Addin.Modules.WebView
                 }
 
                 TalliarkLog.Trace($"text='{text}' – calling CreateLink");
-                LinkedRectangle linkedRect;
-                IList<LinkedRectangle> allRects;
-                using (Globals.ThisAddIn.EnterSelectionNavSuppress())
+                LinkedRectangle linkedRect = null;
+                IList<LinkedRectangle> allRects = null;
+                try
                 {
-                    (linkedRect, allRects) = new CreateLinkService().CreateLink(
-                        payload.PdfId,
-                        payload.Page,
-                        payload.X, payload.Y, payload.Width, payload.Height,
-                        text,
-                        payload.LinkType,
-                        payload.AppendToActiveSum,
-                        payload.TableGrid,
-                        payload.TableCells,
-                        startCell,
-                        activeCell,
-                        owner,
-                        wb);
-
-                    if (linkedRect != null)
+                    using (Globals.ThisAddIn.EnterSelectionNavSuppress())
                     {
-                        Excel.Range linkedCell = LinkCellResolver.TryResolveCell(wb, linkedRect);
-                        ExcelCellNavigationService.BringIntoView(linkedCell);
+                        (linkedRect, allRects) = new CreateLinkService().CreateLink(
+                            payload.PdfId,
+                            payload.Page,
+                            payload.X, payload.Y, payload.Width, payload.Height,
+                            text,
+                            payload.LinkType,
+                            payload.AppendToActiveSum,
+                            payload.TableGrid,
+                            payload.TableCells,
+                            startCell,
+                            activeCell,
+                            owner,
+                            wb);
+
+                        if (linkedRect != null)
+                        {
+                            Excel.Range linkedCell = LinkCellResolver.TryResolveCell(wb, linkedRect);
+                            ExcelCellNavigationService.BringIntoView(linkedCell);
+                        }
                     }
+                }
+                catch (WorkbookProtectionGuard.ProtectedSheetException ex)
+                {
+                    // Refused before any write, so the user only has to be told why.
+                    TalliarkLog.Trace($"CreateLink refused: {ex.Message}");
+                    WorkbookProtectionGuard.ShowProtectedSheetMessage(owner, ex.SheetName);
+                }
+                catch (Exception ex)
+                {
+                    // The viewer still needs its authoritative rectangle set, the file manager
+                    // its refresh, and Excel its focus even when the write failed, so the rest
+                    // of this method runs rather than letting the exception unwind.
+                    TalliarkLog.Trace($"CreateLink failed: {ex.GetType().FullName}: {ex.Message}");
                 }
                 TalliarkLog.Trace($"CreateLink returned id={linkedRect?.Id ?? "null"}");
 
