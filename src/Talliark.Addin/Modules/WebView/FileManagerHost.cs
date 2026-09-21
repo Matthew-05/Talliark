@@ -69,6 +69,7 @@ namespace Talliark.Addin.Modules.WebView
 
         private bool _webViewReady;
         private bool _disposed;
+        private Task _initTask;
 
         private readonly object _osImportLock = new object();
         private readonly Dictionary<string, long> _recentOsImportTicks =
@@ -125,7 +126,7 @@ namespace Talliark.Addin.Modules.WebView
             DragLeave += NativeFileDrop_DragLeave;
             DragDrop += NativeFileDrop_DragDrop;
 
-            _ = InitAsync();
+            _initTask = InitAsync();
         }
 
         private async Task InitAsync()
@@ -139,6 +140,7 @@ namespace Talliark.Addin.Modules.WebView
                 // same user data folder, and the runtime refuses a second environment over
                 // one folder. Already warm by the time any window opens.
                 var environment = await WebViewEagerLoader.GetEnvironmentAsync();
+                if (_disposed) return;
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -1074,6 +1076,10 @@ namespace Talliark.Addin.Modules.WebView
                     DragOver -= NativeFileDrop_DragEnter;
                     DragLeave -= NativeFileDrop_DragLeave;
                     DragDrop -= NativeFileDrop_DragDrop;
+
+                    // Deferred while init is in flight: disposing a WebView2 mid-initialization
+                    // is a native fail-fast in the runtime, and Excel blames the add-in for it.
+                    WebViewDisposal.DisposeWhenInitialized(_webView, _initTask);
 
                     _startup?.Dispose();
                     _startup = null;

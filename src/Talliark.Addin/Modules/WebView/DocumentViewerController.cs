@@ -84,6 +84,7 @@ namespace Talliark.Addin.Modules.WebView
                 // same user data folder, and the runtime refuses a second environment over
                 // one folder. Already warm by the time any window opens.
                 var environment = await WebViewEagerLoader.GetEnvironmentAsync();
+                if (_disposed) return;
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -117,12 +118,10 @@ namespace Talliark.Addin.Modules.WebView
                 }
 
                 TalliarkLog.Trace($"EXCEPTION surface={_loadFailureSurfaceName} {ex.GetType().FullName}: {ex.Message}");
-                MessageBox.Show(
-                    $"Talliark {_loadFailureSurfaceName} failed to load:\n\n{ex.Message}",
-                    "Talliark",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
 
+                // In the surface rather than a message box: this controller backs the task pane
+                // and the viewer window, both of which are warmed invisibly, so a modal here can
+                // fire with no window on screen to own it.
                 ShowStartupFailure(ex.Message);
             }
         }
@@ -1156,14 +1155,9 @@ namespace Talliark.Addin.Modules.WebView
                 TalliarkLog.Trace($"webview event detach failed: {ex.Message}");
             }
 
-            try
-            {
-                _webView.Dispose();
-            }
-            catch (Exception ex)
-            {
-                TalliarkLog.Trace($"webview dispose failed: {ex.Message}");
-            }
+            // Deferred while init is in flight: disposing a WebView2 mid-initialization is a
+            // native fail-fast in the runtime, and Excel attributes the crash to the add-in.
+            WebViewDisposal.DisposeWhenInitialized(_webView, _initTask);
 
             try
             {

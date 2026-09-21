@@ -224,6 +224,7 @@
     <Compile Include="Modules\CustomXml\Serialization\TalliarkReconcileSerializer.cs" />
     <Compile Include="Modules\CustomXml\WorkbookStorageSession.cs" />
     <Compile Include="Modules\TalliarkLog.cs" />
+    <Compile Include="Modules\Infrastructure\AddinExceptionGuard.cs" />
     <Compile Include="Modules\Infrastructure\DevSettings.cs" />
     <Compile Include="Modules\Infrastructure\ExperimentalSettings.cs" />
     <Compile Include="Modules\Infrastructure\ExcelUndoKeyHook.cs" />
@@ -313,6 +314,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Modules\WebView\WebMessageParser.cs" />
+    <Compile Include="Modules\WebView\WebViewDisposal.cs" />
     <Compile Include="Modules\WebView\WebViewStartupSurface.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\GeneratedVersion.cs" />

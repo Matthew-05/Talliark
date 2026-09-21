@@ -30,8 +30,10 @@ namespace Talliark.Addin.Ribbon
             }
             catch (Exception ex)
             {
+                // Returning null costs the ribbon; rethrowing lets Office treat the add-in as
+                // failed to load and disable it. The log is the diagnostic.
                 Modules.TalliarkLog.Trace($"GetCustomUI EXCEPTION: {ex}");
-                throw;
+                return null;
             }
         }
 

@@ -1329,39 +1329,76 @@ namespace Talliark.Addin
 
             Modules.TalliarkLog.Trace("addin startup");
 
-            WebViewEagerLoader.Initialize(this);
+            // Last-resort handlers first: from here on, an exception the add-in failed to catch
+            // is logged rather than left to unwind into Excel, which disables add-ins that do.
 
-            Application.SheetSelectionChange += Application_SheetSelectionChange;
+            Modules.Infrastructure.AddinExceptionGuard.Install();
 
-            Application.SheetActivate += Application_SheetActivate;
+            // Warm-up is guarded on its own so a WebView2 failure cannot skip the event wiring
+            // below — an add-in that loads without surfaces is recoverable, one that throws out
+            // of Startup is not.
 
-            Application.SheetChange += Application_SheetChange;
+            try
 
-            Application.WorkbookBeforeClose += Application_WorkbookBeforeClose;
+            {
 
-            Application.WorkbookBeforeSave += Application_WorkbookBeforeSave;
+                WebViewEagerLoader.Initialize(this);
 
-            Application.WorkbookActivate += Application_WorkbookActivate;
+            }
 
-            Application.WorkbookOpen += Application_WorkbookOpen;
+            catch (Exception ex)
 
-            ((Excel.AppEvents_Event)Application).NewWorkbook += Application_NewWorkbook;
+            {
 
-            EnsureLinkTracking(Application.ActiveWorkbook);
+                Modules.TalliarkLog.Trace($"eager load failed: {ex}");
 
-            _excelUndoKeyHook = new Modules.Infrastructure.ExcelUndoKeyHook(
-                () => UndoMostRecentAction());
+            }
 
-            Modules.Infrastructure.DevSettings.CharBoundingBoxesChanged +=
-                OnCharBoundingBoxesChanged;
-            Modules.Infrastructure.DevSettings.ValuesChanged += OnValuesChanged;
-            Modules.Infrastructure.DevSettings.ReferencesChanged += OnReferencesChanged;
-            Modules.Infrastructure.DevSettings.StructureChanged += OnStructureChanged;
-            Modules.Infrastructure.DevSettings.ValueNoiseChanged += OnValueNoiseChanged;
-            Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged +=
-                OnExperimentalTableDetectionChanged;
+            try
 
-            _ = CheckForUpdateOnOpenAsync();
+            {
+
+                Application.SheetSelectionChange += Application_SheetSelectionChange;
+
+                Application.SheetActivate += Application_SheetActivate;
+
+                Application.SheetChange += Application_SheetChange;
+
+                Application.WorkbookBeforeClose += Application_WorkbookBeforeClose;
+
+                Application.WorkbookBeforeSave += Application_WorkbookBeforeSave;
+
+                Application.WorkbookActivate += Application_WorkbookActivate;
+
+                Application.WorkbookOpen += Application_WorkbookOpen;
+
+                ((Excel.AppEvents_Event)Application).NewWorkbook += Application_NewWorkbook;
+
+                EnsureLinkTracking(Application.ActiveWorkbook);
+
+                _excelUndoKeyHook = new Modules.Infrastructure.ExcelUndoKeyHook(
+                    () => UndoMostRecentAction());
+
+                Modules.Infrastructure.DevSettings.CharBoundingBoxesChanged +=
+                    OnCharBoundingBoxesChanged;
+                Modules.Infrastructure.DevSettings.ValuesChanged += OnValuesChanged;
+                Modules.Infrastructure.DevSettings.ReferencesChanged += OnReferencesChanged;
+                Modules.Infrastructure.DevSettings.StructureChanged += OnStructureChanged;
+                Modules.Infrastructure.DevSettings.ValueNoiseChanged += OnValueNoiseChanged;
+                Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged +=
+                    OnExperimentalTableDetectionChanged;
+
+                _ = CheckForUpdateOnOpenAsync();
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                Modules.TalliarkLog.Trace($"addin startup failed: {ex}");
+
+            }
 
         }
 
@@ -1373,36 +1410,66 @@ namespace Talliark.Addin
 
             Modules.TalliarkLog.Trace("ENTER");
 
-            DisposeApplicationSurfacesForShutdown();
+            try
 
-            _excelUndoKeyHook?.Dispose();
+            {
 
-            _excelUndoKeyHook = null;
+                DisposeApplicationSurfacesForShutdown();
 
-            Modules.Infrastructure.DevSettings.CharBoundingBoxesChanged -=
-                OnCharBoundingBoxesChanged;
-            Modules.Infrastructure.DevSettings.ValuesChanged -= OnValuesChanged;
-            Modules.Infrastructure.DevSettings.ReferencesChanged -= OnReferencesChanged;
-            Modules.Infrastructure.DevSettings.StructureChanged -= OnStructureChanged;
-            Modules.Infrastructure.DevSettings.ValueNoiseChanged -= OnValueNoiseChanged;
-            Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged -=
-                OnExperimentalTableDetectionChanged;
+                _excelUndoKeyHook?.Dispose();
 
-            Application.SheetSelectionChange -= Application_SheetSelectionChange;
+                _excelUndoKeyHook = null;
 
-            Application.SheetActivate -= Application_SheetActivate;
+            }
 
-            Application.SheetChange -= Application_SheetChange;
+            catch (Exception ex)
 
-            Application.WorkbookBeforeClose -= Application_WorkbookBeforeClose;
+            {
 
-            Application.WorkbookBeforeSave -= Application_WorkbookBeforeSave;
+                Modules.TalliarkLog.Trace($"addin shutdown cleanup failed: {ex}");
 
-            Application.WorkbookActivate -= Application_WorkbookActivate;
+            }
 
-            Application.WorkbookOpen -= Application_WorkbookOpen;
+            try
 
-            ((Excel.AppEvents_Event)Application).NewWorkbook -= Application_NewWorkbook;
+            {
+
+                Modules.Infrastructure.DevSettings.CharBoundingBoxesChanged -=
+                    OnCharBoundingBoxesChanged;
+                Modules.Infrastructure.DevSettings.ValuesChanged -= OnValuesChanged;
+                Modules.Infrastructure.DevSettings.ReferencesChanged -= OnReferencesChanged;
+                Modules.Infrastructure.DevSettings.StructureChanged -= OnStructureChanged;
+                Modules.Infrastructure.DevSettings.ValueNoiseChanged -= OnValueNoiseChanged;
+                Modules.Infrastructure.ExperimentalSettings.TableDetectionChanged -=
+                    OnExperimentalTableDetectionChanged;
+
+                Application.SheetSelectionChange -= Application_SheetSelectionChange;
+
+                Application.SheetActivate -= Application_SheetActivate;
+
+                Application.SheetChange -= Application_SheetChange;
+
+                Application.WorkbookBeforeClose -= Application_WorkbookBeforeClose;
+
+                Application.WorkbookBeforeSave -= Application_WorkbookBeforeSave;
+
+                Application.WorkbookActivate -= Application_WorkbookActivate;
+
+                Application.WorkbookOpen -= Application_WorkbookOpen;
+
+                ((Excel.AppEvents_Event)Application).NewWorkbook -= Application_NewWorkbook;
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                Modules.TalliarkLog.Trace($"addin shutdown unsubscribe failed: {ex}");
+
+            }
+
+            Modules.Infrastructure.AddinExceptionGuard.Uninstall();
 
             Modules.TalliarkLog.Trace("EXIT");
 
@@ -1508,8 +1575,18 @@ namespace Talliark.Addin
                 $"sessions={_storageSessions.Count}");
 
             // Safe to drop even if the close is cancelled: the session is only a cache over
-            // the workbook's Custom XML, and GetStorageSession rebuilds it on next use.
-            ReleaseStorageSession(wb);
+            // the workbook's Custom XML, and GetStorageSession rebuilds it on next use. Guarded
+            // because the workbook's RCW can already be disconnected here, which throws from
+            // the COM identity read inside.
+            try
+            {
+                ReleaseStorageSession(wb);
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"storage session release failed: {ex.GetType().FullName}: {ex.Message}");
+            }
 
             // The recorded selection must not outlive the workbook instance. Keys are full
             // paths, so a workbook reopened at the same path would otherwise inherit the
@@ -1735,19 +1812,22 @@ namespace Talliark.Addin
 
         {
 
-            ReconcileClosedWorkbooks();
-
-            WebViewEagerLoader.WarmUp(this, wb);
-
-            EnsureLinkTracking(wb);
-
-            // Pending undo belongs to whichever workbook is in front, so re-evaluate before
-            // anything else — including the pop-out early return further down.
-            RefreshExcelUndoArmedState();
+            // An exception escaping an Excel COM event is how an add-in gets disabled, so the
+            // whole handler is guarded — not just the refresh at the end of it.
 
             try
 
             {
+
+                ReconcileClosedWorkbooks();
+
+                WebViewEagerLoader.WarmUp(this, wb);
+
+                EnsureLinkTracking(wb);
+
+                // Pending undo belongs to whichever workbook is in front, so re-evaluate before
+                // anything else — including the pop-out early return further down.
+                RefreshExcelUndoArmedState();
 
                 WorkbookViewerEntry viewerEntry = FindViewerEntryFor(wb);
                 if (viewerEntry != null
@@ -1764,13 +1844,9 @@ namespace Talliark.Addin
 
                 }
 
-
-
                 var entry = FindEntryFor(wb);
 
                 if (entry == null) return;
-
-
 
                 if (entry.Pane.Visible)
 
@@ -1782,9 +1858,8 @@ namespace Talliark.Addin
 
             {
 
-                System.Diagnostics.Debug.WriteLine(
-
-                    $"[Talliark] Application_WorkbookActivate refresh failed: {ex.Message}");
+                Modules.TalliarkLog.Trace(
+                    $"Application_WorkbookActivate failed: {ex.GetType().FullName}: {ex.Message}");
 
             }
 
@@ -1796,13 +1871,31 @@ namespace Talliark.Addin
 
         {
 
-            ReconcileClosedWorkbooks();
+            // async void on a COM event: an exception here is rethrown on Excel's UI thread and
+            // attributed to the add-in, so it must never escape.
 
-            WebViewEagerLoader.WarmUp(this, wb);
+            try
 
-            EnsureLinkTracking(wb);
+            {
 
-            await CheckForUpdateOnOpenAsync();
+                ReconcileClosedWorkbooks();
+
+                WebViewEagerLoader.WarmUp(this, wb);
+
+                EnsureLinkTracking(wb);
+
+                await CheckForUpdateOnOpenAsync();
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                Modules.TalliarkLog.Trace(
+                    $"Application_WorkbookOpen failed: {ex.GetType().FullName}: {ex.Message}");
+
+            }
 
         }
 
@@ -1810,18 +1903,37 @@ namespace Talliark.Addin
 
         {
 
-            if (AppVersion.IsDevelopment)
-                return Task.CompletedTask;
+            try
 
-            if ((DateTime.UtcNow - Settings.Default.LastUpdateCheck).TotalHours < 24)
-                return Task.CompletedTask;
-
-            lock (_automaticUpdateCheckSync)
             {
-                if (_automaticUpdateCheckTask == null || _automaticUpdateCheckTask.IsCompleted)
-                    _automaticUpdateCheckTask = CheckForUpdateOnOpenCoreAsync();
 
-                return _automaticUpdateCheckTask;
+                if (AppVersion.IsDevelopment)
+                    return Task.CompletedTask;
+
+                if ((DateTime.UtcNow - Settings.Default.LastUpdateCheck).TotalHours < 24)
+                    return Task.CompletedTask;
+
+                lock (_automaticUpdateCheckSync)
+                {
+                    if (_automaticUpdateCheckTask == null || _automaticUpdateCheckTask.IsCompleted)
+                        _automaticUpdateCheckTask = CheckForUpdateOnOpenCoreAsync();
+
+                    return _automaticUpdateCheckTask;
+                }
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                // Reading settings can fail on a corrupt user.config; that must not fail the
+                // workbook-open event it was called from.
+
+                Modules.TalliarkLog.Trace($"update check skipped: {ex.Message}");
+
+                return Task.CompletedTask;
+
             }
 
         }
@@ -1838,7 +1950,22 @@ namespace Talliark.Addin
 
             if (result?.UpdateAvailable != true) return;
 
-            UpdateDialog.ShowSingle(result);
+            try
+
+            {
+
+                UpdateDialog.ShowSingle(result);
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                Modules.TalliarkLog.Trace(
+                    $"update dialog failed: {ex.GetType().FullName}: {ex.Message}");
+
+            }
 
         }
 
@@ -1848,9 +1975,24 @@ namespace Talliark.Addin
 
         {
 
-            WebViewEagerLoader.WarmUp(this, wb);
+            try
 
-            EnsureLinkTracking(wb);
+            {
+
+                WebViewEagerLoader.WarmUp(this, wb);
+
+                EnsureLinkTracking(wb);
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                Modules.TalliarkLog.Trace(
+                    $"Application_NewWorkbook failed: {ex.GetType().FullName}: {ex.Message}");
+
+            }
 
         }
 
@@ -2440,9 +2582,18 @@ namespace Talliark.Addin
 
             NoteSelectionTarget(sh as Excel.Worksheet, target);
 
-            Modules.TalliarkLog.Trace(
-                $"ENTER sheet={DescribeSheetName(sh)} addr={target?.Address ?? "null"} " +
-                $"SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
+            // Outside the main try, so the trace is guarded on its own: reading Address from a
+            // stale range RCW throws, and this handler runs on every cell selection.
+            try
+            {
+                Modules.TalliarkLog.Trace(
+                    $"ENTER sheet={DescribeSheetName(sh)} addr={target?.Address ?? "null"} " +
+                    $"SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace($"selection trace failed: {ex.Message}");
+            }
 
             if (SuppressNextSelectionNav)
 

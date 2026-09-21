@@ -27,6 +27,7 @@ namespace Talliark.Addin.Modules.WebView
         private string _scanningPdfId;
         private bool _webViewReady;
         private bool _disposed;
+        private Task _initTask;
 
         public ReconcileHost(Excel.Workbook workbook)
         {
@@ -43,7 +44,7 @@ namespace Talliark.Addin.Modules.WebView
             Controls.Add(_webView);
             _startup = new WebViewStartupSurface(this, _webView, "Opening Reconcile...");
             _ocrService = new OcrService(this);
-            _ = InitAsync();
+            _initTask = InitAsync();
         }
 
         private async Task InitAsync()
@@ -51,6 +52,8 @@ namespace Talliark.Addin.Modules.WebView
             try
             {
                 CoreWebView2Environment environment = await WebViewEagerLoader.GetEnvironmentAsync();
+                if (_disposed) return;
+
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
 
@@ -299,6 +302,10 @@ namespace Talliark.Addin.Modules.WebView
                 {
                     _startup?.Dispose();
                     _startup = null;
+
+                    // Deferred while init is in flight: disposing a WebView2 mid-initialization
+                    // is a native fail-fast in the runtime, and Excel blames the add-in for it.
+                    WebViewDisposal.DisposeWhenInitialized(_webView, _initTask);
                 }
             }
             base.Dispose(disposing);

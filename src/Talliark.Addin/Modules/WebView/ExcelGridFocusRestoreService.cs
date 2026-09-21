@@ -67,8 +67,17 @@ namespace Talliark.Addin.Modules.WebView
 
         private IntPtr HandleMouseMessage(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (!_disposed && nCode == HC_ACTION && IsMouseDown(wParam.ToInt32()))
-                RestoreFocusForExcelGridClick(lParam);
+            // A hook procedure runs inside Excel's message pump: an exception escaping it
+            // faults the host process, so nothing here may throw.
+            try
+            {
+                if (!_disposed && nCode == HC_ACTION && IsMouseDown(wParam.ToInt32()))
+                    RestoreFocusForExcelGridClick(lParam);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Talliark] mouse hook failed: {ex.Message}");
+            }
 
             return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
         }

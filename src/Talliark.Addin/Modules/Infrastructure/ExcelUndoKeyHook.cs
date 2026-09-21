@@ -113,13 +113,22 @@ namespace Talliark.Addin.Modules.Infrastructure
 
         private IntPtr HandleKeyMessage(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (!_disposed && nCode == HC_ACTION && ShouldConsume(wParam, lParam))
+            // A hook procedure runs inside Excel's message pump: an exception escaping it
+            // faults the host process, so nothing here may throw.
+            try
             {
-                RequestUndo();
+                if (!_disposed && nCode == HC_ACTION && ShouldConsume(wParam, lParam))
+                {
+                    RequestUndo();
 
-                // A non-zero return swallows the keystroke, so Excel never sees the Ctrl+Z
-                // and cannot run its own undo on top of ours.
-                return new IntPtr(1);
+                    // A non-zero return swallows the keystroke, so Excel never sees the Ctrl+Z
+                    // and cannot run its own undo on top of ours.
+                    return new IntPtr(1);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Talliark] keyboard hook failed: {ex.Message}");
             }
 
             return CallNextHookEx(_hookHandle, nCode, wParam, lParam);

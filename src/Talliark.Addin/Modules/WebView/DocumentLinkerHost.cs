@@ -26,6 +26,7 @@ namespace Talliark.Addin.Modules.WebView
         private WebViewStartupSurface _startup;
         private bool _webViewReady;
         private bool _disposed;
+        private Task _initTask;
         private bool _selectionChangeSubscribed;
         private bool _selectionLocked;
 
@@ -90,7 +91,7 @@ namespace Talliark.Addin.Modules.WebView
             // linker-app-ready, and every one of those seconds would be a blank rectangle.
             _startup = new WebViewStartupSurface(this, _webView);
 
-            _ = InitAsync();
+            _initTask = InitAsync();
         }
 
         private async Task InitAsync()
@@ -104,6 +105,7 @@ namespace Talliark.Addin.Modules.WebView
                 // same user data folder, and the runtime refuses a second environment over
                 // one folder. Already warm by the time any window opens.
                 var environment = await WebViewEagerLoader.GetEnvironmentAsync();
+                if (_disposed) return;
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
@@ -939,7 +941,10 @@ namespace Talliark.Addin.Modules.WebView
                 UnsubscribeSelectionChanged();
                 _startup?.Dispose();
                 _startup = null;
-                _webView.Dispose();
+
+                // Deferred while init is in flight: disposing a WebView2 mid-initialization
+                // is a native fail-fast in the runtime, and Excel blames the add-in for it.
+                WebViewDisposal.DisposeWhenInitialized(_webView, _initTask);
             }
             base.Dispose(disposing);
         }
