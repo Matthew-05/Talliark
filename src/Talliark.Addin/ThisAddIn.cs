@@ -2441,6 +2441,13 @@ namespace Talliark.Addin
         /// window's sheet — typically the workbook's first tab — rather than the sheet the
         /// user was working on. The identity-checked fallback covers a workbook whose
         /// selection predates the tracker (it was already open when the add-in started).
+        /// <para>
+        /// A multi-cell selection resolves to its top-left cell. The range says what the user
+        /// has selected, not which cell a link should target, and handing the range on would
+        /// stop the rightward scan for an available cell: <c>Range.Formula</c> answers for a
+        /// multi-cell range with an array, which every candidate reads as occupied. The
+        /// top-left cell is the origin the pipeline is meant to receive.
+        /// </para>
         /// </remarks>
         internal bool TryGetLinkTargetCell(
             Excel.Workbook workbook,
@@ -2456,8 +2463,9 @@ namespace Talliark.Addin
                 string key = GetWorkbookSessionKey(workbook);
                 if (_selectionTargets.TryResolve(workbook, key, out startCell, out activeCell))
                 {
+                    startCell = TopLeftCellOf(startCell);
                     Modules.TalliarkLog.Trace($"link target recorded {DescribeRange(startCell)}");
-                    return true;
+                    return startCell != null;
                 }
 
                 var selection = Application?.Selection as Excel.Range;
@@ -2468,7 +2476,7 @@ namespace Talliark.Addin
                 if (!IsSameWorkbook(selection.Worksheet?.Parent as Excel.Workbook, workbook))
                     return false;
 
-                startCell = (Excel.Range)selection.Cells[1, 1];
+                startCell = TopLeftCellOf(selection);
                 activeCell = Application?.ActiveCell as Excel.Range;
                 Modules.TalliarkLog.Trace($"link target live {DescribeRange(startCell)}");
                 return startCell != null;
@@ -2573,6 +2581,18 @@ namespace Talliark.Addin
             {
                 return "(unavailable)";
             }
+        }
+
+        /// <summary>
+        /// Reduces a selection to the single cell a viewer-created link starts from. For a
+        /// multi-cell range that is its top-left cell, which is also what a single-cell
+        /// selection is.
+        /// </summary>
+        private static Excel.Range TopLeftCellOf(Excel.Range selection)
+        {
+            if (selection == null) return null;
+
+            return (Excel.Range)selection.Cells[1, 1];
         }
 
         /// <summary>
