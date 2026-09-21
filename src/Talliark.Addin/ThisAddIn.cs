@@ -93,6 +93,16 @@ namespace Talliark.Addin
 
         internal Modules.Services.ExcelCellNavigationService CellNavigation => _cellNavigation;
 
+        /// <summary>
+        /// The cell the user last selected in each workbook. Viewer-initiated link creation
+        /// resolves its target from here rather than from <c>Application.Selection</c>, which
+        /// answers for the active window and changes without a selection event when another
+        /// window of the same workbook is activated. See
+        /// <see cref="Modules.Services.SelectionTargetTracker"/>.
+        /// </summary>
+        private readonly Modules.Services.SelectionTargetTracker _selectionTargets =
+            new Modules.Services.SelectionTargetTracker();
+
 
 
         /// <summary>
@@ -1323,6 +1333,8 @@ namespace Talliark.Addin
 
             Application.SheetSelectionChange += Application_SheetSelectionChange;
 
+            Application.SheetActivate += Application_SheetActivate;
+
             Application.SheetChange += Application_SheetChange;
 
             Application.WorkbookBeforeClose += Application_WorkbookBeforeClose;
@@ -1378,6 +1390,8 @@ namespace Talliark.Addin
 
             Application.SheetSelectionChange -= Application_SheetSelectionChange;
 
+            Application.SheetActivate -= Application_SheetActivate;
+
             Application.SheetChange -= Application_SheetChange;
 
             Application.WorkbookBeforeClose -= Application_WorkbookBeforeClose;
@@ -1413,6 +1427,7 @@ namespace Talliark.Addin
 
                 _workbookPanes.Clear();
                 _recentlyActivated.Clear();
+                _selectionTargets.Clear();
 
                 foreach (WorkbookFileManagerEntry entry in _workbookFileManagers.ToArray())
                 {
@@ -1527,6 +1542,7 @@ namespace Talliark.Addin
                 && _workbookReconcileWindows.Count == 0
                 && _workbookLinkers.Count == 0
                 && _recentlyActivated.Count == 0
+                && _selectionTargets.Count == 0
                 && _storageSessions.Count == 0)
                 return;
 
@@ -1557,6 +1573,11 @@ namespace Talliark.Addin
                 Modules.TalliarkLog.Trace($"ReconcileClosedWorkbooks enumeration failed: {ex.Message}");
                 return;
             }
+
+            // Selection targets are recorded for every workbook the user touches, including
+            // ones with no Talliark surface, so they prune from the live set rather than
+            // riding on the storage-session sweep below.
+            _selectionTargets.PruneTo(liveKeys);
 
             foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
             {
@@ -2218,11 +2239,189 @@ namespace Talliark.Addin
             RefreshExcelUndoArmedState();
         }
 
+        /// <summary>
+        /// Resolves where a link created from the viewer should be written: the cell the user
+        /// last selected in <paramref name="workbook"/>, falling back to the live selection
+        /// only when that selection belongs to the same workbook.
+        /// </summary>
+        /// <remarks>
+        /// The recorded target is preferred because <c>Application.Selection</c> answers for
+        /// the active window. A workbook with more than one window keeps a separate active
+        /// sheet per window, so activating the pane's window changes that answer without a
+        /// selection event, and reading it at message time wrote the link onto the pane
+        /// window's sheet — typically the workbook's first tab — rather than the sheet the
+        /// user was working on. The identity-checked fallback covers a workbook whose
+        /// selection predates the tracker (it was already open when the add-in started).
+        /// </remarks>
+        internal bool TryGetLinkTargetCell(
+            Excel.Workbook workbook,
+            out Excel.Range startCell,
+            out Excel.Range activeCell)
+        {
+            startCell = null;
+            activeCell = null;
+            if (workbook == null) return false;
+
+            try
+            {
+                string key = GetWorkbookSessionKey(workbook);
+                if (_selectionTargets.TryResolve(workbook, key, out startCell, out activeCell))
+                {
+                    Modules.TalliarkLog.Trace($"link target recorded {DescribeRange(startCell)}");
+                    return true;
+                }
+
+                var selection = Application?.Selection as Excel.Range;
+                if (selection == null) return false;
+
+                // Never fall through to another workbook's selection: the pdfIds and cell
+                // records this target is used with belong to this workbook alone.
+                if (!IsSameWorkbook(selection.Worksheet?.Parent as Excel.Workbook, workbook))
+                    return false;
+
+                startCell = (Excel.Range)selection.Cells[1, 1];
+                activeCell = Application?.ActiveCell as Excel.Range;
+                Modules.TalliarkLog.Trace($"link target live {DescribeRange(startCell)}");
+                return startCell != null;
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"TryGetLinkTargetCell failed: {ex.GetType().FullName}: {ex.Message}");
+                startCell = null;
+                activeCell = null;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Remembers where the cursor is in the selection's workbook. Recorded for suppressed
+        /// selections too: a programmatic select still moves the cursor that the next
+        /// viewer-initiated link should start from.
+        /// </summary>
+        private void NoteSelectionTarget(Excel.Worksheet sheet, Excel.Range target)
+        {
+            try
+            {
+                Excel.Workbook workbook = sheet?.Parent as Excel.Workbook;
+                if (workbook == null || target == null) return;
+
+                // The active cell seeds the table-link anchor. Only record it when it is on
+                // the recorded sheet: resolving a foreign sheet's address here would anchor a
+                // table on a cell the user never chose.
+                string activeCellAddress = null;
+                var activeCell = Application?.ActiveCell as Excel.Range;
+                if (activeCell != null
+                    && string.Equals(
+                        (activeCell.Worksheet as Excel.Worksheet)?.Name,
+                        sheet.Name,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    activeCellAddress = activeCell.Address;
+                }
+
+                _selectionTargets.Note(
+                    GetWorkbookSessionKey(workbook), sheet, target, activeCellAddress);
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"NoteSelectionTarget failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Makes <paramref name="cell"/> the link target for its workbook. Called by
+        /// navigation the viewer drives itself, because Excel raises no selection event for a
+        /// select that does not change the selection — jumping to a linked cell can land on a
+        /// cell the sheet already had selected, and without this the target would stay on the
+        /// sheet the user came from.
+        /// </summary>
+        internal void NoteLinkTargetCell(Excel.Range cell)
+        {
+            if (cell == null) return;
+
+            try
+            {
+                var sheet = cell.Worksheet as Excel.Worksheet;
+                var workbook = sheet?.Parent as Excel.Workbook;
+                if (sheet == null || workbook == null) return;
+
+                _selectionTargets.Note(
+                    GetWorkbookSessionKey(workbook), sheet, cell, cell.Address);
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"NoteLinkTargetCell failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        private static string DescribeSheetName(object sheet)
+        {
+            try { return (sheet as Excel.Worksheet)?.Name ?? "(none)"; }
+            catch (COMException) { return "(unavailable)"; }
+        }
+
+        private static string DescribeRange(Excel.Range range)
+        {
+            if (range == null) return "(null)";
+
+            try
+            {
+                var sheet = range.Worksheet as Excel.Worksheet;
+                return $"{sheet?.Name ?? "(none)"}!{range.Address}";
+            }
+            catch (COMException)
+            {
+                return "(unavailable)";
+            }
+        }
+
+        /// <summary>
+        /// Records the activated sheet as the link target when the activation restores a
+        /// selection Excel will not report.
+        /// </summary>
+        /// <remarks>
+        /// Activating a sheet restores the selection that sheet last had, and Excel raises no
+        /// selection-change event when the restored selection is the one the sheet already
+        /// had — so without this, switching tabs would leave the link target on the sheet the
+        /// user came from. The selection is recorded only when it belongs to the activated
+        /// sheet: an activation in a background window leaves <c>Application.Selection</c> on
+        /// another sheet, and pairing this sheet with that address would record a cell the
+        /// user never chose.
+        /// </remarks>
+        private void Application_SheetActivate(object sh)
+        {
+            try
+            {
+                var sheet = sh as Excel.Worksheet;
+                var selection = Application?.Selection as Excel.Range;
+                var selectionSheet = selection?.Worksheet as Excel.Worksheet;
+                if (sheet == null || selection == null || selectionSheet == null) return;
+
+                if (!string.Equals(
+                        selectionSheet.Name, sheet.Name, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                NoteSelectionTarget(sheet, selection);
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"Application_SheetActivate failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
         private void Application_SheetSelectionChange(object sh, Excel.Range target)
 
         {
 
-            Modules.TalliarkLog.Trace($"ENTER addr={target?.Address ?? "null"} SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
+            NoteSelectionTarget(sh as Excel.Worksheet, target);
+
+            Modules.TalliarkLog.Trace(
+                $"ENTER sheet={DescribeSheetName(sh)} addr={target?.Address ?? "null"} " +
+                $"SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
 
             if (SuppressNextSelectionNav)
 

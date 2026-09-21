@@ -261,6 +261,7 @@
     <Compile Include="Modules\Services\PdfStatus.cs" />
     <Compile Include="Modules\Services\PdfTextLayerDetector.cs" />
     <Compile Include="Modules\Services\RotatePageService.cs" />
+    <Compile Include="Modules\Services\SelectionTargetTracker.cs" />
     <Compile Include="Modules\Services\UpdateCheckService.cs" />
     <Compile Include="Modules\Services\UpdateInstallerService.cs" />
     <Compile Include="Modules\Services\UpdateLinkService.cs" />

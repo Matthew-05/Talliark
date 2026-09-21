@@ -305,14 +305,6 @@ namespace Talliark.Addin.Modules.WebView
                 if (!WorkbookProtectionGuard.TryRequireWritable(wb, owner))
                     return;
 
-                try
-                {
-                    var sel = Globals.ThisAddIn.Application?.Selection as Excel.Range;
-                    TalliarkLog.Trace($"selection before CreateLink: {sel?.Address ?? "null"}");
-                    TalliarkLog.Trace($"active cell before CreateLink: {(Globals.ThisAddIn.Application?.ActiveCell as Excel.Range)?.Address ?? "null"}, value={((Globals.ThisAddIn.Application?.ActiveCell as Excel.Range)?.Value2 ?? "(null)")}");
-                }
-                catch (Exception ex) { TalliarkLog.Trace($"pre-create cell read failed: {ex.Message}"); }
-
                 string text = payload.Text;
                 if (payload.LinkType != LinkType.Table && string.IsNullOrWhiteSpace(text))
                 {
@@ -322,6 +314,17 @@ namespace Talliark.Addin.Modules.WebView
                         SendLinkedRectanglesToWebView();
                         return;
                     }
+                }
+
+                // Resolved from the workbook's last user selection rather than the live
+                // Application.Selection: the pane's window can become active without a
+                // selection event, which used to point this at the wrong sheet.
+                if (!Globals.ThisAddIn.TryGetLinkTargetCell(
+                        wb, out Excel.Range startCell, out Excel.Range activeCell))
+                {
+                    TalliarkLog.Trace("create-link aborted: no link target cell for this workbook");
+                    SendLinkedRectanglesToWebView();
+                    return;
                 }
 
                 TalliarkLog.Trace($"text='{text}' – calling CreateLink");
@@ -338,6 +341,8 @@ namespace Talliark.Addin.Modules.WebView
                         payload.AppendToActiveSum,
                         payload.TableGrid,
                         payload.TableCells,
+                        startCell,
+                        activeCell,
                         owner,
                         wb);
 
@@ -445,6 +450,11 @@ namespace Talliark.Addin.Modules.WebView
             {
                 ((Excel.Worksheet)cell.Worksheet).Activate();
                 cell.Select();
+
+                // The select above is a no-op when the sheet already had this cell selected,
+                // and Excel raises no selection event for that — record the jump explicitly
+                // so the next link created from the viewer lands here.
+                Globals.ThisAddIn.NoteLinkTargetCell(cell);
 
                 // Selection nav is suppressed for this round-trip, so publish the selection
                 // explicitly: a Sum cell still has several rectangles to list.

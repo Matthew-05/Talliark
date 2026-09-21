@@ -24,6 +24,13 @@ namespace Talliark.Addin.Modules.Services
         /// all linked rectangles so callers can propagate the data to the viewer without a
         /// second round-trip to storage.
         /// </summary>
+        /// <remarks>
+        /// The target cells are supplied by the caller rather than read from
+        /// <c>Application.Selection</c> here: that property answers for the active window,
+        /// and activating the pane's window changes it without a selection event, which
+        /// wrote links onto the pane window's sheet while the user worked on another. See
+        /// <see cref="ThisAddIn.TryGetLinkTargetCell"/>.
+        /// </remarks>
         public (LinkedRectangle LinkedRect, IList<LinkedRectangle> AllRects) CreateLink(
             string pdfId,
             int page,
@@ -33,25 +40,22 @@ namespace Talliark.Addin.Modules.Services
             bool appendToActiveSum,
             TableGrid tableGrid,
             IList<IList<string>> tableCells,
+            Excel.Range startCell,
+            Excel.Range activeCell,
             IWin32Window owner,
             Excel.Workbook workbook)
         {
             if (workbook == null) throw new ArgumentNullException(nameof(workbook));
+            if (startCell == null) throw new ArgumentNullException(nameof(startCell));
             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
 
-            Excel.Application app = Globals.ThisAddIn.Application;
-            var selection = app?.Selection as Excel.Range;
-            if (selection == null) return (null, null);
-
-            Excel.Range startCell = (Excel.Range)selection.Cells[1, 1];
-
-            Trace($"startCell={startCell.Address}");
+            Trace($"startCell={((Excel.Worksheet)startCell.Worksheet).Name}!{startCell.Address}");
 
             WorkbookStorageSession session = Globals.ThisAddIn.GetStorageSession(workbook);
 
             if (linkType == LinkType.Table)
             {
-                Excel.Range tableAnchor = app.ActiveCell as Excel.Range ?? startCell;
+                Excel.Range tableAnchor = activeCell ?? startCell;
                 return CreateTableLink(
                     tableAnchor, pdfId, page, x, y, width, height,
                     tableGrid, tableCells, owner, session, workbook);
