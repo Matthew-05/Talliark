@@ -63,8 +63,6 @@ namespace Talliark.Addin.Modules.WebView
 
         internal Control Surface => _surface;
 
-        internal WebView2 WebView => _webView;
-
         internal void Start()
         {
             if (_disposed) return;

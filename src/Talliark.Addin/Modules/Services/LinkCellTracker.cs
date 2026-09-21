@@ -26,12 +26,6 @@ namespace Talliark.Addin.Modules.Services
     internal static class LinkCellTracker
     {
         private const string TrackNamePrefix = "TalliarkTrack_";
-        private const string LegacyMapNamePrefix = "Talliark_";
-        private const string LegacyLinkXPath = "/TalliarkLink";
-        private const string LegacyTrackerSheetSentinel = "Talliark Formula Tracking v1";
-        private const int LegacyTrackerSheetTrackIndexColumn = 1;
-        private const int LegacyTrackerSheetFormulaColumn = 2;
-        private const int LegacyTrackerSheetFirstRow = 2;
         private const int MaximumTrackIndex = 1048574;
 
         public static int NextTrackIndex(IEnumerable<LinkedRectangle> linkedRectangles)
@@ -52,7 +46,6 @@ namespace Talliark.Addin.Modules.Services
             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
 
             WriteTrackName(workbook, cell, trackIndex);
-            RemoveLegacyMap(workbook, trackIndex);
         }
 
         public static void UnbindCell(Excel.Workbook workbook, Excel.Range cell, int trackIndex)
@@ -63,14 +56,12 @@ namespace Talliark.Addin.Modules.Services
             if (workbook == null) return;
 
             DeleteTrackName(workbook, trackIndex);
-            RemoveLegacyMap(workbook, trackIndex);
         }
 
         /// <summary>
-        /// Creates track names for persisted links that do not have one, removes names whose
-        /// link is gone, and finishes the migration away from the legacy XML maps and the
-        /// legacy tracking worksheet. Existing broken references are not rebuilt from their
-        /// stored address because <c>#REF!</c> means the tracked cell was deleted.
+        /// Creates track names for persisted links that do not have one and removes names whose
+        /// link is gone. Existing broken references are not rebuilt from their stored address
+        /// because <c>#REF!</c> means the tracked cell was deleted.
         /// </summary>
         public static void EnsureBindings(
             Excel.Workbook workbook,
@@ -87,50 +78,35 @@ namespace Talliark.Addin.Modules.Services
             var liveTrackIndexes = new HashSet<int>(
                 distinctLinks.Select(link => link.LinkedCell.TrackIndex));
             ISet<int> boundTrackIndexes = EnumerateTrackNameIndexes(workbook);
-            Excel.Worksheet legacySheet = FindLegacyTrackerSheet(workbook);
 
             bool hasMissingBindings = distinctLinks.Any(link =>
                 !boundTrackIndexes.Contains(link.LinkedCell.TrackIndex));
             bool hasOrphanBindings = boundTrackIndexes.Any(index => !liveTrackIndexes.Contains(index));
-            bool hasLegacyMaps = HasLegacyMaps(workbook);
-            bool hasLegacySheet = legacySheet != null;
 
-            if (!hasMissingBindings && !hasOrphanBindings && !hasLegacyMaps && !hasLegacySheet)
+            if (!hasMissingBindings && !hasOrphanBindings)
                 return;
 
             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
 
-            ExecuteWorkbookMutation(workbook, () =>
+            foreach (LinkedRectangle link in distinctLinks)
             {
-                foreach (LinkedRectangle link in distinctLinks)
-                {
-                    int trackIndex = link.LinkedCell.TrackIndex;
-                    if (TrackNameExists(workbook, trackIndex))
-                        continue;
+                int trackIndex = link.LinkedCell.TrackIndex;
+                if (TrackNameExists(workbook, trackIndex))
+                    continue;
 
-                    Excel.Range target = FindRangeForLegacyMap(
-                        workbook,
-                        FindLegacyMap(workbook, trackIndex));
-                    if (target == null)
-                        target = TryResolveLegacySheetBinding(workbook, legacySheet, trackIndex);
-                    if (target == null)
-                        target = ResolveStoredCell(workbook, link.LinkedCell);
-                    if (target == null)
-                        continue;
+                Excel.Range target = ResolveStoredCell(workbook, link.LinkedCell);
+                if (target == null)
+                    continue;
 
-                    WriteTrackName(workbook, target, trackIndex);
-                }
+                WriteTrackName(workbook, target, trackIndex);
+            }
 
-                foreach (int orphanTrackIndex in EnumerateTrackNameIndexes(workbook)
-                    .Where(index => !liveTrackIndexes.Contains(index))
-                    .ToList())
-                {
-                    DeleteTrackName(workbook, orphanTrackIndex);
-                }
-
-                RemoveAllLegacyMaps(workbook);
-                RemoveLegacyTrackerSheetIfRedundant(workbook, legacySheet, liveTrackIndexes);
-            });
+            foreach (int orphanTrackIndex in EnumerateTrackNameIndexes(workbook)
+                .Where(index => !liveTrackIndexes.Contains(index))
+                .ToList())
+            {
+                DeleteTrackName(workbook, orphanTrackIndex);
+            }
         }
 
         public sealed class TrackedCell
@@ -200,12 +176,6 @@ namespace Talliark.Addin.Modules.Services
             return found;
         }
 
-        public static int FindTrackIndexForCell(Excel.Range cell)
-        {
-            IList<TrackedCell> tracked = FindTrackedCellsInRange(cell);
-            return tracked.Count > 0 ? tracked[0].TrackIndex : 0;
-        }
-
         internal static Excel.Range TryResolveCell(
             Excel.Workbook workbook,
             int trackIndex,
@@ -240,7 +210,7 @@ namespace Talliark.Addin.Modules.Services
         /// object is not proof that the user's cell was deleted and must never cost them a
         /// persisted rectangle.
         /// </summary>
-        internal static ISet<int> FindBrokenReferenceTrackIndexes(Excel.Workbook workbook)
+        private static ISet<int> FindBrokenReferenceTrackIndexes(Excel.Workbook workbook)
         {
             var broken = new HashSet<int>();
             if (workbook == null) return broken;
@@ -600,256 +570,6 @@ namespace Talliark.Addin.Modules.Services
             }
 
             return null;
-        }
-
-        private static Excel.Worksheet FindLegacyTrackerSheet(Excel.Workbook workbook)
-        {
-            foreach (Excel.Worksheet worksheet in workbook.Worksheets)
-            {
-                try
-                {
-                    string sentinel = Convert.ToString(
-                        ((Excel.Range)worksheet.Cells[1, 1]).Value2,
-                        CultureInfo.InvariantCulture);
-                    if (string.Equals(sentinel, LegacyTrackerSheetSentinel, StringComparison.Ordinal))
-                        return worksheet;
-                }
-                catch (COMException)
-                {
-                }
-            }
-
-            return null;
-        }
-
-        private static IList<int> ReadLegacySheetTrackIndexes(Excel.Worksheet legacySheet)
-        {
-            var indexes = new List<int>();
-            if (legacySheet == null) return indexes;
-
-            int lastRow;
-            try
-            {
-                Excel.Range usedRange = legacySheet.UsedRange;
-                lastRow = usedRange.Row + usedRange.Rows.Count - 1;
-            }
-            catch (COMException)
-            {
-                return indexes;
-            }
-
-            for (int row = LegacyTrackerSheetFirstRow; row <= lastRow; row++)
-            {
-                try
-                {
-                    object raw = ((Excel.Range)legacySheet.Cells[
-                        row, LegacyTrackerSheetTrackIndexColumn]).Value2;
-                    if (raw == null) continue;
-                    int trackIndex = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
-                    if (trackIndex > 0 && trackIndex <= MaximumTrackIndex)
-                        indexes.Add(trackIndex);
-                }
-                catch (Exception ex) when (ex is COMException || ex is FormatException
-                    || ex is InvalidCastException || ex is OverflowException)
-                {
-                }
-            }
-
-            return indexes;
-        }
-
-        /// <summary>
-        /// Resolves a binding still carried by the legacy tracking worksheet, so a migration
-        /// adopts the live reference Excel maintained rather than the last stored address.
-        /// </summary>
-        private static Excel.Range TryResolveLegacySheetBinding(
-            Excel.Workbook workbook,
-            Excel.Worksheet legacySheet,
-            int trackIndex)
-        {
-            if (legacySheet == null || trackIndex <= 0 || trackIndex > MaximumTrackIndex)
-                return null;
-
-            try
-            {
-                string formula = Convert.ToString(
-                    ((Excel.Range)legacySheet.Cells[
-                        LegacyTrackerSheetRow(trackIndex), LegacyTrackerSheetFormulaColumn]).Formula,
-                    CultureInfo.InvariantCulture);
-                return ResolveReferenceFormula(workbook, formula);
-            }
-            catch (COMException)
-            {
-                return null;
-            }
-        }
-
-        private static int LegacyTrackerSheetRow(int trackIndex)
-        {
-            return checked(trackIndex + 1);
-        }
-
-        /// <summary>
-        /// Removes the legacy tracking worksheet once every live link it carried has a name
-        /// binding, so an unresolvable link never loses its tracker to the cleanup.
-        /// </summary>
-        private static void RemoveLegacyTrackerSheetIfRedundant(
-            Excel.Workbook workbook,
-            Excel.Worksheet legacySheet,
-            ISet<int> liveTrackIndexes)
-        {
-            if (legacySheet == null) return;
-
-            foreach (int trackIndex in ReadLegacySheetTrackIndexes(legacySheet))
-            {
-                if (liveTrackIndexes.Contains(trackIndex) && !TrackNameExists(workbook, trackIndex))
-                    return;
-            }
-
-            try
-            {
-                // Excel rejects Delete on an xlSheetVeryHidden worksheet. Mutations run with
-                // screen updating and events disabled, so briefly revealing it is invisible.
-                legacySheet.Visible = Excel.XlSheetVisibility.xlSheetVisible;
-                legacySheet.Delete();
-                TalliarkLog.Trace("removed legacy tracker sheet");
-            }
-            catch (COMException)
-            {
-            }
-        }
-
-        private static bool HasLegacyMaps(Excel.Workbook workbook)
-        {
-            foreach (Excel.XmlMap map in workbook.XmlMaps)
-            {
-                try
-                {
-                    if (map.Name?.StartsWith(LegacyMapNamePrefix, StringComparison.Ordinal) == true)
-                        return true;
-                }
-                catch (COMException)
-                {
-                }
-            }
-
-            return false;
-        }
-
-        private static Excel.XmlMap FindLegacyMap(Excel.Workbook workbook, int trackIndex)
-        {
-            string targetName = LegacyMapNamePrefix + trackIndex.ToString(CultureInfo.InvariantCulture);
-            foreach (Excel.XmlMap map in workbook.XmlMaps)
-            {
-                try
-                {
-                    if (string.Equals(map.Name, targetName, StringComparison.Ordinal))
-                        return map;
-                }
-                catch (COMException)
-                {
-                }
-            }
-
-            return null;
-        }
-
-        private static Excel.Range FindRangeForLegacyMap(
-            Excel.Workbook workbook,
-            Excel.XmlMap map)
-        {
-            if (map == null) return null;
-
-            foreach (Excel.Worksheet worksheet in workbook.Worksheets)
-            {
-                try
-                {
-                    object result = worksheet.XmlDataQuery(
-                        LegacyLinkXPath,
-                        Type.Missing,
-                        map);
-                    if (result is Excel.Range range)
-                        return range;
-                }
-                catch (COMException)
-                {
-                }
-            }
-
-            return null;
-        }
-
-        private static void RemoveLegacyMap(Excel.Workbook workbook, int trackIndex)
-        {
-            Excel.XmlMap map = FindLegacyMap(workbook, trackIndex);
-            if (map == null) return;
-
-            Excel.Range mappedRange = FindRangeForLegacyMap(workbook, map);
-            if (mappedRange != null)
-            {
-                try { mappedRange.XPath.Clear(); }
-                catch (COMException) { }
-            }
-
-            try { map.Delete(); }
-            catch (COMException) { }
-        }
-
-        private static void RemoveAllLegacyMaps(Excel.Workbook workbook)
-        {
-            for (int index = workbook.XmlMaps.Count; index >= 1; index--)
-            {
-                Excel.XmlMap map;
-                try { map = workbook.XmlMaps[index]; }
-                catch (COMException) { continue; }
-
-                string name;
-                try { name = map.Name; }
-                catch (COMException) { continue; }
-                if (name?.StartsWith(LegacyMapNamePrefix, StringComparison.Ordinal) != true)
-                    continue;
-
-                Excel.Range mappedRange = FindRangeForLegacyMap(workbook, map);
-                if (mappedRange != null)
-                {
-                    try { mappedRange.XPath.Clear(); }
-                    catch (COMException) { }
-                }
-
-                try { map.Delete(); }
-                catch (COMException) { }
-            }
-        }
-
-        private static void ExecuteWorkbookMutation(Excel.Workbook workbook, Action action)
-        {
-            Excel.Application application = workbook.Application as Excel.Application;
-            if (application == null)
-            {
-                action();
-                return;
-            }
-
-            bool previousEnableEvents = application.EnableEvents;
-            bool previousDisplayAlerts = application.DisplayAlerts;
-            bool previousScreenUpdating = application.ScreenUpdating;
-
-            try
-            {
-                application.EnableEvents = false;
-                application.DisplayAlerts = false;
-                application.ScreenUpdating = false;
-                action();
-            }
-            finally
-            {
-                try { application.ScreenUpdating = previousScreenUpdating; }
-                catch (COMException) { }
-                try { application.DisplayAlerts = previousDisplayAlerts; }
-                catch (COMException) { }
-                try { application.EnableEvents = previousEnableEvents; }
-                catch (COMException) { }
-            }
         }
 
         private static string GetWorkbookDebugName(Excel.Workbook workbook)

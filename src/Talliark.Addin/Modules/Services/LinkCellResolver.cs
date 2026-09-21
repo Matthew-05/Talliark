@@ -100,11 +100,6 @@ namespace Talliark.Addin.Modules.Services
             return null;
         }
 
-        internal static Excel.Range TryResolveCellViaTracker(Excel.Workbook workbook, int trackIndex)
-        {
-            return LinkCellTracker.TryResolveCell(workbook, trackIndex, out _);
-        }
-
         private static Excel.Worksheet FindWorksheet(Excel.Workbook workbook, string sheetName)
         {
             foreach (Excel.Worksheet ws in workbook.Worksheets)
