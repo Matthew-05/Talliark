@@ -290,8 +290,15 @@ namespace Talliark.Addin.Modules.WebView
 
             _invokeTarget.BeginInvoke(new Action(() =>
             {
-                if (!TryActivateWorkbook()) return;
-                ExecuteLinkRectangleCreated(payload, _workbook);
+                // The command activates the workbook and the target sheet; neither may move
+                // the recorded link target, because another add-in can answer an activation
+                // by switching sheets (CCH's ePace does), which would aim this link at the
+                // sheet the command landed on instead of the one the user drew from.
+                using (Globals.ThisAddIn.EnterActivationTargetSuppress())
+                {
+                    if (!TryActivateWorkbook()) return;
+                    ExecuteLinkRectangleCreated(payload, _workbook);
+                }
             }));
         }
 
@@ -631,6 +638,11 @@ namespace Talliark.Addin.Modules.WebView
 
             try
             {
+                // Already in front: skip the call so Excel raises no Workbook/Window
+                // activation events for other add-ins (ePace) to react to.
+                if (Globals.ThisAddIn.IsWorkbookActive(_workbook))
+                    return true;
+
                 _workbook.Activate();
                 return true;
             }

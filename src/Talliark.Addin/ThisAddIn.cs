@@ -149,6 +149,36 @@ namespace Talliark.Addin
             }
         }
 
+        private int _suppressActivationTargetDepth;
+
+        /// <summary>
+        /// When &gt; 0, <see cref="Application_SheetActivate"/> does not record the activated
+        /// sheet as the link target. Entered for the duration of a viewer command, where any
+        /// activation is programmatic — including another add-in's reaction to the workbook
+        /// or target sheet being activated (CCH's ePace re-activates its own sheet), which
+        /// would otherwise point the next link at the sheet the command landed on.
+        /// </summary>
+        internal bool IsActivationTargetSuppressed => _suppressActivationTargetDepth > 0;
+
+        internal ActivationTargetSuppressScope EnterActivationTargetSuppress() =>
+            new ActivationTargetSuppressScope(this);
+
+        internal sealed class ActivationTargetSuppressScope : IDisposable
+        {
+            private readonly ThisAddIn _addIn;
+
+            internal ActivationTargetSuppressScope(ThisAddIn addIn)
+            {
+                _addIn = addIn;
+                _addIn._suppressActivationTargetDepth++;
+            }
+
+            public void Dispose()
+            {
+                _addIn._suppressActivationTargetDepth--;
+            }
+        }
+
         internal bool IsViewerPoppedOut =>
             IsViewerPoppedOutFor(Application?.ActiveWorkbook);
 
@@ -2136,8 +2166,12 @@ namespace Talliark.Addin
             }
         }
 
+        /// <summary>True when <paramref name="workbook"/> is Excel's active workbook.</summary>
+        internal bool IsWorkbookActive(Excel.Workbook workbook) =>
+            IsSameWorkbook(workbook, Application?.ActiveWorkbook);
+
         /// <summary>COM-identity comparison, the same test the registry lookups use.</summary>
-        private static bool IsSameWorkbook(Excel.Workbook left, Excel.Workbook right)
+        internal static bool IsSameWorkbook(Excel.Workbook left, Excel.Workbook right)
         {
             if (left == null || right == null) return false;
 
@@ -2455,12 +2489,12 @@ namespace Talliark.Addin
         /// selections too: a programmatic select still moves the cursor that the next
         /// viewer-initiated link should start from.
         /// </summary>
-        private void NoteSelectionTarget(Excel.Worksheet sheet, Excel.Range target)
+        private bool NoteSelectionTarget(Excel.Worksheet sheet, Excel.Range target)
         {
             try
             {
                 Excel.Workbook workbook = sheet?.Parent as Excel.Workbook;
-                if (workbook == null || target == null) return;
+                if (workbook == null || target == null) return false;
 
                 // The active cell seeds the table-link anchor. Only record it when it is on
                 // the recorded sheet: resolving a foreign sheet's address here would anchor a
@@ -2483,13 +2517,14 @@ namespace Talliark.Addin
                 {
                 }
 
-                _selectionTargets.Note(
+                return _selectionTargets.Note(
                     GetWorkbookSessionKey(workbook), sheet, target, activeCellAddress);
             }
             catch (Exception ex)
             {
                 Modules.TalliarkLog.Trace(
                     $"NoteSelectionTarget failed: {ex.GetType().FullName}: {ex.Message}");
+                return false;
             }
         }
 
@@ -2558,6 +2593,17 @@ namespace Talliark.Addin
         {
             try
             {
+                // A viewer command activates the workbook and the target sheet itself, and
+                // another add-in may answer that by activating a sheet of its own choosing.
+                // Recording such an activation would move the link target away from the sheet
+                // the user was working in. User tab switches happen outside a command and
+                // still record.
+                if (IsActivationTargetSuppressed)
+                {
+                    Modules.TalliarkLog.Trace("sheet activation ignored (viewer command in flight)");
+                    return;
+                }
+
                 var sheet = sh as Excel.Worksheet;
                 var selection = Application?.Selection as Excel.Range;
                 var selectionSheet = selection?.Worksheet as Excel.Worksheet;
@@ -2568,6 +2614,7 @@ namespace Talliark.Addin
                     return;
 
                 NoteSelectionTarget(sheet, selection);
+                Modules.TalliarkLog.Trace($"sheet activation recorded {DescribeRange(selection)}");
             }
             catch (Exception ex)
             {
@@ -2580,7 +2627,7 @@ namespace Talliark.Addin
 
         {
 
-            NoteSelectionTarget(sh as Excel.Worksheet, target);
+            bool noted = NoteSelectionTarget(sh as Excel.Worksheet, target);
 
             // Outside the main try, so the trace is guarded on its own: reading Address from a
             // stale range RCW throws, and this handler runs on every cell selection.
@@ -2588,7 +2635,7 @@ namespace Talliark.Addin
             {
                 Modules.TalliarkLog.Trace(
                     $"ENTER sheet={DescribeSheetName(sh)} addr={target?.Address ?? "null"} " +
-                    $"SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
+                    $"noted={noted} SuppressNext={SuppressNextSelectionNav} SuppressDepth={_suppressSelectionNavDepth}");
             }
             catch (Exception ex)
             {

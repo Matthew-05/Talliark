@@ -55,16 +55,17 @@ namespace Talliark.Addin.Modules.Services
         /// <summary>
         /// Records <paramref name="selection"/> as the workbook's current link target.
         /// Failures are swallowed: remembering a target is a convenience, never a reason to
-        /// fail the selection change that triggered it.
+        /// fail the selection change that triggered it. Returns whether the snapshot was
+        /// stored, so the event handler can trace a record that never landed.
         /// </summary>
-        internal void Note(
+        internal bool Note(
             string workbookKey,
             Excel.Worksheet sheet,
             Excel.Range selection,
             string activeCellAddress)
         {
             if (string.IsNullOrEmpty(workbookKey) || sheet == null || selection == null)
-                return;
+                return false;
 
             string sheetName;
             string address;
@@ -77,11 +78,11 @@ namespace Talliark.Addin.Modules.Services
             {
                 // The sheet went away between the event and this read. The previous snapshot
                 // remains the best answer, so leave it in place.
-                return;
+                return false;
             }
 
             if (string.IsNullOrEmpty(sheetName) || string.IsNullOrEmpty(address))
-                return;
+                return false;
 
             // Optional: the code name is what lets a renamed sheet still resolve. Losing it
             // costs the rename fallback, never the record.
@@ -98,6 +99,8 @@ namespace Talliark.Addin.Modules.Services
                     ? null
                     : activeCellAddress,
             };
+
+            return true;
         }
 
         /// <summary>
