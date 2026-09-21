@@ -176,9 +176,9 @@ namespace Talliark.Addin.Modules.Services
                 forCell.Add(link);
             }
 
-            // Resolve the formula trackers once for the complete range. The old path walked
-            // every destination cell, and every one-cell lookup scanned the tracking sheet
-            // again; multi-page table footprints made that cost grow explosively.
+            // Resolve the track names once for the complete range. The old path walked
+            // every destination cell, and every one-cell lookup scanned the bindings again;
+            // multi-page table footprints made that cost grow explosively.
             foreach (LinkCellTracker.TrackedCell tracked in
                      LinkCellTracker.FindTrackedCellsInRange(selection))
             {

@@ -31,7 +31,7 @@ namespace Talliark.Addin.Modules.Services
         /// and, within a cell, in stored order. A Sum cell shares one
         /// <see cref="LinkedCell"/> across its contributing rectangles, so it yields one
         /// entry per rectangle. Resolves the whole selection in a single pass over the
-        /// workbook's formula trackers.
+        /// workbook's track names.
         /// </summary>
         internal static IList<SelectedLink> ResolveLinksInSelection(
             IList<LinkedRectangle> links,

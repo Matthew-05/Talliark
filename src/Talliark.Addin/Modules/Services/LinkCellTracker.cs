@@ -11,20 +11,27 @@ using Excel = Microsoft.Office.Interop.Excel;
 namespace Talliark.Addin.Modules.Services
 {
     /// <summary>
-    /// Tracks linked cells through direct-reference formulas stored on an
-    /// <c>xlSheetVeryHidden</c> worksheet. Excel rewrites those references for
-    /// cut/paste moves, inserted or deleted rows and columns, and worksheet renames,
-    /// without imposing the filtering restrictions of mapped XML cells.
+    /// Tracks linked cells through hidden workbook defined names whose formulas are
+    /// direct references (<c>='Sheet'!$A$1</c>). Excel rewrites those references for
+    /// cut/paste moves, inserted or deleted rows and columns, and worksheet renames.
     /// </summary>
+    /// <remarks>
+    /// The previous design kept the references on an <c>xlSheetVeryHidden</c> worksheet.
+    /// Creating that worksheet during link insertion added a sheet to the workbook and had
+    /// to activate another sheet to hide it again, which CCH Engagement's ePace add-in
+    /// reacted to by switching the active tab. A defined name carries the same structural
+    /// tracking with no sheet-set change and no activation, and a hidden name is absent
+    /// from the Name Box and from formula autocomplete.
+    /// </remarks>
     internal static class LinkCellTracker
     {
-        private const string TrackerSheetBaseName = "_TalliarkTracking";
-        private const string TrackerSheetSentinel = "Talliark Formula Tracking v1";
+        private const string TrackNamePrefix = "TalliarkTrack_";
         private const string LegacyMapNamePrefix = "Talliark_";
         private const string LegacyLinkXPath = "/TalliarkLink";
-        private const int TrackIndexColumn = 1;
-        private const int FormulaColumn = 2;
-        private const int FirstTrackerRow = 2;
+        private const string LegacyTrackerSheetSentinel = "Talliark Formula Tracking v1";
+        private const int LegacyTrackerSheetTrackIndexColumn = 1;
+        private const int LegacyTrackerSheetFormulaColumn = 2;
+        private const int LegacyTrackerSheetFirstRow = 2;
         private const int MaximumTrackIndex = 1048574;
 
         public static int NextTrackIndex(IEnumerable<LinkedRectangle> linkedRectangles)
@@ -44,12 +51,8 @@ namespace Talliark.Addin.Modules.Services
             ValidateBindingArguments(workbook, cell, trackIndex);
             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
 
-            ExecuteWorkbookMutation(workbook, () =>
-            {
-                Excel.Worksheet trackerSheet = EnsureTrackingSheet(workbook);
-                WriteBinding(trackerSheet, cell, trackIndex);
-                RemoveLegacyMap(workbook, trackIndex);
-            });
+            WriteTrackName(workbook, cell, trackIndex);
+            RemoveLegacyMap(workbook, trackIndex);
         }
 
         public static void UnbindCell(Excel.Workbook workbook, Excel.Range cell, int trackIndex)
@@ -59,24 +62,14 @@ namespace Talliark.Addin.Modules.Services
                 WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
             if (workbook == null) return;
 
-            ExecuteWorkbookMutation(workbook, () =>
-            {
-                Excel.Worksheet trackerSheet = FindTrackingSheet(workbook);
-                if (trackerSheet != null && trackIndex <= MaximumTrackIndex)
-                {
-                    int row = GetTrackerRow(trackIndex);
-                    ((Excel.Range)trackerSheet.Cells[row, TrackIndexColumn]).ClearContents();
-                    ((Excel.Range)trackerSheet.Cells[row, FormulaColumn]).ClearContents();
-                    DeleteTrackingSheetIfEmpty(trackerSheet);
-                }
-
-                RemoveLegacyMap(workbook, trackIndex);
-            });
+            DeleteTrackName(workbook, trackIndex);
+            RemoveLegacyMap(workbook, trackIndex);
         }
 
         /// <summary>
-        /// Creates formula trackers for persisted links that do not have one, then removes
-        /// the old XML maps. Existing broken formula references are not rebuilt from their
+        /// Creates track names for persisted links that do not have one, removes names whose
+        /// link is gone, and finishes the migration away from the legacy XML maps and the
+        /// legacy tracking worksheet. Existing broken references are not rebuilt from their
         /// stored address because <c>#REF!</c> means the tracked cell was deleted.
         /// </summary>
         public static void EnsureBindings(
@@ -93,60 +86,50 @@ namespace Talliark.Addin.Modules.Services
                 .ToList();
             var liveTrackIndexes = new HashSet<int>(
                 distinctLinks.Select(link => link.LinkedCell.TrackIndex));
-            Excel.Worksheet trackerSheet = FindTrackingSheet(workbook);
+            ISet<int> boundTrackIndexes = EnumerateTrackNameIndexes(workbook);
+            Excel.Worksheet legacySheet = FindLegacyTrackerSheet(workbook);
 
             bool hasMissingBindings = distinctLinks.Any(link =>
-                !BindingExists(trackerSheet, link.LinkedCell.TrackIndex));
-            bool hasOrphanBindings = trackerSheet != null
-                && FindStoredTrackIndexes(trackerSheet).Any(index => !liveTrackIndexes.Contains(index));
-            bool visibilityNeedsRepair = trackerSheet != null
-                && trackerSheet.Visible != Excel.XlSheetVisibility.xlSheetVeryHidden;
+                !boundTrackIndexes.Contains(link.LinkedCell.TrackIndex));
+            bool hasOrphanBindings = boundTrackIndexes.Any(index => !liveTrackIndexes.Contains(index));
             bool hasLegacyMaps = HasLegacyMaps(workbook);
+            bool hasLegacySheet = legacySheet != null;
 
-            if (!hasMissingBindings && !hasOrphanBindings
-                && !visibilityNeedsRepair && !hasLegacyMaps)
+            if (!hasMissingBindings && !hasOrphanBindings && !hasLegacyMaps && !hasLegacySheet)
                 return;
 
             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
 
             ExecuteWorkbookMutation(workbook, () =>
             {
-                trackerSheet = FindTrackingSheet(workbook);
-
                 foreach (LinkedRectangle link in distinctLinks)
                 {
                     int trackIndex = link.LinkedCell.TrackIndex;
-                    if (BindingExists(trackerSheet, trackIndex))
+                    if (TrackNameExists(workbook, trackIndex))
                         continue;
 
                     Excel.Range target = FindRangeForLegacyMap(
                         workbook,
                         FindLegacyMap(workbook, trackIndex));
                     if (target == null)
+                        target = TryResolveLegacySheetBinding(workbook, legacySheet, trackIndex);
+                    if (target == null)
                         target = ResolveStoredCell(workbook, link.LinkedCell);
                     if (target == null)
                         continue;
 
-                    trackerSheet = trackerSheet ?? EnsureTrackingSheet(workbook);
-                    WriteBinding(trackerSheet, target, trackIndex);
+                    WriteTrackName(workbook, target, trackIndex);
                 }
 
-                if (trackerSheet != null)
+                foreach (int orphanTrackIndex in EnumerateTrackNameIndexes(workbook)
+                    .Where(index => !liveTrackIndexes.Contains(index))
+                    .ToList())
                 {
-                    foreach (int orphanTrackIndex in FindStoredTrackIndexes(trackerSheet)
-                        .Where(index => !liveTrackIndexes.Contains(index))
-                        .ToList())
-                    {
-                        int row = GetTrackerRow(orphanTrackIndex);
-                        ((Excel.Range)trackerSheet.Cells[row, TrackIndexColumn]).ClearContents();
-                        ((Excel.Range)trackerSheet.Cells[row, FormulaColumn]).ClearContents();
-                    }
-
-                    EnsureTrackingSheetHidden(workbook, trackerSheet);
-                    DeleteTrackingSheetIfEmpty(trackerSheet);
+                    DeleteTrackName(workbook, orphanTrackIndex);
                 }
 
                 RemoveAllLegacyMaps(workbook);
+                RemoveLegacyTrackerSheetIfRedundant(workbook, legacySheet, liveTrackIndexes);
             });
         }
 
@@ -182,10 +165,7 @@ namespace Talliark.Addin.Modules.Services
                 return found;
             }
 
-            Excel.Worksheet trackerSheet = FindTrackingSheet(workbook);
-            if (trackerSheet == null) return found;
-
-            foreach (int trackIndex in FindStoredTrackIndexes(trackerSheet))
+            foreach (int trackIndex in EnumerateTrackNameIndexes(workbook))
             {
                 Excel.Range trackedCell = TryResolveCell(workbook, trackIndex, out _);
                 if (trackedCell == null) continue;
@@ -235,57 +215,53 @@ namespace Talliark.Addin.Modules.Services
             if (workbook == null || trackIndex <= 0 || trackIndex > MaximumTrackIndex)
                 return null;
 
-            Excel.Worksheet trackerSheet = FindTrackingSheet(workbook);
-            if (trackerSheet == null) return null;
+            Excel.Name trackName = FindTrackName(workbook, TrackNameFor(trackIndex));
+            if (trackName == null) return null;
 
-            Excel.Range formulaCell =
-                (Excel.Range)trackerSheet.Cells[GetTrackerRow(trackIndex), FormulaColumn];
-            string formula;
+            string refersTo;
             try
             {
-                formula = Convert.ToString(formulaCell.Formula, CultureInfo.InvariantCulture);
+                refersTo = Convert.ToString(trackName.RefersTo, CultureInfo.InvariantCulture);
             }
             catch (COMException)
             {
                 return null;
             }
 
-            bindingExists = !string.IsNullOrWhiteSpace(formula)
-                && formula.StartsWith("=", StringComparison.Ordinal);
+            bindingExists = !string.IsNullOrWhiteSpace(refersTo);
             if (!bindingExists) return null;
 
-            return ResolveReferenceFormula(workbook, formula);
+            return ResolveReferenceFormula(workbook, refersTo);
         }
 
         /// <summary>
-        /// Returns the tracker indexes whose direct-reference formulas contain
-        /// <c>#REF!</c>. This is deliberately narrower than "could not resolve": a missing
-        /// tracker or a temporarily unavailable COM object is not proof that the user's cell
-        /// was deleted and must never cost them a persisted rectangle.
+        /// Returns the track indexes whose names contain <c>#REF!</c>. This is deliberately
+        /// narrower than "could not resolve": a missing name or a temporarily unavailable COM
+        /// object is not proof that the user's cell was deleted and must never cost them a
+        /// persisted rectangle.
         /// </summary>
         internal static ISet<int> FindBrokenReferenceTrackIndexes(Excel.Workbook workbook)
         {
             var broken = new HashSet<int>();
             if (workbook == null) return broken;
 
-            Excel.Worksheet trackerSheet = FindTrackingSheet(workbook);
-            if (trackerSheet == null) return broken;
-
-            foreach (int trackIndex in FindStoredTrackIndexes(trackerSheet))
+            foreach (int trackIndex in EnumerateTrackNameIndexes(workbook))
             {
+                Excel.Name trackName = FindTrackName(workbook, TrackNameFor(trackIndex));
+                if (trackName == null) continue;
+
                 try
                 {
-                    string formula = Convert.ToString(
-                        ((Excel.Range)trackerSheet.Cells[
-                            GetTrackerRow(trackIndex), FormulaColumn]).Formula,
-                        CultureInfo.InvariantCulture);
+                    string refersTo = Convert.ToString(
+                        trackName.RefersTo, CultureInfo.InvariantCulture);
 
-                    if (formula.IndexOf("#REF!", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (refersTo != null
+                        && refersTo.IndexOf("#REF!", StringComparison.OrdinalIgnoreCase) >= 0)
                         broken.Add(trackIndex);
                 }
                 catch (COMException)
                 {
-                    // An unreadable tracker is uncertain, not stale. A later save can retry.
+                    // An unreadable name is uncertain, not stale. A later save can retry.
                 }
             }
 
@@ -293,7 +269,7 @@ namespace Talliark.Addin.Modules.Services
         }
 
         /// <summary>
-        /// Synchronizes persisted cell addresses and prunes rectangles whose formula tracker
+        /// Synchronizes persisted cell addresses and prunes rectangles whose name reference
         /// definitively became <c>#REF!</c> after a structural worksheet deletion.
         /// </summary>
         /// <returns>The ids of rectangles removed as stale.</returns>
@@ -340,7 +316,7 @@ namespace Talliark.Addin.Modules.Services
                         out _);
                     if (foundRange == null)
                     {
-                        // A formula that exists but cannot currently be resolved is not enough
+                        // A name that exists but cannot currently be resolved is not enough
                         // evidence to delete user data. Only the explicit #REF! set above prunes.
                         missingBindings++;
                         continue;
@@ -374,14 +350,14 @@ namespace Talliark.Addin.Modules.Services
                     {
                         try
                         {
-                            // The records are already safely persisted as removed. Tracker
+                            // The records are already safely persisted as removed. Name
                             // cleanup is best-effort and will be retried by EnsureBindings.
                             EnsureBindings(workbook, remaining);
                         }
                         catch (Exception ex)
                         {
                             TalliarkLog.Trace(
-                                $"stale tracker cleanup deferred: {ex.GetType().FullName}: {ex.Message}");
+                                $"stale name cleanup deferred: {ex.GetType().FullName}: {ex.Message}");
                         }
                     }
                 }
@@ -402,20 +378,137 @@ namespace Talliark.Addin.Modules.Services
                 throw new ArgumentOutOfRangeException(nameof(trackIndex));
         }
 
-        private static int GetTrackerRow(int trackIndex)
+        private static string TrackNameFor(int trackIndex)
         {
-            return checked(trackIndex + 1);
+            return TrackNamePrefix + trackIndex.ToString(CultureInfo.InvariantCulture);
         }
 
-        private static void WriteBinding(
-            Excel.Worksheet trackerSheet,
-            Excel.Range target,
-            int trackIndex)
+        /// <summary>
+        /// Writes the hidden name that binds <paramref name="target"/> to
+        /// <paramref name="trackIndex"/>, replacing any name already carrying that index.
+        /// </summary>
+        private static void WriteTrackName(Excel.Workbook workbook, Excel.Range target, int trackIndex)
         {
-            int row = GetTrackerRow(trackIndex);
-            ((Excel.Range)trackerSheet.Cells[row, TrackIndexColumn]).Value2 = trackIndex;
-            ((Excel.Range)trackerSheet.Cells[row, FormulaColumn]).Formula =
-                BuildReferenceFormula(target);
+            string name = TrackNameFor(trackIndex);
+            Excel.Name existing = FindTrackName(workbook, name);
+            if (existing != null)
+            {
+                try { existing.Delete(); }
+                catch (COMException) { }
+            }
+
+            workbook.Names.Add(name, BuildReferenceFormula(target), false);
+        }
+
+        private static void DeleteTrackName(Excel.Workbook workbook, int trackIndex)
+        {
+            Excel.Name trackName = FindTrackName(workbook, TrackNameFor(trackIndex));
+            if (trackName == null) return;
+
+            try { trackName.Delete(); }
+            catch (COMException) { }
+        }
+
+        private static bool TrackNameExists(Excel.Workbook workbook, int trackIndex)
+        {
+            return FindTrackName(workbook, TrackNameFor(trackIndex)) != null;
+        }
+
+        /// <summary>
+        /// Finds the workbook-scoped track name called <paramref name="name"/>. The scope is
+        /// verified because <c>Names.Item</c> can resolve a worksheet-scoped name that happens
+        /// to share the name ahead of the workbook-scoped one.
+        /// </summary>
+        private static Excel.Name FindTrackName(Excel.Workbook workbook, string name)
+        {
+            try
+            {
+                Excel.Name direct = workbook.Names.Item(name);
+                if (direct != null && direct.Parent is Excel.Workbook)
+                    return direct;
+            }
+            catch (COMException)
+            {
+            }
+
+            try
+            {
+                Excel.Names names = workbook.Names;
+                if (names == null) return null;
+
+                int count = names.Count;
+                for (int index = 1; index <= count; index++)
+                {
+                    try
+                    {
+                        Excel.Name candidate = names.Item(index);
+                        if (candidate != null
+                            && candidate.Parent is Excel.Workbook
+                            && string.Equals(candidate.Name, name, StringComparison.Ordinal))
+                            return candidate;
+                    }
+                    catch (COMException)
+                    {
+                    }
+                }
+            }
+            catch (COMException)
+            {
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Enumerates the track indexes currently bound by a hidden name. Sheet-scoped names
+        /// are ignored: the tracker only ever creates workbook-scoped ones.
+        /// </summary>
+        private static ISet<int> EnumerateTrackNameIndexes(Excel.Workbook workbook)
+        {
+            var indexes = new HashSet<int>();
+            if (workbook == null) return indexes;
+
+            Excel.Names names;
+            int count;
+            try
+            {
+                names = workbook.Names;
+                if (names == null) return indexes;
+                count = names.Count;
+            }
+            catch (COMException)
+            {
+                return indexes;
+            }
+
+            for (int index = 1; index <= count; index++)
+            {
+                try
+                {
+                    Excel.Name name = names.Item(index);
+                    if (name == null || !(name.Parent is Excel.Workbook)) continue;
+
+                    string fullName = name.Name;
+                    if (fullName == null
+                        || !fullName.StartsWith(TrackNamePrefix, StringComparison.Ordinal))
+                        continue;
+
+                    if (!int.TryParse(
+                            fullName.Substring(TrackNamePrefix.Length),
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out int trackIndex))
+                        continue;
+
+                    if (trackIndex > 0 && trackIndex <= MaximumTrackIndex)
+                        indexes.Add(trackIndex);
+                }
+                catch (COMException)
+                {
+                }
+            }
+
+            return indexes;
         }
 
         private static string BuildReferenceFormula(Excel.Range target)
@@ -509,7 +602,7 @@ namespace Talliark.Addin.Modules.Services
             return null;
         }
 
-        private static Excel.Worksheet FindTrackingSheet(Excel.Workbook workbook)
+        private static Excel.Worksheet FindLegacyTrackerSheet(Excel.Workbook workbook)
         {
             foreach (Excel.Worksheet worksheet in workbook.Worksheets)
             {
@@ -518,7 +611,7 @@ namespace Talliark.Addin.Modules.Services
                     string sentinel = Convert.ToString(
                         ((Excel.Range)worksheet.Cells[1, 1]).Value2,
                         CultureInfo.InvariantCulture);
-                    if (string.Equals(sentinel, TrackerSheetSentinel, StringComparison.Ordinal))
+                    if (string.Equals(sentinel, LegacyTrackerSheetSentinel, StringComparison.Ordinal))
                         return worksheet;
                 }
                 catch (COMException)
@@ -529,105 +622,15 @@ namespace Talliark.Addin.Modules.Services
             return null;
         }
 
-        private static Excel.Worksheet EnsureTrackingSheet(Excel.Workbook workbook)
-        {
-            Excel.Worksheet existing = FindTrackingSheet(workbook);
-            if (existing != null)
-            {
-                EnsureTrackingSheetHidden(workbook, existing);
-                return existing;
-            }
-
-            Excel.Worksheet previouslyActive = workbook.ActiveSheet as Excel.Worksheet;
-            object after = workbook.Worksheets[workbook.Worksheets.Count];
-            var trackerSheet = (Excel.Worksheet)workbook.Worksheets.Add(
-                Type.Missing,
-                after,
-                Type.Missing,
-                Type.Missing);
-            trackerSheet.Name = FindAvailableTrackerSheetName(workbook);
-            ((Excel.Range)trackerSheet.Cells[1, 1]).Value2 = TrackerSheetSentinel;
-            ((Excel.Range)trackerSheet.Cells[1, 2]).Value2 = "Reference";
-
-            try { previouslyActive?.Activate(); }
-            catch (COMException) { }
-
-            EnsureTrackingSheetHidden(workbook, trackerSheet);
-            return trackerSheet;
-        }
-
-        private static string FindAvailableTrackerSheetName(Excel.Workbook workbook)
-        {
-            for (int suffix = 0; suffix < 1000; suffix++)
-            {
-                string candidate = suffix == 0
-                    ? TrackerSheetBaseName
-                    : TrackerSheetBaseName + "_" + suffix.ToString(CultureInfo.InvariantCulture);
-                if (FindWorksheet(workbook, candidate) == null)
-                    return candidate;
-            }
-
-            throw new InvalidOperationException("Unable to allocate a Talliark tracking worksheet name.");
-        }
-
-        private static void EnsureTrackingSheetHidden(
-            Excel.Workbook workbook,
-            Excel.Worksheet trackerSheet)
-        {
-            if (trackerSheet.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden)
-                return;
-
-            try
-            {
-                string activeName = (workbook.ActiveSheet as Excel.Worksheet)?.Name;
-                if (string.Equals(activeName, trackerSheet.Name, StringComparison.Ordinal))
-                {
-                    foreach (Excel.Worksheet worksheet in workbook.Worksheets)
-                    {
-                        if (string.Equals(worksheet.Name, trackerSheet.Name, StringComparison.Ordinal))
-                            continue;
-                        if (worksheet.Visible != Excel.XlSheetVisibility.xlSheetVisible)
-                            continue;
-                        worksheet.Activate();
-                        break;
-                    }
-                }
-            }
-            catch (COMException)
-            {
-            }
-
-            trackerSheet.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
-        }
-
-        private static bool BindingExists(Excel.Worksheet trackerSheet, int trackIndex)
-        {
-            if (trackerSheet == null || trackIndex <= 0 || trackIndex > MaximumTrackIndex)
-                return false;
-
-            try
-            {
-                string formula = Convert.ToString(
-                    ((Excel.Range)trackerSheet.Cells[GetTrackerRow(trackIndex), FormulaColumn]).Formula,
-                    CultureInfo.InvariantCulture);
-                return !string.IsNullOrWhiteSpace(formula)
-                    && formula.StartsWith("=", StringComparison.Ordinal);
-            }
-            catch (COMException)
-            {
-                return false;
-            }
-        }
-
-        private static IList<int> FindStoredTrackIndexes(Excel.Worksheet trackerSheet)
+        private static IList<int> ReadLegacySheetTrackIndexes(Excel.Worksheet legacySheet)
         {
             var indexes = new List<int>();
-            if (trackerSheet == null) return indexes;
+            if (legacySheet == null) return indexes;
 
             int lastRow;
             try
             {
-                Excel.Range usedRange = trackerSheet.UsedRange;
+                Excel.Range usedRange = legacySheet.UsedRange;
                 lastRow = usedRange.Row + usedRange.Rows.Count - 1;
             }
             catch (COMException)
@@ -635,11 +638,12 @@ namespace Talliark.Addin.Modules.Services
                 return indexes;
             }
 
-            for (int row = FirstTrackerRow; row <= lastRow; row++)
+            for (int row = LegacyTrackerSheetFirstRow; row <= lastRow; row++)
             {
                 try
                 {
-                    object raw = ((Excel.Range)trackerSheet.Cells[row, TrackIndexColumn]).Value2;
+                    object raw = ((Excel.Range)legacySheet.Cells[
+                        row, LegacyTrackerSheetTrackIndexColumn]).Value2;
                     if (raw == null) continue;
                     int trackIndex = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
                     if (trackIndex > 0 && trackIndex <= MaximumTrackIndex)
@@ -654,16 +658,65 @@ namespace Talliark.Addin.Modules.Services
             return indexes;
         }
 
-        private static void DeleteTrackingSheetIfEmpty(Excel.Worksheet trackerSheet)
+        /// <summary>
+        /// Resolves a binding still carried by the legacy tracking worksheet, so a migration
+        /// adopts the live reference Excel maintained rather than the last stored address.
+        /// </summary>
+        private static Excel.Range TryResolveLegacySheetBinding(
+            Excel.Workbook workbook,
+            Excel.Worksheet legacySheet,
+            int trackIndex)
         {
-            if (trackerSheet == null || FindStoredTrackIndexes(trackerSheet).Count > 0)
-                return;
+            if (legacySheet == null || trackIndex <= 0 || trackIndex > MaximumTrackIndex)
+                return null;
 
-            // Excel rejects Delete on an xlSheetVeryHidden worksheet. Mutations run with
-            // screen updating and events disabled, so briefly revealing it is not visible
-            // to the user and does not disturb the active worksheet.
-            trackerSheet.Visible = Excel.XlSheetVisibility.xlSheetVisible;
-            trackerSheet.Delete();
+            try
+            {
+                string formula = Convert.ToString(
+                    ((Excel.Range)legacySheet.Cells[
+                        LegacyTrackerSheetRow(trackIndex), LegacyTrackerSheetFormulaColumn]).Formula,
+                    CultureInfo.InvariantCulture);
+                return ResolveReferenceFormula(workbook, formula);
+            }
+            catch (COMException)
+            {
+                return null;
+            }
+        }
+
+        private static int LegacyTrackerSheetRow(int trackIndex)
+        {
+            return checked(trackIndex + 1);
+        }
+
+        /// <summary>
+        /// Removes the legacy tracking worksheet once every live link it carried has a name
+        /// binding, so an unresolvable link never loses its tracker to the cleanup.
+        /// </summary>
+        private static void RemoveLegacyTrackerSheetIfRedundant(
+            Excel.Workbook workbook,
+            Excel.Worksheet legacySheet,
+            ISet<int> liveTrackIndexes)
+        {
+            if (legacySheet == null) return;
+
+            foreach (int trackIndex in ReadLegacySheetTrackIndexes(legacySheet))
+            {
+                if (liveTrackIndexes.Contains(trackIndex) && !TrackNameExists(workbook, trackIndex))
+                    return;
+            }
+
+            try
+            {
+                // Excel rejects Delete on an xlSheetVeryHidden worksheet. Mutations run with
+                // screen updating and events disabled, so briefly revealing it is invisible.
+                legacySheet.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+                legacySheet.Delete();
+                TalliarkLog.Trace("removed legacy tracker sheet");
+            }
+            catch (COMException)
+            {
+            }
         }
 
         private static bool HasLegacyMaps(Excel.Workbook workbook)

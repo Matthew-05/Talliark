@@ -121,7 +121,7 @@ namespace Talliark.Addin.Modules.Services
             if (sheet == null) return false;
 
             // A hidden sheet cannot be the cell the user is looking at, and the add-in's own
-            // formula tracker is very hidden — never let a stale record target one.
+            // tracking artifacts are hidden — never let a stale record target one.
             try
             {
                 if (sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible) return false;

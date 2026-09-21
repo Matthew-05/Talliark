@@ -15,8 +15,8 @@ namespace Talliark.Addin.Modules.CustomXml.Models
 
         /// <summary>
         /// Stable, monotonically-increasing integer assigned at link creation.
-        /// Selects the row on Talliark's very-hidden formula tracking sheet used to
-        /// follow structural cell moves. Never reused after a link is deleted.
+        /// Selects the hidden workbook name whose reference follows structural cell
+        /// moves. Never reused after a link is deleted.
         /// </summary>
         public int TrackIndex { get; set; }
     }

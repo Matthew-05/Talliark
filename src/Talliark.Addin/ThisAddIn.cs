@@ -2284,9 +2284,9 @@ namespace Talliark.Addin
         }
 
         /// <summary>
-        /// Creates filter-safe formula trackers for persisted links and removes legacy
-        /// per-cell XML maps. The operation is idempotent and normally becomes a quick
-        /// read-only check on subsequent workbook activations.
+        /// Creates hidden track names for persisted links and removes the legacy per-cell
+        /// XML maps and the legacy tracking worksheet. The operation is idempotent and
+        /// normally becomes a quick read-only check on subsequent workbook activations.
         /// </summary>
         private void EnsureLinkTracking(Excel.Workbook wb)
         {
