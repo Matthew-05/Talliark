@@ -179,6 +179,37 @@ function charBoxOverlapsRect(
   return intersectArea / charArea >= MIN_CHAR_BOX_OVERLAP;
 }
 
+/**
+ * Whether a whitespace glyph is mostly buried inside a printing glyph on its
+ * own visual line.
+ *
+ * A right-aligned column often carries a run of space glyphs whose last member
+ * reaches the column's text and overlaps its first glyph. That space is
+ * alignment padding, not a separator: emitting it puts a space inside the figure
+ * ("3 ,016,601"), and a number reader then splits it into two addends. Ordinary
+ * word spaces may graze a neighbour's advance box but are never mostly covered
+ * by it, so a majority overlap tells the two apart.
+ */
+function isPaddingOverlap(ordered: OrderedEntry[], index: number): boolean {
+  const target = ordered[index]!.entry;
+  const targetWidth = target.normRight - target.normLeft;
+  if (targetWidth <= 0) return false;
+  const visualLine = ordered[index]!.visualLine;
+  for (const direction of [-1, 1]) {
+    for (let i = index + direction; i >= 0 && i < ordered.length; i += direction) {
+      const neighbor = ordered[i]!;
+      if (neighbor.visualLine !== visualLine) break;
+      const glyph = neighbor.entry;
+      if (glyph.char.trim() === "") continue;
+      const overlapWidth = Math.min(target.normRight, glyph.normRight)
+        - Math.max(target.normLeft, glyph.normLeft);
+      if (overlapWidth > targetWidth * 0.5) return true;
+      break;
+    }
+  }
+  return false;
+}
+
 export function extractText(entries: CharacterEntry[] | null, rect: NormalizedRect): string {
   if (!entries || entries.length === 0) return "";
 
@@ -191,12 +222,17 @@ export function extractText(entries: CharacterEntry[] | null, rect: NormalizedRe
 
   if (included.length === 0) return "";
 
+  const ordered = orderForExtraction(included);
   const spacesPrecomputed = entries[0]?.spacesPrecomputed === true;
   let result = "";
   let prev: OrderedEntry | null = null;
 
-  for (const current of orderForExtraction(included)) {
+  for (let index = 0; index < ordered.length; index++) {
+    const current = ordered[index]!;
     const entry = current.entry;
+    if (entry.char.trim() === "" && isPaddingOverlap(ordered, index)) {
+      continue;
+    }
     if (prev !== null && current.visualLine !== prev.visualLine) {
       result += " ";
     } else if (!spacesPrecomputed && prev !== null && entry.itemIndex !== prev.entry.itemIndex) {

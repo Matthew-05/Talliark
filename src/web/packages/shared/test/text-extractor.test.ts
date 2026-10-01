@@ -97,3 +97,31 @@ test("does not fold a separate small line into the line below it", () => {
 
   assert.equal(extractText(entries, fullRect), "1 A");
 });
+
+test("does not let right-alignment padding split a number", () => {
+  // Right-aligned columns carry a run of space glyphs whose last member
+  // reaches the figure and overlaps its first digit. Emitting it would read
+  // "3,016" as "3 ,016", and a sum tool then adds 3 and 16 separately.
+  const entries = [
+    entry("3", 0, 0, 0.60, 0.10, 0.61, 0.12),
+    entry(",", 0, 1, 0.61, 0.10, 0.615, 0.12),
+    entry("0", 0, 2, 0.615, 0.10, 0.625, 0.12),
+    entry("1", 0, 3, 0.625, 0.10, 0.635, 0.12),
+    entry("6", 0, 4, 0.635, 0.10, 0.645, 0.12),
+    entry(" ", 1, 5, 0.55, 0.10, 0.555, 0.12),
+    entry(" ", 1, 6, 0.56, 0.10, 0.565, 0.12),
+    entry(" ", 1, 7, 0.60, 0.10, 0.605, 0.12),
+  ];
+
+  assert.equal(extractText(entries, fullRect), "  3,016");
+});
+
+test("keeps an ordinary word space that only grazes a neighbour", () => {
+  const entries = [
+    entry(",", 0, 0, 0.20, 0.10, 0.205, 0.12),
+    entry(" ", 0, 1, 0.2046, 0.10, 0.2096, 0.12),
+    entry("n", 0, 2, 0.2099, 0.10, 0.2169, 0.12),
+  ];
+
+  assert.equal(extractText(entries, fullRect), ", n");
+});
