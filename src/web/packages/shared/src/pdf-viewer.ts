@@ -45,6 +45,7 @@ export class PdfViewer {
     state.className = "viewer__placeholder";
     state.textContent = placeholder;
     this.element.appendChild(state);
+    this.attachRepaintTriggers();
   }
 
   onLoaded(callback: (totalPages: number) => void): void {
@@ -179,8 +180,7 @@ export class PdfViewer {
     const document_ = this.document;
     const page = this.pages[pageNumber - 1];
     if (!document_ || !page) return;
-    const canvas = page.wrapper.querySelector<HTMLCanvasElement>(".viewer__canvas");
-    if (page.renderedScale === this.scale && canvas) return;
+    if (!this.pageNeedsRender(page)) return;
     const generation = ++this.renderGeneration;
     await this.enqueueRender(async () => {
       if (generation === this.renderGeneration && document_ === this.document) {
@@ -251,8 +251,14 @@ export class PdfViewer {
     for (let index = 0; index < this.pages.length; index += 1) {
       if (generation !== this.renderGeneration || document_ !== this.document) return;
       const page = this.pages[index]!;
-      if (page.renderedScale !== this.scale) {
+      if (!this.pageNeedsRender(page)) continue;
+      try {
         await renderPdfPage(document_, index + 1, page, this.scale, generation, () => this.renderGeneration);
+      } catch (error) {
+        // One damaged page must not stop the pages after it from rendering, and
+        // must not poison the shared rendering queue. The page's renderedScale
+        // stays null so a later repaint (zoom, surface show, refocus) retries it.
+        console.warn(`[Talliark] failed to render page ${index + 1}:`, error);
       }
     }
   }
@@ -260,6 +266,17 @@ export class PdfViewer {
   private async renderAll(): Promise<void> {
     const generation = ++this.renderGeneration;
     await this.renderPages(generation);
+  }
+
+  /**
+   * A page needs rendering when its pixels are stale for the current zoom, or
+   * when its canvas has gone missing while the paint bookkeeping still says it
+   * is current. Both the single-page and background paths share this check, so
+   * a page that lost its canvas can never be skipped as "already rendered".
+   */
+  private pageNeedsRender(entry: PageEntry): boolean {
+    return entry.renderedScale !== this.scale
+      || entry.wrapper.querySelector(".viewer__canvas") === null;
   }
 
   /** A failed PDF.js render must not permanently poison every later queue entry. */
@@ -272,6 +289,49 @@ export class PdfViewer {
   private cancelZoomDebounce(): void {
     if (this.zoomDebounce !== null) clearTimeout(this.zoomDebounce);
     this.zoomDebounce = null;
+  }
+
+  /**
+   * The native host hides the WebView2 surface while this JavaScript context
+   * stays alive, and Chromium can come back with a blank canvas even though
+   * `renderedScale` still says the page is current. The host fires its own
+   * surface-shown callback for the show/hide path it controls; these window
+   * triggers cover the rest — tab switch, Excel focus changes, minimize and
+   * restore — so a blank page repairs itself instead of waiting for a zoom
+   * nudge.
+   */
+  private attachRepaintTriggers(): void {
+    const repaint = (): void => { void this.repairVisiblePages(); };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") repaint();
+    });
+    window.addEventListener("focus", repaint);
+  }
+
+  /** Re-renders only the pages currently in the viewport, leaving state alone. */
+  private async repairVisiblePages(): Promise<void> {
+    const document_ = this.document;
+    if (!document_ || this.pages.length === 0) return;
+    this.cancelZoomDebounce();
+    const generation = ++this.renderGeneration;
+    for (const index of this.visiblePageIndices()) {
+      this.pages[index]!.renderedScale = null;
+    }
+    await this.renderPages(generation);
+  }
+
+  private visiblePageIndices(): number[] {
+    const viewport = this.element.getBoundingClientRect();
+    const indices: number[] = [];
+    for (let index = 0; index < this.pages.length; index += 1) {
+      const bounds = this.pages[index]!.wrapper.getBoundingClientRect();
+      const visible = Math.max(
+        0,
+        Math.min(bounds.bottom, viewport.bottom) - Math.max(bounds.top, viewport.top),
+      );
+      if (visible > 0) indices.push(index);
+    }
+    return indices;
   }
 
   private setAvailability(value: boolean): void {
