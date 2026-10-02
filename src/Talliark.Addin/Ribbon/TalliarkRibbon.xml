@@ -43,7 +43,7 @@
             <button id="Talliark.BtnAddFromClipboard"
                     label="Import from Clipboard"
                     screentip="Import from Clipboard"
-                    supertip="Add files or folders that you copied to the Windows clipboard."
+                    supertip="Add files, folders, or a picture that you copied to the Windows clipboard."
                     getImage="GetImportClipboardImage"
                     onAction="OnImportDocumentsFromClipboard" />
             <button id="Talliark.BtnAddFolder"

@@ -93,8 +93,9 @@ namespace Talliark.Addin.Modules.Services.Conversion
     ///   2. <see cref="PrepareAsync"/> — convert the agreed types into temp PDFs and
     ///      return ready-to-embed import requests.
     ///
-    /// Keeping both phases here means the ribbon, the file picker, OS drag-drop and
-    /// the web dropzone all get identical behaviour.
+    /// Keeping both phases here means the ribbon — its file picker, its folder
+    /// picker and its clipboard, which delivers a picture as bytes rather than a
+    /// path — OS drag-drop and the web dropzone all get identical behaviour.
     /// </summary>
     internal static class ImportPreparationService
     {

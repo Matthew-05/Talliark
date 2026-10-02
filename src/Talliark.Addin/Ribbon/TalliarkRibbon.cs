@@ -182,7 +182,7 @@ namespace Talliark.Addin.Ribbon
             }
         }
 
-        /// <summary>Adds files and folders copied in Windows Explorer.</summary>
+        /// <summary>Adds files, folders or a picture copied to the Windows clipboard.</summary>
         public async void OnImportDocumentsFromClipboard(IRibbonControl control)
         {
             try
@@ -191,28 +191,94 @@ namespace Talliark.Addin.Ribbon
                 if (workbook == null)
                     return;
 
-                if (!Clipboard.ContainsFileDropList())
+                // Explorer publishes a file-drop list. A screenshot, a browser's
+                // "Copy image" and Office's "Copy as picture" publish pixels instead,
+                // which the drop list never reports.
+                if (Clipboard.ContainsFileDropList())
+                {
+                    string[] clipboardPaths = Clipboard.GetFileDropList()
+                        .Cast<string>()
+                        .ToArray();
+
+                    if (clipboardPaths.Length > 0)
+                    {
+                        await ImportDocumentPathsAsync(workbook, clipboardPaths);
+                        return;
+                    }
+                }
+
+                IList<ImportCandidate> pictureCandidates = CollectClipboardPictureCandidates();
+                if (pictureCandidates.Count == 0)
                 {
                     MessageBox.Show(
-                        text: "Copy one or more files or folders, then try again.",
+                        text: "Copy one or more files, folders, or a picture, then try again.",
                         caption: "Talliark",
                         buttons: MessageBoxButtons.OK,
                         icon: MessageBoxIcon.Information);
                     return;
                 }
 
-                string[] clipboardPaths = Clipboard.GetFileDropList()
-                    .Cast<string>()
-                    .ToArray();
-
-                if (clipboardPaths.Length == 0)
-                    return;
-
-                await ImportDocumentPathsAsync(workbook, clipboardPaths);
+                await ImportCandidatesAsync(workbook, pictureCandidates);
             }
             catch (Exception ex)
             {
                 ShowImportFailure("OnImportDocumentsFromClipboard", ex);
+            }
+        }
+
+        /// <summary>
+        /// Turns a picture on the clipboard into an import candidate, or returns an
+        /// empty list when there is none to read.
+        ///
+        /// A screenshot, a browser's "Copy image" and Office's "Copy as picture" all
+        /// hand over their pixels, and <see cref="Clipboard.GetFileDropList"/> sees
+        /// nothing of them. The picture is re-encoded as PNG — the one raster format
+        /// every source can produce and the one the image converter reads — and named
+        /// from the clock, so a second paste is a second document rather than a repeat
+        /// of the first. Transparent pixels are left alone: the conversion engine
+        /// already flattens them onto white, which is the right answer for a pasted
+        /// screenshot and cheaper to do once.
+        /// </summary>
+        private static IList<ImportCandidate> CollectClipboardPictureCandidates()
+        {
+            try
+            {
+                if (!Clipboard.ContainsImage())
+                    return Array.Empty<ImportCandidate>();
+
+                using (System.Drawing.Image picture = Clipboard.GetImage())
+                {
+                    if (picture == null || picture.Width <= 0 || picture.Height <= 0)
+                        return Array.Empty<ImportCandidate>();
+
+                    byte[] png;
+                    using (var buffer = new MemoryStream())
+                    {
+                        picture.Save(buffer, System.Drawing.Imaging.ImageFormat.Png);
+                        png = buffer.ToArray();
+                    }
+
+                    Modules.TalliarkLog.Trace(
+                        $"Clipboard picture: {picture.Width}x{picture.Height} {picture.PixelFormat} " +
+                        $"→ {png.Length} PNG bytes.");
+
+                    return new[]
+                    {
+                        new ImportCandidate
+                        {
+                            Name = $"Pasted image {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png",
+                            Bytes = png,
+                        },
+                    };
+                }
+            }
+            catch (ExternalException ex)
+            {
+                // Another process is holding the clipboard open. Nothing to import
+                // is a far better outcome than an error dialog over a picture that
+                // is still there.
+                Modules.TalliarkLog.Trace($"Clipboard picture could not be read: {ex}");
+                return Array.Empty<ImportCandidate>();
             }
         }
 
@@ -314,7 +380,22 @@ namespace Talliark.Addin.Ribbon
                 }
             }
 
-            if (candidates.Count == 0)
+            await ImportCandidatesAsync(workbook, candidates, importedFolderName);
+        }
+
+        /// <summary>
+        /// Confirms, converts and embeds a selection of candidates, whether each one
+        /// arrived as a path on disk or as bytes. The path-based callers
+        /// (<see cref="ImportDocumentPathsAsync"/>) and the clipboard picture
+        /// (<see cref="CollectClipboardPictureCandidates"/>) both arrive here, so
+        /// neither can drift into its own idea of what confirming an import means.
+        /// </summary>
+        private static async Task ImportCandidatesAsync(
+            Excel.Workbook workbook,
+            IList<ImportCandidate> candidates,
+            string importedFolderName = null)
+        {
+            if (candidates == null || candidates.Count == 0)
             {
                 MessageBox.Show(
                     text: "No supported documents were found.",
