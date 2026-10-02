@@ -6,12 +6,14 @@ import unittest
 from pathlib import Path
 
 from engines.values import categories
+from engines.values.detector import detect_values
 from engines.values.spans import cut_token, recognize_spans, token_spans
 
-from documents import detect, detect_pages, geometry as _geometry, cell as _cell, line as _line, label as _label, noise as _noise, published as _published, refused as _refused, references as _references
+from documents import canonical, detect, detect_pages, expand_geometry, geometry as _geometry, cell as _cell, line as _line, label as _label, noise as _noise, published as _published, refused as _refused, references as _references
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "values" / "span-oracle.json"
+DETECTOR_FIXTURE = Path(__file__).parent / "fixtures" / "values" / "detector-cases.json"
 
 
 def detect_model(model, *, tables=None, diagnostics=None):
@@ -644,3 +646,22 @@ class SharedFootnoteTests(unittest.TestCase):
         )])
         self.assertEqual(published, ["(1)"])
         self.assertEqual(noise, [])
+
+
+class SharedDetectorCorpusTests(unittest.TestCase):
+    """One geometry-to-model corpus, scored by both recognizers.
+
+    The same file the TypeScript suite reads (`detector-cases.json`) is asserted
+    here against the Python engine, so neither recognizer can drift from the
+    other without a test on one side failing. The comparison drops derived ids
+    and the detector version and materializes every optional layer, through
+    `documents.canonical`, which the TypeScript runner mirrors.
+    """
+
+    def test_matches_the_shared_corpus(self) -> None:
+        cases = json.loads(DETECTOR_FIXTURE.read_text(encoding="utf-8"))
+        self.assertGreater(len(cases), 0)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                model = detect_values(expand_geometry(case["geometry"]))
+                self.assertEqual(canonical(model), case["expect"])

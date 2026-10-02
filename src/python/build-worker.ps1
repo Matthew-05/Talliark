@@ -112,6 +112,12 @@ Copy-Item (Join-Path $scriptDir "worker.py") $workerDir
 Copy-Item (Join-Path $scriptDir "engines")  (Join-Path $workerDir "engines")  -Recurse -Force
 Copy-Item (Join-Path $scriptDir "schemas")  (Join-Path $workerDir "schemas")  -Recurse -Force
 
+# The value-recognition config is read at runtime by engines/values/config.py,
+# so it must ship beside the engine in the bundle.
+$configDir = Join-Path $workerDir "contracts"
+New-Item -ItemType Directory -Force $configDir | Out-Null
+Copy-Item (Join-Path $scriptDir "..\..\contracts\value-recognition-config-v1.json") (Join-Path $configDir "value-recognition-config-v1.json") -Force
+
 # ── Copy tool binaries ────────────────────────────────────────────────────────
 Write-Host "Copying Tesseract..." -ForegroundColor Cyan
 Copy-Item $tessDir (Join-Path $workerDir "tesseract") -Recurse -Force

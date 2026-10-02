@@ -49,6 +49,47 @@ def geometry(pages: list[list[dict]]) -> dict:
     }
 
 
+def compact_geometry(model: dict) -> dict:
+    """Store a text-geometry model with per-character arrays, for the shared corpus.
+
+    The corpus is read by both the Python and TypeScript suites, so it is kept in
+    a compact form -- one short array per character instead of a six-key object --
+    and each runner expands it back to text-geometry-v1 with `expand_geometry`.
+    """
+    return {
+        "version": model["version"],
+        "coordinateSpace": model["coordinateSpace"],
+        "pages": [
+            {
+                "pageIndex": page["pageIndex"],
+                "characters": [
+                    [char["char"], char["x"], char["y"], char["width"], char["height"], char["lineIndex"]]
+                    for char in page["characters"]
+                ],
+            }
+            for page in model["pages"]
+        ],
+    }
+
+
+def expand_geometry(compact: dict) -> dict:
+    """Expand the compact character arrays back into a text-geometry-v1 model."""
+    return {
+        "version": compact["version"],
+        "coordinateSpace": compact["coordinateSpace"],
+        "pages": [
+            {
+                "pageIndex": page["pageIndex"],
+                "characters": [
+                    {"char": c[0], "x": c[1], "y": c[2], "width": c[3], "height": c[4], "lineIndex": c[5]}
+                    for c in page["characters"]
+                ],
+            }
+            for page in compact["pages"]
+        ],
+    }
+
+
 def detect(model: dict, *, tables: dict | None = None) -> Detected:
     """Run both tiers over one text-geometry model."""
     document = prepare(model)
@@ -101,3 +142,31 @@ def refused(model: dict) -> list[dict]:
 def label(item: dict) -> str:
     """What a refusal called itself: a noise reason, or a structure kind."""
     return item.get("reason") or item["kind"]
+
+
+def canonical(model: dict) -> dict:
+    """The cross-runtime comparable form of a values model.
+
+    Derived span ids and the detector version are dropped, and every optional
+    layer is materialized as a list, so the Python engine and the TypeScript
+    recognizer can be scored against one shared corpus. The TypeScript side
+    mirrors this function exactly; keeping it this small is what keeps the two
+    from drifting.
+    """
+    def strip(span: dict) -> dict:
+        return {key: value for key, value in span.items() if key != "id"}
+
+    return {
+        "documentContext": model["documentContext"],
+        "pages": [
+            {
+                "pageIndex": page["pageIndex"],
+                "context": page["context"],
+                "values": [strip(span) for span in page.get("values", [])],
+                "references": [strip(span) for span in page.get("references", [])],
+                "structure": [strip(span) for span in page.get("structure", [])],
+                "noise": [strip(span) for span in page.get("noise", [])],
+            }
+            for page in model["pages"]
+        ],
+    }

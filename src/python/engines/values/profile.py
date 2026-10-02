@@ -27,6 +27,16 @@ from dataclasses import dataclass
 from statistics import median
 
 from .categories import PAGE_FURNITURE
+from .config import (
+    FUNCTION_WORDS,
+    PLACE_TOLERANCE,
+    REPEAT_MINIMUM,
+    REPEAT_SHARE,
+    REPRESENTATIVE_GLYPHS,
+    SEQUENCE_MINIMUM,
+    SUPERSCRIPT_RATIO,
+    YEAR_RANGE,
+)
 from .spans import MONTHS
 
 
@@ -35,36 +45,33 @@ _WORDS = re.compile(r"[^\W\d_]+")
 # A line that is nothing but a small integer: the shape a bare page number takes.
 _ONLY_NUMBER = re.compile(r"^[(\[]?-?\s*(\d{1,4})\s*[)\]]?[.,]?$")
 # A page-number sequence runs through consecutive pages by its nature.
-_SEQUENCE_MINIMUM = 3
+_SEQUENCE_MINIMUM = SEQUENCE_MINIMUM
 # A statement's column headers are years, and consecutive pages of them climb by
 # one exactly as page numbers do. Nothing else separates the two sequences, so a
 # value that reads as a year is not a page number unless the document is long
 # enough to actually reach that page.
-_YEAR_RANGE = (1500, 2200)
+_YEAR_RANGE = YEAR_RANGE
 # A page number is printed in the same place on every page. A year that happens
 # to sit in a column header moves with the table it heads.
-_PLACE_TOLERANCE = 120
+_PLACE_TOLERANCE = PLACE_TOLERANCE
 
 # Furniture has to recur across a real share of the document before it is
 # treated as furniture rather than as content that happens to repeat.
-_REPEAT_SHARE = 0.25
-_REPEAT_MINIMUM = 3
+_REPEAT_SHARE = REPEAT_SHARE
+_REPEAT_MINIMUM = REPEAT_MINIMUM
 # A footnote marker measures about two thirds of the text it annotates. The
 # corpus shows markers at 0.65 and nothing at all between there and 0.8.
-_SUPERSCRIPT_RATIO = 0.72
+_SUPERSCRIPT_RATIO = SUPERSCRIPT_RATIO
 # A page needs enough glyphs for its median to mean "ordinary text". A title
 # page of two dozen words in two sizes does not: its median lands on the
 # heading, and the ordinary text below reads as a footnote marker.
-_REPRESENTATIVE_GLYPHS = 200
+_REPRESENTATIVE_GLYPHS = REPRESENTATIVE_GLYPHS
 
 # Words that carry no identity of their own. A line built only from these, month
 # names and digits is a period caption -- "As of December 31, 2025", "For the
 # fiscal year ended ..." -- which repeats on every page of a report but names the
 # period its figures belong to, so it must stay readable.
-_FUNCTION_WORDS = frozenset(
-    "a an as at and by for from in of on or the to through ended ending end"
-    " year years period periods quarter months month fiscal date dated".split()
-)
+_FUNCTION_WORDS = FUNCTION_WORDS
 
 
 def skeleton(text: str) -> str:

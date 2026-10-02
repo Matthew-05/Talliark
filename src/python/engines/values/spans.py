@@ -7,6 +7,17 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from .categories import ALPHANUMERIC, IDENTIFIER, PARTIAL_TOKEN
+from .config import (
+    CONFIDENCE,
+    CURRENCY_CODE_PATTERN,
+    CURRENCY_CODES,
+    CURRENCY_SYMBOL_PATTERN,
+    CURRENCY_SYMBOLS,
+    MAGNITUDE_PATTERN,
+    MAGNITUDES,
+    MONTH_PATTERN,
+    MONTHS,
+)
 
 
 @dataclass(frozen=True)
@@ -29,55 +40,6 @@ class TextFragment:
     end: int
     text: str
 
-
-MONTHS = {
-    name.lower(): index
-    for index in range(1, 13)
-    for name in (calendar.month_name[index], calendar.month_abbr[index])
-}
-MONTH_PATTERN = (
-    r"Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
-    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|"
-    r"Nov(?:ember)?|Dec(?:ember)?"
-)
-CURRENCY_CODES = {code: code for code in ("USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "KRW")}
-CURRENCY_SYMBOLS = {"$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₩": "KRW"}
-# Built from the two tables above so the pattern cannot list a currency the
-# reader does not know, or miss one it does.
-CURRENCY_CODE_PATTERN = "|".join(sorted(CURRENCY_CODES))
-CURRENCY_SYMBOL_PATTERN = "[" + "".join(CURRENCY_SYMBOLS) + "]"
-
-MAGNITUDES = {
-    "k": 1_000,
-    "th": 1_000,
-    "ths": 1_000,
-    "thou": 1_000,
-    "thousand": 1_000,
-    "thousands": 1_000,
-    "m": 1_000_000,
-    "mm": 1_000_000,
-    "mn": 1_000_000,
-    "mil": 1_000_000,
-    "mln": 1_000_000,
-    "million": 1_000_000,
-    "millions": 1_000_000,
-    "b": 1_000_000_000,
-    "bn": 1_000_000_000,
-    "bln": 1_000_000_000,
-    "bil": 1_000_000_000,
-    "billion": 1_000_000_000,
-    "billions": 1_000_000_000,
-    "t": 1_000_000_000_000,
-    "tn": 1_000_000_000_000,
-    "trn": 1_000_000_000_000,
-    "tril": 1_000_000_000_000,
-    "trillion": 1_000_000_000_000,
-    "trillions": 1_000_000_000_000,
-}
-MAGNITUDE_PATTERN = (
-    r"thousands?|millions?|billions?|trillions?|"
-    r"thou|tril|bln|mln|trn|ths|bil|mil|bn|mn|mm|tn|th|k|m|b|t"
-)
 
 _DATE_PATTERNS = (
     (re.compile(rf"\b(?P<month>{MONTH_PATTERN})\.?\s+(?P<day>\d{{1,2}})(?:st|nd|rd|th)?\s*,?\s+(?P<year>(?:19|20)\d{{2}})\b", re.I), "mdy"),
@@ -269,7 +231,7 @@ def _date_span(match: re.Match[str], mode: str) -> RecognizedSpan | None:
             return None
         normalized, precision, order = f"{year:04d}-{month:02d}-{day:02d}", "day", mode
     return RecognizedSpan(
-        match.start(), match.end(), "date", match.group(0), 0.98 if precision == "day" else 0.92,
+        match.start(), match.end(), "date", match.group(0),         CONFIDENCE["dateDay"] if precision == "day" else CONFIDENCE["dateOther"],
         normalized, date_precision=precision, date_order=order,
     )
 
@@ -408,7 +370,12 @@ def recognize_spans(
             end = match.end("percent")
         if cuts_a_token(start, end):
             continue
-        confidence = 0.99 if percent or currency else 0.94 if "," in number_text else 0.82 if "." in number_text else 0.62
+        confidence = (
+            CONFIDENCE["numberPercentOrCurrency"] if percent or currency
+            else CONFIDENCE["numberComma"] if "," in number_text
+            else CONFIDENCE["numberDecimal"] if "." in number_text
+            else CONFIDENCE["numberBare"]
+        )
         results.append(RecognizedSpan(
             start, end, "percent" if percent else "number", text[start:end].strip(), confidence,
             normalized, magnitude=magnitude, currency=currency,

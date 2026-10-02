@@ -21,13 +21,17 @@ from .categories import (
     IDENTIFIER,
     NOISE,
     PHONE,
-    POSTAL,
     REFERENCE,
-    SECURITY_ID,
     SUPERSCRIPT,
-    TAX_ID,
     UNSUPPORTED,
     VALUE,
+)
+from .config import (
+    CITATION_CONTEXT_FRAGMENT,
+    IDENTIFIER_CUES as _CUE_FRAGMENTS,
+    NUMBER_MARK_FRAGMENT,
+    PERIOD_CONTEXT_FRAGMENT,
+    PROSE_WORDS,
 )
 from .profile import DocumentProfile
 from .spans import RecognizedSpan
@@ -51,41 +55,15 @@ _PHONE = re.compile(
 # what the number it introduces actually identifies. Matched against the text
 # before the span so a label cannot condemn the whole line.
 _IDENTIFIER_CUES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    (
-        PHONE,
-        re.compile(r"\b(?:phone|telephone|tel|fax)\b[^.]{0,30}$", re.I),
-    ),
-    (
-        POSTAL,
-        re.compile(r"\b(?:zip|postal code)\b[^.]{0,30}$", re.I),
-    ),
-    (
-        TAX_ID,
-        re.compile(r"\bemployer identification\b[^.]{0,30}$", re.I),
-    ),
-    (
-        SECURITY_ID,
-        re.compile(
-            r"\b(?:isin|cusip|sedol|ticker|trading symbol|symbol)\b[^.]{0,30}$",
-            re.I,
-        ),
-    ),
-    (
-        IDENTIFIER,
-        re.compile(
-            r"\b(?:suite|p\.?\s?o\.?\s?box|file number|commission file"
-            r"|registration (?:no|number))\b[^.]{0,30}$",
-            re.I,
-        ),
+    *(
+        (kind, re.compile(rf"\b(?:{fragment})\b[^.]{{0,30}}$", re.I))
+        for kind, fragment in _CUE_FRAGMENTS
     ),
     # The number mark itself, standing apart from the number it names. "#7" is
     # one token and the recognizer refuses it on shape; "No. 7" and "# 7" are
     # two, so the mark has to be read as the cue it is. It must sit immediately
     # before the span -- a mark answers for the next number, not the sentence.
-    (
-        IDENTIFIER,
-        re.compile(r"(?:\bnos?\.|[#\u2116])\s*$", re.I),
-    ),
+    (IDENTIFIER, re.compile(rf"(?:\b{NUMBER_MARK_FRAGMENT})\s*$", re.I)),
 )
 
 # What a figure written like a figure carries on its face: a comma group, a
@@ -95,8 +73,7 @@ _INTRINSIC_MARK = re.compile(r"[,%]|\.\d")
 
 # Language that puts a number in a period rather than in a sentence.
 _PERIOD_CONTEXT = re.compile(
-    r"\b(?:due|ended|ending|as of|fiscal|through|maturing|maturity|years?"
-    r"|quarter|period|expiring|beginning|thereafter)\b[^.]{0,20}$",
+    rf"\b(?:{PERIOD_CONTEXT_FRAGMENT})\b[^.]{{0,20}}$",
     re.I,
 )
 
@@ -105,14 +82,12 @@ _PERIOD_CONTEXT = re.compile(
 # corpus CAFR, 89 of 97 on the invoice -- while a filing's narrative runs well
 # past this. The threshold only has to separate those two populations, and the
 # gap between them is wide enough that its exact value is not load-bearing.
-_PROSE_WORDS = 6
+_PROSE_WORDS = PROSE_WORDS
 _WORD = re.compile(r"[^\W\d_]{2,}")
 
 # A year reached through a citation is naming a law, not a period.
 _CITATION_CONTEXT = re.compile(
-    r"\b(?:act|section|rule|item|part|exhibit|form|schedule|chapter|article"
-    r"|paragraph|regulation|pursuant|subtopic|topic|cik)"
-    r"\b[^.]{0,25}$",
+    rf"\b(?:{CITATION_CONTEXT_FRAGMENT})\b[^.]{{0,25}}$",
     re.I,
 )
 

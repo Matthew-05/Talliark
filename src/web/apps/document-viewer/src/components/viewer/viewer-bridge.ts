@@ -28,11 +28,19 @@ async function indexAllPdfs(
   valuesCache.clear();
   await Promise.allSettled(
     entries.map(async (entry) => {
+      // Text and table models build in parallel; values then build over the text
+      // cache, because a document with no OCR values is recognized in the browser
+      // from that cache's geometry.
       await Promise.allSettled([
         cache.buildForUrl(entry.id, entry.url, entry.geometryBase64),
         tableCache.build(entry.id, entry.tableStructureBase64),
-        valuesCache.build(entry.id, entry.documentValuesBase64, entry.financialStructureBase64),
       ]);
+      await valuesCache.build(
+        entry.id,
+        entry.documentValuesBase64,
+        entry.financialStructureBase64,
+        entry.documentValuesBase64 ? undefined : cache.geometryFor(entry.id),
+      );
     }),
   );
 }
@@ -136,8 +144,13 @@ export function connectViewerToHostBridge(
         await Promise.allSettled([
           cache.buildForUrl(entry.id, entry.url, entry.geometryBase64),
           tableCache.build(entry.id, entry.tableStructureBase64),
-          valuesCache.build(entry.id, entry.documentValuesBase64, entry.financialStructureBase64),
         ]);
+        await valuesCache.build(
+          entry.id,
+          entry.documentValuesBase64,
+          entry.financialStructureBase64,
+          entry.documentValuesBase64 ? undefined : cache.geometryFor(entry.id),
+        );
       })().finally(() => {
         onTableStructureChanged();
         endIndexing();

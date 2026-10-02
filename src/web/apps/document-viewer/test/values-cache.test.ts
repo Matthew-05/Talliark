@@ -196,3 +196,32 @@ test("a stale values decode cannot replace a newer OCR model", async () => {
 
   assert.deepEqual(cache.valuesOnPage("pdf", 0).map((entry) => entry.text), ["fresh"]);
 });
+
+test("recognizes values in the browser when the document was never OCR'd", async () => {
+  const model = {
+    version: 1, coordinateSpace: "normalized", detectorVersion: "frontend", documentContext: {},
+    pages: [{ pageIndex: 0, context: {}, values: [{ id: "val-native", kind: "number", text: "1,234", bounds: { x: 0.1, y: 0.1, width: 0.1, height: 0.02 }, clickable: true, confidence: 0.94 }] }],
+  };
+  const geometry = { version: 1 as const, coordinateSpace: "normalized" as const, pages: [] };
+  const cache = new ValuesCache(undefined, undefined, async () => model as never);
+  await cache.build("native-pdf", undefined, undefined, geometry as never);
+  assert.equal(cache.valueCount("native-pdf"), 1);
+  assert.deepEqual(cache.valuesOnPage("native-pdf", 0).map((entry) => entry.text), ["1,234"]);
+});
+
+test("OCR values win over the frontend recognizer", async () => {
+  const ocrModel = {
+    version: 1, coordinateSpace: "normalized", detectorVersion: "ocr", documentContext: {},
+    pages: [{ pageIndex: 0, context: {}, values: [{ id: "val-ocr", kind: "number", text: "999", bounds: { x: 0.1, y: 0.1, width: 0.1, height: 0.02 }, clickable: true, confidence: 1 }] }],
+  };
+  let recognizerCalled = false;
+  const geometry = { version: 1 as const, coordinateSpace: "normalized" as const, pages: [] };
+  const cache = new ValuesCache(
+    async () => ocrModel as never,
+    undefined,
+    async () => { recognizerCalled = true; return { version: 1, coordinateSpace: "normalized", detectorVersion: "frontend", documentContext: {}, pages: [] } as never; },
+  );
+  await cache.build("pdf", "encoded", undefined, geometry as never);
+  assert.equal(recognizerCalled, false);
+  assert.deepEqual(cache.valuesOnPage("pdf", 0).map((entry) => entry.text), ["999"]);
+});

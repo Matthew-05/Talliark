@@ -18,6 +18,13 @@ the contract's enums when a rule is added.
 """
 from __future__ import annotations
 
+from .config import (
+    CLICKABLE_BY_DEFAULT,
+    CLICKABLE_KINDS,
+    NOISE_REASONS,
+    REFERENCE_KINDS,
+    STRUCTURE_KINDS,
+)
 
 VALUE = "value"
 REFERENCE = "reference"
@@ -39,16 +46,6 @@ SECURITY_ID = "security-id"
 NOTE = "note"
 ITEM = "item"
 
-REFERENCE_KINDS = (
-    IDENTIFIER,
-    PHONE,
-    POSTAL,
-    TAX_ID,
-    SECURITY_ID,
-    NOTE,
-    ITEM,
-)
-
 
 # --- structure kinds -------------------------------------------------------
 # The apparatus a document indexes itself with. Printed text with meaning, which
@@ -61,15 +58,6 @@ ITEM_TOC_ENTRY = "item-toc-entry"
 LIST_MARKER = "list-marker"
 FOOTNOTE_MARKER = "footnote-marker"
 FOOTNOTE_REFERENCE = "footnote-reference"
-
-STRUCTURE_KINDS = (
-    NOTE_HEADER,
-    ITEM_HEADER,
-    ITEM_TOC_ENTRY,
-    LIST_MARKER,
-    FOOTNOTE_MARKER,
-    FOOTNOTE_REFERENCE,
-)
 
 
 # --- noise reasons ---------------------------------------------------------
@@ -88,33 +76,14 @@ SUPERSCRIPT = "superscript"
 CITATION_YEAR = "citation-year"
 UNSUPPORTED = "unsupported"
 
-NOISE_REASONS = (
-    PARTIAL_TOKEN,
-    PAGE_FURNITURE,
-    SUPERSCRIPT,
-    CITATION_YEAR,
-    UNSUPPORTED,
-)
-
 
 # --- clickability ----------------------------------------------------------
 # Whether a span becomes a click target, by category, in one place. Values and
 # references are captured by readers; structure is drawn only as a diagnostic
 # today, and noise never has anything to capture.
 #
-# A kind that should be clickable against its category's default belongs in
-# CLICKABLE_KINDS, which is deliberately empty: nothing needs the exception yet,
-# and the field exists so that adding one is a line here rather than a contract
-# change.
-
-CLICKABLE_BY_DEFAULT = {
-    VALUE: True,
-    REFERENCE: True,
-    STRUCTURE: False,
-    NOISE: False,
-}
-
-CLICKABLE_KINDS: dict[str, bool] = {}
+# The policy itself lives in contracts/value-recognition-config-v1.json, shared
+# with the TypeScript recognizer, so both runtimes read the same statement.
 
 
 def is_clickable(category: str, kind: str) -> bool:

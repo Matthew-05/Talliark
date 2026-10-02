@@ -810,7 +810,14 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
       : cache.buildFromDoc(pdfId, doc);
 
     void buildPromise
-      .then(() => valuesCache.build(pdfId, entry?.documentValuesBase64, entry?.financialStructureBase64))
+      .then(() => valuesCache.build(
+        pdfId,
+        entry?.documentValuesBase64,
+        entry?.financialStructureBase64,
+        // Never OCR'd: recognize values in the browser from the text cache.
+        // When OCR values exist the recognizer is not consulted at all.
+        entry?.documentValuesBase64 ? undefined : cache.geometryFor(pdfId),
+      ))
       .then(() => {
         if (gen !== cacheGeneration) return;
         finish();

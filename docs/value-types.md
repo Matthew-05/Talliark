@@ -2,8 +2,16 @@
 
 What the detector publishes for a document, and what each thing means. This
 describes `document-values-v1` and the parts of `financial-structure-v1` that resolve
-against it. The rules live in `src/python/engines/values/`; this document is the
-reader's view of them, not a second copy.
+against it. The algorithmic rules live in `src/python/engines/values/`; this
+document is the reader's view of them, not a second copy.
+
+The same model is produced by two recognizers. The Python engine runs it during
+OCR (`src/python/engines/values/`). A TypeScript mirror runs it in the browser
+(`src/web/packages/shared/src/value-recognition/`) for documents that have never
+been OCR'd: once OCR has run, its values are the only ones used. What the two
+share — the vocabulary, the clickability policy, the recognition tables and the
+tunable thresholds — lives in `contracts/value-recognition-config-v1.json`, so a
+change to what values get captured is made there once and read by both.
 
 ## 1. The four categories
 
@@ -25,9 +33,10 @@ the separation is the point: a kind of span can become capturable by changing
 one line in the detector, with no contract change and no viewer change.
 
 The right-hand column above is therefore today's policy, not a rule. It lives in
-`categories.CLICKABLE_BY_DEFAULT`, with `CLICKABLE_KINDS` there for a single kind
-that should differ from its category — deliberately empty, because nothing needs
-the exception yet.
+`clickable.byDefault` in `contracts/value-recognition-config-v1.json`, shared by
+both recognizers, with `clickable.byKind` there for a single kind that should
+differ from its category — deliberately empty, because nothing needs the
+exception yet.
 
 Noise is the one category where clickability is not a policy: the contract pins
 it to `false`, because a click target the detector could not identify would be a

@@ -45,6 +45,17 @@ from statistics import median
 
 from .lines import Fragment, TextLine
 from .categories import FOOTNOTE_MARKER, FOOTNOTE_REFERENCE, LIST_MARKER
+from .config import (
+    BAND_REACH,
+    COLUMN_TOLERANCE,
+    INDICATOR_RATIO,
+    INLINE_REACH,
+    MIN_CHAIN,
+    MIN_INDICATORS,
+    MIN_PROSE_WORDS,
+    REFERENCE_REACH,
+    REPRESENTATIVE_LINES,
+)
 
 
 # ``3.1``, ``10.15``, ``1.``, ``(7)``, ``10.5†``. Roman and alphabetic markers
@@ -70,38 +81,13 @@ _ENUMERATOR_AFTER = frozenset(")]”’;:")
 # as in "(2)(4)(5)" -- may precede one.
 _INDICATOR_AFTER = frozenset(")]”’")
 
-# A chain has to step through enough of a list to be one. Two ordinals that
-# happen to ascend are a coincidence; three that step by one are a list.
-MIN_CHAIN = 3
-# How far apart two members of the same column may sit horizontally. Exhibit
-# numbers are set ragged inside their column, so this is not zero.
-COLUMN_TOLERANCE = 0.012
-# An enumeration runs through one passage, not across a page.
-INLINE_REACH = 8
-# How far ahead of its definitions an indicator may be printed. A table's
-# footnotes follow it immediately; an exhibit index carries its notes at the end.
-REFERENCE_REACH = 4
-# How many indicators must point at a definition that has no siblings to form a
-# chain with. One is enough because of what an indicator has to be to count: a
-# mark raised out of the text, or one attached to the end of a word. Neither is
-# something a figure in a table can be, so counting them adds no safety the
-# classes do not already carry -- and requiring two loses every note printed
-# against a single row.
-MIN_INDICATORS = 1
-# An indicator set in its own cell is recognized by being raised out of the text,
-# at the ratio `profile.py` uses for the same observation. Holding the two to one
-# convention is deliberate: a full-size bracketed number alone in a cell is what
-# a negative figure in a table column looks like, and it must stay a value.
-INDICATOR_RATIO = 0.72
-# A page needs this many lines before its own median says what "ordinary text"
-# measures there; below it the document's median is the better answer.
-REPRESENTATIVE_LINES = 20
-# What a marker has to be leading before it counts as leading anything.
-MIN_PROSE_WORDS = 2
-# How many lines either side of a marker cell its item may be delivered in. The
-# cells of one band arrive together, so this only has to survive a stray line
-# landing between them.
-BAND_REACH = 4
+# The chain thresholds live in contracts/value-recognition-config-v1.json,
+# shared with the TypeScript recognizer. Two ordinals that happen to ascend are
+# a coincidence; three that step by one are a list. An indicator set in its own
+# cell is recognized by being raised out of the text, at the ratio `profile.py`
+# uses for the same observation -- a full-size bracketed number alone in a cell
+# is what a negative figure in a table column looks like, and it must stay a
+# value.
 
 
 @dataclass(frozen=True)

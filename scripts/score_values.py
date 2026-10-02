@@ -1,9 +1,13 @@
-"""Score value detection: the span oracle, and a per-document report.
+"""Score value detection: the span oracle, the shared detector corpus, and a
+per-document report.
 
-With no arguments this runs the span oracle -- the unit-level gate that pins the
-exact spans a line of text must produce. Given a PDF it runs the detector over
-real geometry and reports what was published, what was suppressed and why, so
-two runs can be compared across a change.
+With no arguments this runs the two unit-level gates. The *span oracle* pins the
+exact spans a line of text must produce. The *detector corpus* pins the model the
+engine publishes for a geometry, and is the same file the TypeScript recognizer
+is scored against (`scripts/make_value_fixtures.py`), so the two recognizers
+cannot drift. Given a PDF it runs the detector over real geometry and reports
+what was published, what was suppressed and why, so two runs can be compared
+across a change.
 
     py scripts/score_values.py
     py scripts/score_values.py "sample-document-corpus/financial-statements/apple 10k.pdf" --write-report output/fs.json
@@ -18,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_ROOT = Path(__file__).resolve().parent
-for entry in (str(ROOT / "src" / "python"), str(SCRIPT_ROOT)):
+for entry in (str(ROOT / "src" / "python"), str(ROOT / "src" / "python" / "tests"), str(SCRIPT_ROOT)):
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
@@ -26,6 +30,7 @@ from engines.values.spans import recognize_spans  # noqa: E402
 
 
 ORACLE = ROOT / "src" / "python" / "tests" / "fixtures" / "values" / "span-oracle.json"
+DETECTOR_CORPUS = ROOT / "src" / "python" / "tests" / "fixtures" / "values" / "detector-cases.json"
 
 # A refusal must never discard a *well-formed value* carrying an unambiguous
 # financial mark. Anything caught here is a recall bug, not a tuning question.
@@ -91,6 +96,24 @@ def run_oracle() -> int:
         else:
             print(json.dumps({"text": case["text"], "expected": case["spans"], "actual": actual}))
     print(json.dumps({"cases": len(cases), "passed": passed, "failed": len(cases) - passed}))
+    return 0 if passed == len(cases) else 1
+
+
+def run_detector_corpus() -> int:
+    """Score the engine against the shared corpus the TypeScript port also reads."""
+    from documents import canonical, expand_geometry
+
+    from engines.values.detector import detect_values
+
+    cases = json.loads(DETECTOR_CORPUS.read_text(encoding="utf-8"))
+    passed = 0
+    for case in cases:
+        actual = canonical(detect_values(expand_geometry(case["geometry"])))
+        if actual == case["expect"]:
+            passed += 1
+        else:
+            print(json.dumps({"case": case["name"], "expected": case["expect"], "actual": actual}))
+    print(json.dumps({"corpusCases": len(cases), "passed": passed, "failed": len(cases) - passed}))
     return 0 if passed == len(cases) else 1
 
 
@@ -161,7 +184,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.pdf:
-        return run_oracle()
+        return max(run_oracle(), run_detector_corpus())
 
     reports = [score_document(pdf) for pdf in args.pdf]
     for report in reports:

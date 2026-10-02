@@ -4,14 +4,12 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from .config import SCALE_BODIES
 from .spans import CURRENCY_CODES, CURRENCY_SYMBOLS
 
 
-_SCALE_PATTERNS = (
-    (1_000_000_000, re.compile(r"\b(?:amounts?\s+)?in\s+billions?\b", re.I)),
-    (1_000_000, re.compile(r"\b(?:amounts?\s+)?in\s+millions?\b", re.I)),
-    (1_000, re.compile(r"\b(?:amounts?\s+)?in\s+thousands?\b", re.I)),
-    (1, re.compile(r"\b(?:amounts?\s+)?in\s+(?:ones|units|dollars)\b", re.I)),
+_SCALE_PATTERNS = tuple(
+    (scale, re.compile(rf"\b{body}\b", re.I)) for scale, body in SCALE_BODIES
 )
 
 

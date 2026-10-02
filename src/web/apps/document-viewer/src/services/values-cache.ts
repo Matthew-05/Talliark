@@ -11,6 +11,7 @@ import type {
   FinancialNoteReference,
   FinancialStructure,
   NoiseSpan,
+  TextGeometry,
   ValueContext,
 } from "@talliark/shared";
 
@@ -43,16 +44,32 @@ export class ValuesCache {
   private _epoch = 0;
   private readonly _valuesDecoder: ((base64: string) => Promise<DocumentValues>) | undefined;
   private readonly _structureDecoder: ((base64: string) => Promise<FinancialStructure>) | undefined;
+  private readonly _valuesRecognizer: ((geometry: TextGeometry) => Promise<DocumentValues>) | undefined;
 
   constructor(
     valuesDecoder?: (base64: string) => Promise<DocumentValues>,
     structureDecoder?: (base64: string) => Promise<FinancialStructure>,
+    valuesRecognizer?: (geometry: TextGeometry) => Promise<DocumentValues>,
   ) {
     this._valuesDecoder = valuesDecoder;
     this._structureDecoder = structureDecoder;
+    this._valuesRecognizer = valuesRecognizer;
   }
 
-  async build(pdfId: string, documentValuesBase64?: string, financialStructureBase64?: string): Promise<void> {
+  /**
+   * Build the value model for one PDF.
+   *
+   * OCR values always win: when `documentValuesBase64` is present the frontend
+   * recognizer is never consulted. `fallbackGeometry` is the document's text
+   * geometry, used to recognize values in the browser only when the document was
+   * never OCR'd.
+   */
+  async build(
+    pdfId: string,
+    documentValuesBase64?: string,
+    financialStructureBase64?: string,
+    fallbackGeometry?: TextGeometry,
+  ): Promise<void> {
     this.clearPdf(pdfId);
     this._reset(pdfId);
     const epoch = this._epoch;
@@ -64,6 +81,16 @@ export class ValuesCache {
         if (this._isCurrent(pdfId, epoch, generation)) this._ingestValues(pdfId, values);
       } catch {
         // A malformed optional artifact must not prevent the PDF itself loading.
+        if (this._isCurrent(pdfId, epoch, generation)) this._reset(pdfId);
+      }
+    } else if (fallbackGeometry) {
+      try {
+        const recognize = this._valuesRecognizer ?? (await import("@talliark/shared")).detectValues;
+        const values = await recognize(fallbackGeometry);
+        if (this._isCurrent(pdfId, epoch, generation)) this._ingestValues(pdfId, values);
+      } catch {
+        // Recognition is best-effort; a failure leaves OCR values (absent here)
+        // as the only source, which is an empty model rather than an error.
         if (this._isCurrent(pdfId, epoch, generation)) this._reset(pdfId);
       }
     }

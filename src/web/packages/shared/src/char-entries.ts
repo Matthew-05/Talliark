@@ -121,3 +121,30 @@ export function buildCharEntriesFromGeometry(
 
   return pageMap;
 }
+
+/**
+ * The inverse of `buildCharEntriesFromGeometry`: a text-geometry model from the
+ * cached character entries. The value recognizer reads text-geometry-v1, and the
+ * viewer's cache already holds the characters, so this lets the recognizer run
+ * over a document that was never OCR'd without re-extracting the text.
+ */
+export function charEntriesToGeometry(
+  entriesByPage: Map<number, CharacterEntry[]>,
+): TextGeometry {
+  const pages: TextGeometry["pages"] = [];
+  const ordered = [...entriesByPage.entries()].sort((a, b) => a[0] - b[0]);
+  for (const [pageIndex, entries] of ordered) {
+    pages.push({
+      pageIndex,
+      characters: entries.map((entry) => ({
+        char: entry.char,
+        x: entry.normLeft,
+        y: entry.normTop,
+        width: entry.normRight - entry.normLeft,
+        height: entry.normBottom - entry.normTop,
+        lineIndex: entry.lineIndex,
+      })),
+    });
+  }
+  return { version: 1, coordinateSpace: "normalized", pages };
+}

@@ -1,12 +1,13 @@
 import {
   buildCharEntriesFromGeometry,
   buildSearchPageIndexFromEntries,
+  charEntriesToGeometry,
   decodeTextGeometry,
   extractTextGeometryFromPdfDocument,
   extractTextGeometryFromPdfUrl,
 } from "@talliark/shared";
 import * as pdfjsLib from "pdfjs-dist";
-import type { SearchPageIndex } from "@talliark/shared";
+import type { SearchPageIndex, TextGeometry } from "@talliark/shared";
 
 export interface CharacterEntry {
   char: string;
@@ -89,6 +90,15 @@ export class TextContentCache {
   /** Returns true when every page of the PDF has been indexed. */
   has(pdfId: string): boolean {
     return this._cache.has(pdfId);
+  }
+
+  /**
+   * A text-geometry model for the indexed pages, for the frontend value
+   * recognizer. Undefined until the cache has been built.
+   */
+  geometryFor(pdfId: string): TextGeometry | undefined {
+    const pageMap = this._cache.get(pdfId);
+    return pageMap ? charEntriesToGeometry(pageMap) : undefined;
   }
 
   /** Returns all indexed pdfIds. */

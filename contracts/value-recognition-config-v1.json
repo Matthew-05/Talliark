@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:talliark:config:value-recognition:1",
+  "title": "Talliark Value Recognition Config v1",
+  "description": "The single source of truth for the value recognizer's vocabulary, clickability policy, recognition tables and tunable thresholds. Read by both the Python OCR engine (src/python/engines/values/) and the TypeScript frontend recognizer (src/web/packages/shared/src/value-recognition/), so a change to what values get captured is made here once and reflected in both. The recognizer's dialect-specific regular expressions (the number and date grammars, the ordinal-marker grammar) are NOT shared here -- Python and JavaScript regex dialects differ (inline flags, lookbehind) -- but each language composes its patterns from the tables below, so the tables themselves are shared. This file is not a data contract; it configures the recognizer.",
+  "version": 1,
+  "categories": ["value", "reference", "structure", "noise"],
+
+  "referenceKinds": ["identifier", "phone", "postal", "tax-id", "security-id", "note", "item"],
+  "structureKinds": ["note-header", "item-header", "item-toc-entry", "list-marker", "footnote-marker", "footnote-reference"],
+  "noiseReasons": ["partial-token", "page-furniture", "superscript", "citation-year", "unsupported"],
+
+  "clickable": {
+    "description": "Whether a span becomes a click target, by category. A kind that should differ from its category's default belongs in byKind (deliberately empty today).",
+    "byDefault": { "value": true, "reference": true, "structure": false, "noise": false },
+    "byKind": {}
+  },
+
+  "currencies": {
+    "codes": ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "KRW"],
+    "symbols": { "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₩": "KRW" }
+  },
+
+  "magnitudes": {
+    "k": 1000, "th": 1000, "ths": 1000, "thou": 1000, "thousand": 1000, "thousands": 1000,
+    "m": 1000000, "mm": 1000000, "mn": 1000000, "mil": 1000000, "mln": 1000000, "million": 1000000, "millions": 1000000,
+    "b": 1000000000, "bn": 1000000000, "bln": 1000000000, "bil": 1000000000, "billion": 1000000000, "billions": 1000000000,
+    "t": 1000000000000, "tn": 1000000000000, "trn": 1000000000000, "tril": 1000000000000, "trillion": 1000000000000, "trillions": 1000000000000
+  },
+
+  "monthPattern": "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?",
+  "magnitudePattern": "thousands?|millions?|billions?|trillions?|thou|tril|bln|mln|trn|ths|bil|mil|bn|mn|mm|tn|th|k|m|b|t",
+
+  "months": {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+  },
+
+  "confidence": {
+    "dateDay": 0.98, "dateOther": 0.92,
+    "numberPercentOrCurrency": 0.99, "numberComma": 0.94, "numberDecimal": 0.82, "numberBare": 0.62
+  },
+
+  "evidence": {
+    "identifierCues": [
+      { "kind": "phone", "fragment": "phone|telephone|tel|fax" },
+      { "kind": "postal", "fragment": "zip|postal code" },
+      { "kind": "tax-id", "fragment": "employer identification" },
+      { "kind": "security-id", "fragment": "isin|cusip|sedol|ticker|trading symbol|symbol" },
+      { "kind": "identifier", "fragment": "suite|p\\.?\\s?o\\.?\\s?box|file number|commission file|registration (?:no|number)" }
+    ],
+    "numberMarkFragment": "nos?\\.|[#№]",
+    "proseWords": 6,
+    "periodContextFragment": "due|ended|ending|as of|fiscal|through|maturing|maturity|years?|quarter|period|expiring|beginning|thereafter",
+    "citationContextFragment": "act|section|rule|item|part|exhibit|form|schedule|chapter|article|paragraph|regulation|pursuant|subtopic|topic|cik"
+  },
+
+  "context": {
+    "scaleBodies": [
+      { "scale": 1000000000, "body": "(?:amounts?\\s+)?in\\s+billions?" },
+      { "scale": 1000000, "body": "(?:amounts?\\s+)?in\\s+millions?" },
+      { "scale": 1000, "body": "(?:amounts?\\s+)?in\\s+thousands?" },
+      { "scale": 1, "body": "(?:amounts?\\s+)?in\\s+(?:ones|units|dollars)" }
+    ]
+  },
+
+  "profile": {
+    "superscriptRatio": 0.72,
+    "representativeGlyphs": 200,
+    "sequenceMinimum": 3,
+    "yearRange": [1500, 2200],
+    "placeTolerance": 120,
+    "repeatShare": 0.25,
+    "repeatMinimum": 3,
+    "functionWords": [
+      "a", "an", "as", "at", "and", "by", "for", "from", "in", "of", "on", "or", "the", "to",
+      "through", "ended", "ending", "end", "year", "years", "period", "periods", "quarter",
+      "months", "month", "fiscal", "date", "dated"
+    ]
+  },
+
+  "lists": {
+    "minChain": 3,
+    "columnTolerance": 0.012,
+    "inlineReach": 8,
+    "referenceReach": 4,
+    "minIndicators": 1,
+    "indicatorRatio": 0.72,
+    "representativeLines": 20,
+    "minProseWords": 2,
+    "bandReach": 4
+  }
+}
