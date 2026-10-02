@@ -19,6 +19,9 @@ namespace Talliark.Addin.Modules.UI
         /// <summary>Vertical gap between stacked cards.</summary>
         private const int CardGap = 16;
 
+        /// <summary>Where the Experimental card's flowed rows start, below its heading.</summary>
+        private const int ExperimentalRowsTop = 62;
+
         /// <summary>Where the Development card's flowed rows start, below its heading.</summary>
         private const int DevelopmentRowsTop = 82;
 
@@ -97,6 +100,9 @@ namespace Talliark.Addin.Modules.UI
             int nextCardTop = 82;
             _experimentalCard = BuildExperimentalCard(new Point(ContentMargin, nextCardTop), cardWidth);
             _content.Controls.Add(_experimentalCard);
+            // Wrapping makes the card's height depend on the dialog's width, so the cards
+            // below it cannot keep a fixed top.
+            _experimentalCard.SizeChanged += (sender, args) => LayoutContent();
             nextCardTop += _experimentalCard.Height + CardGap;
 
             _developmentCard = null;
@@ -178,29 +184,29 @@ namespace Talliark.Addin.Modules.UI
             var card = new CardPanel
             {
                 Location = location,
-                Size = new Size(width, 158),
+                Size = new Size(width, ExperimentalRowsTop),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             card.Controls.Add(DialogTheme.CreateSectionTitle("Experimental", new Point(CardPadding, 14)));
             card.Controls.Add(DialogTheme.CreateSeparator(new Point(CardPadding, 46), width - (CardPadding * 2)));
-            var toggle = new CheckBox
-            {
-                Text = "Table Detection",
-                AutoSize = true,
-                Location = new Point(CardPadding + 2, 62),
-                Font = DialogTheme.BodyFont,
-                ForeColor = DialogTheme.Text,
-                Cursor = Cursors.Hand,
-                Checked = ExperimentalSettings.TableDetection
-            };
-            toggle.CheckedChanged += (sender, args) => ExperimentalSettings.TableDetection = toggle.Checked;
-            card.Controls.Add(toggle);
-            var caption = DialogTheme.CreateCaption(
+
+            AddFlowedToggle(
+                card,
+                "Table Detection",
                 "Detects table structure during ordinary OCR and enables detected-table assistance in the document viewer. " +
                 "Reconcile always detects tables. Manually drawn table rectangles and their grids remain available.",
-                new Point(CardPadding + CaptionIndent, 88));
-            DialogTheme.WrapAt(caption, Math.Max(1, width - CardPadding * 2 - CaptionIndent));
-            card.Controls.Add(caption);
+                ExperimentalSettings.TableDetection,
+                value => ExperimentalSettings.TableDetection = value);
+
+            LayoutFlowedRows(card, ExperimentalRowsTop);
+            int laidOutAt = card.ClientSize.Width;
+            card.SizeChanged += (sender, args) =>
+            {
+                if (card.ClientSize.Width == laidOutAt) return;
+                laidOutAt = card.ClientSize.Width;
+                LayoutFlowedRows(card, ExperimentalRowsTop);
+            };
+
             return card;
         }
 
@@ -209,7 +215,7 @@ namespace Talliark.Addin.Modules.UI
         /// The rows are laid out by flowing rather than by fixed coordinates. Every
         /// caption wraps at the card's width, so its height depends on how wide the
         /// dialog is, and a hard-coded Y for the row beneath it would overlap as soon
-        /// as one line became two. <see cref="LayoutDevelopmentRows"/> re-runs on
+        /// as one line became two. <see cref="LayoutFlowedRows"/> re-runs on
         /// every width change and gives the card the height its content needs.
         /// </remarks>
         private CardPanel BuildDevelopmentCard(Point location, int width)
@@ -230,14 +236,14 @@ namespace Talliark.Addin.Modules.UI
             card.Controls.Add(DialogTheme.CreateSubHeading(
                 "Debugging tools", new Point(CardPadding + 2, 60)));
 
-            AddDebugToggle(
+            AddFlowedToggle(
                 card,
                 "Show character bounding boxes",
                 "Draws the per-character text boxes over every page in the document viewer.",
                 DevSettings.ShowCharBoundingBoxes,
                 value => DevSettings.ShowCharBoundingBoxes = value);
 
-            AddDebugToggle(
+            AddFlowedToggle(
                 card,
                 "Show detected-value debug boxes",
                 "Values measure something. Click targets are always active; this draws "
@@ -245,7 +251,7 @@ namespace Talliark.Addin.Modules.UI
                 DevSettings.ShowValues,
                 value => DevSettings.ShowValues = value);
 
-            AddDebugToggle(
+            AddFlowedToggle(
                 card,
                 "Show reference boxes",
                 "References identify something outside the document — an invoice number, "
@@ -254,7 +260,7 @@ namespace Talliark.Addin.Modules.UI
                 DevSettings.ShowReferences,
                 value => DevSettings.ShowReferences = value);
 
-            AddDebugToggle(
+            AddFlowedToggle(
                 card,
                 "Show structure boxes",
                 "Structure is the document indexing itself — a note heading's number, a "
@@ -263,13 +269,23 @@ namespace Talliark.Addin.Modules.UI
                 DevSettings.ShowStructure,
                 value => DevSettings.ShowStructure = value);
 
-            AddDebugToggle(
+            AddFlowedToggle(
                 card,
                 "Show refused spans",
                 "Draws what is left once values, references and structure are taken: "
                 + "damaged tokens, running headers, statute years.",
                 DevSettings.ShowValueNoise,
                 value => DevSettings.ShowValueNoise = value);
+
+            AddFlowedToggle(
+                card,
+                "Show html context menu",
+                "Shows the browser's own right-click menu. Off by default: the document "
+                + "viewer and file manager draw their own menus. Turn on to reach the "
+                + "built-in copy, save and inspect items.",
+                ExperimentalSettings.BrowserContextMenu,
+                value => ExperimentalSettings.BrowserContextMenu = value,
+                NotifyContextMenuRestartRequired);
 
             var openLogsBtn = new Button
             {
@@ -278,10 +294,10 @@ namespace Talliark.Addin.Modules.UI
             };
             DialogTheme.StyleSecondaryButton(openLogsBtn);
             openLogsBtn.Click += OpenLogFolder;
-            openLogsBtn.Tag = DevelopmentRowTag.Footer;
+            openLogsBtn.Tag = FlowedRowTag.Footer;
             card.Controls.Add(openLogsBtn);
 
-            LayoutDevelopmentRows(card);
+            LayoutFlowedRows(card, DevelopmentRowsTop);
             int laidOutAt = card.ClientSize.Width;
             card.SizeChanged += (sender, args) =>
             {
@@ -289,23 +305,24 @@ namespace Talliark.Addin.Modules.UI
                 // the text has to be measured again.
                 if (card.ClientSize.Width == laidOutAt) return;
                 laidOutAt = card.ClientSize.Width;
-                LayoutDevelopmentRows(card);
+                LayoutFlowedRows(card, DevelopmentRowsTop);
             };
 
             return card;
         }
 
-        /// <summary>What part a control plays when the development card is flowed.</summary>
-        private enum DevelopmentRowTag
+        /// <summary>What part a control plays when a settings card is flowed.</summary>
+        private enum FlowedRowTag
         {
             Toggle,
             Caption,
             Footer
         }
 
-        /// <summary>One debugging switch and the sentence explaining it.</summary>
-        private void AddDebugToggle(
-            CardPanel card, string text, string caption, bool initial, Action<bool> apply)
+        /// <summary>One switch and the sentence explaining it, laid out by <see cref="LayoutFlowedRows"/>.</summary>
+        private void AddFlowedToggle(
+            CardPanel card, string text, string caption, bool initial, Action<bool> apply,
+            Action afterChange = null)
         {
             var toggle = new CheckBox
             {
@@ -315,34 +332,48 @@ namespace Talliark.Addin.Modules.UI
                 ForeColor = DialogTheme.Text,
                 Cursor = Cursors.Hand,
                 Checked = initial,
-                Tag = DevelopmentRowTag.Toggle
+                Tag = FlowedRowTag.Toggle
             };
-            toggle.CheckedChanged += (sender, args) => apply(toggle.Checked);
+            toggle.CheckedChanged += (sender, args) =>
+            {
+                apply(toggle.Checked);
+                afterChange?.Invoke();
+            };
             card.Controls.Add(toggle);
 
             var hint = DialogTheme.CreateCaption(caption, Point.Empty);
-            hint.Tag = DevelopmentRowTag.Caption;
+            hint.Tag = FlowedRowTag.Caption;
             card.Controls.Add(hint);
+        }
+
+        private void NotifyContextMenuRestartRequired()
+        {
+            MessageBox.Show(
+                this,
+                "Close all Excel instances and restart Excel for this change to take effect.",
+                "Talliark",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         /// <summary>
         /// Stack the card's rows top to bottom at the width it currently has, then
         /// size the card to whatever that came to.
         /// </summary>
-        private void LayoutDevelopmentRows(CardPanel card)
+        private void LayoutFlowedRows(CardPanel card, int rowsTop)
         {
             int available = card.ClientSize.Width - (CardPadding * 2);
             if (available <= 0) return;
 
-            int y = DevelopmentRowsTop;
+            int y = rowsTop;
             Control footer = null;
 
             foreach (Control control in card.Controls)
             {
-                if (!(control.Tag is DevelopmentRowTag tag)) continue;
-                if (tag == DevelopmentRowTag.Footer) { footer = control; continue; }
+                if (!(control.Tag is FlowedRowTag tag)) continue;
+                if (tag == FlowedRowTag.Footer) { footer = control; continue; }
 
-                bool isCaption = tag == DevelopmentRowTag.Caption;
+                bool isCaption = tag == FlowedRowTag.Caption;
                 int indent = isCaption ? CaptionIndent : 0;
                 DialogTheme.WrapAt(control, available - indent);
                 control.Location = new Point(CardPadding + indent, y);

@@ -50,12 +50,13 @@ namespace Talliark.Addin.Modules.WebView
         private async Task InitAsync()
         {
             try
-            {
-                CoreWebView2Environment environment = await WebViewEagerLoader.GetEnvironmentAsync();
+            {                CoreWebView2Environment environment = await WebViewEagerLoader.GetEnvironmentAsync();
                 if (_disposed) return;
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
+
+                WebViewContextMenu.Apply(_webView);
 
                 string uiPath = GetWebUiPath();
                 if (!Directory.Exists(uiPath))

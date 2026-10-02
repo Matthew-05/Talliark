@@ -87,6 +87,8 @@ namespace Talliark.Addin.Modules.WebView
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
 
+                WebViewContextMenu.Apply(_webView);
+
                 string uiPath = GetWebUiPath();
                 if (!Directory.Exists(uiPath))
                     throw new DirectoryNotFoundException(

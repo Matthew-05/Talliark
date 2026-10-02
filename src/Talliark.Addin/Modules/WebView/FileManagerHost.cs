@@ -131,8 +131,7 @@ namespace Talliark.Addin.Modules.WebView
 
         private async Task InitAsync()
         {
-            TalliarkLog.Trace("ENTER file manager init");
-            try
+            TalliarkLog.Trace("ENTER file manager init");            try
             {
                 if (_disposed) return;
 
@@ -145,6 +144,7 @@ namespace Talliark.Addin.Modules.WebView
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
 
+                WebViewContextMenu.Apply(_webView);
                 _webView.AllowExternalDrop = false;
 
                 string uiPath = GetWebUiPath();

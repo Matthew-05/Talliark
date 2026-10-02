@@ -58,6 +58,14 @@ namespace Talliark.Addin.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ShowBrowserContextMenu {
+            get { return ((bool)(this["ShowBrowserContextMenu"])); }
+            set { this["ShowBrowserContextMenu"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool ShowValues {
             get {
                 return ((bool)(this["ShowValues"]));

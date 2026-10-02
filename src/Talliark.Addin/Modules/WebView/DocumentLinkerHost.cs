@@ -96,8 +96,7 @@ namespace Talliark.Addin.Modules.WebView
 
         private async Task InitAsync()
         {
-            TalliarkLog.Trace("ENTER document linker init");
-            try
+            TalliarkLog.Trace("ENTER document linker init");            try
             {
                 if (_disposed) return;
 
@@ -109,6 +108,8 @@ namespace Talliark.Addin.Modules.WebView
 
                 await _webView.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;
+
+                WebViewContextMenu.Apply(_webView);
 
                 string uiPath = GetWebUiPath();
                 if (!Directory.Exists(uiPath))

@@ -22,5 +22,27 @@ namespace Talliark.Addin.Modules.Infrastructure
                 TableDetectionChanged?.Invoke(null, value);
             }
         }
+
+        /// <summary>
+        /// Whether every Talliark WebView shows the browser's own right-click menu.
+        /// Off by default: the viewer and file manager draw their own context menus and
+        /// the native menu would appear over them. On, it is the only route to the
+        /// built-in copy, save and inspect items. Applied when a surface initializes, so
+        /// a change requires restarting Excel.
+        /// </summary>
+        internal static bool BrowserContextMenu
+        {
+            get
+            {
+                try { return Settings.Default.ShowBrowserContextMenu; }
+                catch (Exception ex) { TalliarkLog.Trace("Could not read ShowBrowserContextMenu: " + ex.Message); return false; }
+            }
+            set
+            {
+                if (BrowserContextMenu == value) return;
+                try { Settings.Default.ShowBrowserContextMenu = value; Settings.Default.Save(); }
+                catch (Exception ex) { TalliarkLog.Trace("Could not persist ShowBrowserContextMenu: " + ex.Message); }
+            }
+        }
     }
 }

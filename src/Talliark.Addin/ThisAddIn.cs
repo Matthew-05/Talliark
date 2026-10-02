@@ -1131,6 +1131,7 @@ namespace Talliark.Addin
             }
         }
 
+
         private void OnValuesChanged(object sender, bool visible)
         {
             foreach (WorkbookPaneEntry entry in _workbookPanes.ToArray())
