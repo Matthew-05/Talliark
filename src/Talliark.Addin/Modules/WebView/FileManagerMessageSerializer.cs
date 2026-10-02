@@ -117,6 +117,24 @@ namespace Talliark.Addin.Modules.WebView
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Builds a host→web <c>folder-selected</c> message. <paramref name="folderId"/> is
+        /// null for All Files, and the field is then omitted rather than sent as JSON null,
+        /// matching how <c>move-file</c> states "uncategorised".
+        /// </summary>
+        public static string BuildFolderSelected(string folderId)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"type\":\"folder-selected\"");
+            if (!string.IsNullOrEmpty(folderId))
+            {
+                sb.Append(",\"folderId\":");
+                AppendString(sb, folderId);
+            }
+            sb.Append('}');
+            return sb.ToString();
+        }
+
         private static void AppendString(StringBuilder sb, string value)
         {
             sb.Append('"');

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -20,50 +19,37 @@ using Excel = Microsoft.Office.Interop.Excel;
 namespace Talliark.Addin.Modules.WebView
 {
     /// <summary>
-    /// Layout constants for native dropzone panel positioning and sizing.
-    /// MUST match corresponding CSS values in src/web/apps/file-manager/src/styles/:
-    /// - SidebarWidth (260) ↔ grid-template-columns: 260px 1fr (layout.css:5)
-    /// - DropZoneHeight (122) ↔ .native-dropzone-spacer { height: 122px; } (folder-panel.css:5)
-    /// - Gap (12) ↔ margin-top/bottom: 12px (folder-panel.css:6-7)
-    /// </summary>
-    internal static class DropzoneLayout
-    {
-        public const int SidebarWidth = 260;
-        public const int Gap = 12;
-        public const int DropZoneHeight = 122;
-        public const int MinWidth = 160;
-    }
-
-    /// <summary>
     /// Hosts the file-manager web UI in a standalone non-modal window bound to one workbook.
     /// </summary>
     /// <remarks>
-    /// Explorer → WebView2 file drops often do not surface HTML5 drop events inside Office/WinForms;
-    /// Chromium may navigate to file:/// URLs instead. This host disables WebView2 external
-    /// drops so WinForms can receive real <see cref="DataFormats.FileDrop"/> paths and imports
-    /// them via <see cref="PdfImportService"/>. The navigation-cancellation handler (CoreWebView2_NavigationStarting)
-    /// remains active to catch any file:/// URLs that slip through as an extra safeguard.
+    /// The folder list is native — see <see cref="FileManagerSidebar"/> — and the web UI owns
+    /// only the file table. Explorer → WebView2 file drops often do not surface HTML5 drop
+    /// events inside Office/WinForms; Chromium may navigate to file:/// URLs instead. This host
+    /// therefore disables WebView2 external drops and takes <see cref="DataFormats.FileDrop"/>
+    /// paths in three ways: a folder row, the file table (into the selected folder), and the
+    /// navigation-cancellation handler, which catches any file:/// URL that slips through.
     /// </remarks>
     public sealed class FileManagerHost : Form
     {
+        /// <summary>Width of the native folder column, in logical pixels.</summary>
+        private const int SidebarWidth = 260;
+
         private readonly Excel.Workbook _workbook;
         private readonly WebView2 _webView = new WebView2();
         private WebViewStartupSurface _startup;
-        private readonly NativeDropZonePanel _nativeDropZone = new NativeDropZonePanel();
+        private readonly FileManagerSidebar _sidebar = new FileManagerSidebar();
         private readonly ManageFilesService _service = new ManageFilesService();
         private OcrService _ocrService;
 
         /// <summary>PDF IDs currently being processed by OCR. Populated before the await, cleared in finally.</summary>
         private readonly HashSet<string> _activeOcrIds = new HashSet<string>(StringComparer.Ordinal);
 
-        /// <summary>The folder GUID currently selected in the web UI (<c>null</c> for All Files).</summary>
-        private string _selectedFolderId;
-
         /// <summary>
-        /// True for the whole OCR run. All file-add entry points (dropzone click, OS drag-drop,
-        /// file:/// navigation fallback, web-originated add-files) are refused while set.
-        /// Keyed off <see cref="_activeOcrIds"/> rather than <see cref="OcrService.IsRunning"/>,
-        /// which only flips once the worker starts and so leaves the job-loading phase unguarded.
+        /// True for the whole OCR run. Every file-add entry point (folder-row drop, table drop,
+        /// file:/// navigation fallback, the file picker) is refused while set, and the sidebar
+        /// locks its folder CRUD. Keyed off <see cref="_activeOcrIds"/> rather than
+        /// <see cref="OcrService.IsRunning"/>, which only flips once the worker starts and so
+        /// leaves the job-loading phase unguarded.
         /// </summary>
         private bool IsOcrLocked => _activeOcrIds.Count > 0;
 
@@ -99,7 +85,7 @@ namespace Talliark.Addin.Modules.WebView
             _ocrService = new OcrService(this);
             Width = 1100;
             Height = 620;
-            MinimumSize = new System.Drawing.Size(700, 480);
+            MinimumSize = new Size(700, 480);
             StartPosition = FormStartPosition.CenterScreen;
             AllowDrop = true;
 
@@ -109,15 +95,19 @@ namespace Talliark.Addin.Modules.WebView
             _webView.DragDrop += NativeFileDrop_DragDrop;
             Controls.Add(_webView);
 
-            _nativeDropZone.AllowDrop = true;
-            _nativeDropZone.Click += (sender, args) => ShowPdfFilePicker();
-            _nativeDropZone.DragEnter += NativeFileDrop_DragEnter;
-            _nativeDropZone.DragOver += NativeFileDrop_DragEnter;
-            _nativeDropZone.DragLeave += NativeFileDrop_DragLeave;
-            _nativeDropZone.DragDrop += NativeFileDrop_DragDrop;
-            Controls.Add(_nativeDropZone);
+            // Added after the fill-docked web view so docking gives the sidebar its strip
+            // first and the web view the remainder.
+            _sidebar.Dock = DockStyle.Left;
+            _sidebar.Width = SidebarWidth;
+            _sidebar.FolderSelected += OnSidebarFolderSelected;
+            _sidebar.FolderCreateRequested += OnSidebarFolderCreateRequested;
+            _sidebar.FolderRenameRequested += OnSidebarFolderRenameRequested;
+            _sidebar.FolderRemoveRequested += OnSidebarFolderRemoveRequested;
+            _sidebar.PathsDropped += OnSidebarPathsDropped;
+            _sidebar.BrowseRequested += ShowPdfFilePicker;
+            Controls.Add(_sidebar);
 
-            // Last in, so it covers both the web view and the drop zone until the manager's
+            // Last in, so it covers both the web view and the sidebar until the manager's
             // own UI is up. Nothing behind it is interactive while it is showing.
             _startup = new WebViewStartupSurface(this, _webView);
 
@@ -213,52 +203,54 @@ namespace Talliark.Addin.Modules.WebView
             if (string.IsNullOrWhiteSpace(localPath))
                 return;
 
-            ProcessOsPaths(new[] { localPath });
+            ProcessOsPaths(new[] { localPath }, _sidebar.SelectedFolderId, FileDropScope.SelectedFolder);
         }
 
         private void CoreWebView2_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
         {
-            if (_disposed) return;
-            PositionNativeDropZone();
+            // Nothing to re-measure: the sidebar is docked, not positioned by hand.
         }
+
+        /// <summary>
+        /// True when the pointer sits over the native sidebar. The sidebar is its own drop
+        /// target and the blank area below its rows is deliberately inert, so the window-level
+        /// handlers must not claim a drop the sidebar has already refused.
+        /// </summary>
+        private bool IsOverSidebar(DragEventArgs e) =>
+            _sidebar.Visible
+            && _sidebar.RectangleToScreen(_sidebar.ClientRectangle).Contains(e.X, e.Y);
 
         private void NativeFileDrop_DragEnter(object sender, DragEventArgs e)
         {
-            if (_disposed) return;
-
-            if (IsOcrLocked)
+            if (_disposed)
             {
                 e.Effect = DragDropEffects.None;
                 return;
             }
 
-            if (GetDroppedPaths(e.Data).Length == 0)
+            if (IsOverSidebar(e) || IsOcrLocked || GetDroppedPaths(e.Data).Length == 0)
             {
                 e.Effect = DragDropEffects.None;
                 return;
             }
 
             e.Effect = DragDropEffects.Copy;
-            _nativeDropZone.SetDragOver(true);
         }
 
         private void NativeFileDrop_DragLeave(object sender, EventArgs e)
         {
-            if (_disposed) return;
-            _nativeDropZone.SetDragOver(false);
         }
 
         private void NativeFileDrop_DragDrop(object sender, DragEventArgs e)
         {
-            if (_disposed || IsOcrLocked) return;
-
-            _nativeDropZone.SetDragOver(false);
+            if (_disposed || IsOcrLocked || IsOverSidebar(e))
+                return;
 
             string[] paths = GetDroppedPaths(e.Data);
             if (paths.Length == 0)
                 return;
 
-            BeginInvoke(new Action(() => ProcessOsPaths(paths)));
+            BeginInvoke(new Action(() => ProcessOsPaths(paths, _sidebar.SelectedFolderId, FileDropScope.SelectedFolder)));
         }
 
         private static string[] GetDroppedPaths(IDataObject data)
@@ -270,9 +262,9 @@ namespace Talliark.Addin.Modules.WebView
         }
 
         /// <summary>
-        /// Enables/disables every OS-level file-add affordance while OCR runs: the native
-        /// dropzone (click + drop) and form/WebView drop targets. The panel repaints itself
-        /// in a muted "paused" state so the block is visible, not just silent.
+        /// Enables/disables every OS-level file-add affordance while OCR runs: the file table's
+        /// drop target and the sidebar's per-row drops and folder CRUD. The sidebar paints itself
+        /// muted and refuses drops, so the block is visible, not just silent.
         /// </summary>
         private void SetFileAddLocked(bool locked)
         {
@@ -285,32 +277,72 @@ namespace Talliark.Addin.Modules.WebView
             }
 
             AllowDrop = !locked;
-            _nativeDropZone.AllowDrop = !locked;
-            _nativeDropZone.SetLocked(locked);
+            _sidebar.SetLocked(locked);
         }
 
-        private void PositionNativeDropZone()
+        // ── Native sidebar intents ────────────────────────────────────────────
+
+/// <summary>
+        /// Tells the web UI which folder to filter by — it owns no folder list of its own.
+        /// The sidebar keeps the selection itself; a drop onto the file table rather than
+        /// a row reads it back through <see cref="FileManagerSidebar.SelectedFolderId"/>.
+        /// </summary>
+        private void OnSidebarFolderSelected(string folderId)
         {
-            if (_disposed || IsDisposed) return;
+            PostToWebView(FileManagerMessageSerializer.BuildFolderSelected(folderId));
+        }
 
-            int width = Math.Max(DropzoneLayout.MinWidth, Math.Min(DropzoneLayout.SidebarWidth - DropzoneLayout.Gap * 2, ClientSize.Width - DropzoneLayout.Gap * 2));
-            width = Math.Min(width, Math.Max(0, ClientSize.Width - DropzoneLayout.Gap * 2));
+        private void OnSidebarPathsDropped(string[] paths, string folderId, FileDropScope scope)
+        {
+            if (paths == null || paths.Length == 0) return;
+            if (IsOcrLocked) return;
 
-            _nativeDropZone.SetBounds(
-                DropzoneLayout.Gap,
-                ClientSize.Height - DropzoneLayout.Gap - DropzoneLayout.DropZoneHeight,
-                width,
-                DropzoneLayout.DropZoneHeight);
-            _nativeDropZone.BringToFront();
+            BeginInvoke(new Action(() => ProcessOsPaths(paths, folderId, scope)));
+        }
+
+        private void OnSidebarFolderCreateRequested(string name)
+        {
+            Excel.Workbook wb = _workbook;
+            if (wb == null) return;
+            if (!RequireWritable(wb)) return;
+
+            _service.AddFolder(wb, name);
+            SendFilesToWebView();
+            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
+        }
+
+        private void OnSidebarFolderRenameRequested(string folderId, string newName)
+        {
+            Excel.Workbook wb = _workbook;
+            if (wb == null) return;
+            if (!RequireWritable(wb)) return;
+
+            _service.RenameFolder(wb, folderId, newName);
+            SendFilesToWebView();
+            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
+        }
+
+        private void OnSidebarFolderRemoveRequested(string folderId)
+        {
+            Excel.Workbook wb = _workbook;
+            if (wb == null) return;
+            if (!RequireWritable(wb)) return;
+
+            _service.RemoveFolder(wb, folderId);
+            SendFilesToWebView();
+            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
         }
 
         /// <summary>
-        /// Imports documents (or folders of documents) dropped from the OS or chosen
-        /// in the file picker. De-duplicates rapid double delivery (NavigationStarting
-        /// + DragDrop). Non-PDF files are confirmed with the user and converted before
-        /// anything is embedded.
+        /// Imports documents (or folders of documents) dropped from the OS or chosen in the
+        /// file picker. Every candidate lands in <paramref name="folderId"/>, and
+        /// <paramref name="scope"/> decides what a dropped <em>directory</em> becomes: a
+        /// folder named after itself when the drop did not name a destination, or a flat
+        /// import when it landed on a specific folder. De-duplicates rapid double delivery
+        /// (NavigationStarting + DragDrop). Non-PDF files are confirmed with the user and
+        /// converted before anything is embedded.
         /// </summary>
-        private async void ProcessOsPaths(string[] paths)
+        private async void ProcessOsPaths(string[] paths, string folderId, FileDropScope scope)
         {
             if (paths == null || paths.Length == 0)
                 return;
@@ -331,8 +363,15 @@ namespace Talliark.Addin.Modules.WebView
 
             try
             {
-                var folderIdCache = new Dictionary<string, string>(StringComparer.Ordinal);
+                // One folder per dropped directory per call, so a tree with repeated paths
+                // cannot produce duplicate folders.
+                var newFolderIds = new Dictionary<string, string>(StringComparer.Ordinal);
                 var candidates = new List<ImportCandidate>();
+
+                // Candidates from a directory dropped without a named destination, paired with
+                // the directory they came from. Their folder is only created once the user has
+                // confirmed the import, so cancelling leaves no empty folders behind.
+                var deferred = new List<KeyValuePair<string, ImportCandidate>>();
 
                 foreach (string raw in paths)
                 {
@@ -355,15 +394,24 @@ namespace Talliark.Addin.Modules.WebView
                     try
                     {
                         FileAttributes attr = File.GetAttributes(path);
-                        if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
-                            AddDirectoryCandidates(wb, path, folderIdCache, candidates);
-                        else
+                        if ((attr & FileAttributes.Directory) != FileAttributes.Directory)
+                        {
                             candidates.Add(new ImportCandidate
                             {
                                 Path = path,
                                 Name = Path.GetFileName(path),
-                                FolderId = _selectedFolderId,
+                                FolderId = folderId,
                             });
+                            continue;
+                        }
+
+                        bool deferFolder = scope == FileDropScope.SelectedFolder;
+                        foreach (ImportCandidate candidate in ImportPathCollector.CollectDirectory(path, deferFolder ? null : folderId))
+                        {
+                            if (ShouldSkipDuplicateOsImport(candidate.Path)) continue;
+                            candidates.Add(candidate);
+                            if (deferFolder) deferred.Add(new KeyValuePair<string, ImportCandidate>(path, candidate));
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -376,6 +424,20 @@ namespace Talliark.Addin.Modules.WebView
                 if (plan.Cancelled || plan.IsEmpty)
                     return;
 
+                foreach (KeyValuePair<string, ImportCandidate> pair in deferred)
+                {
+                    string created = CreateFolderForDirectory(wb, pair.Key, newFolderIds);
+                    if (created != null) pair.Value.FolderId = created;
+                }
+
+                if (deferred.Count > 0)
+                {
+                    // The folders exist whether or not the files below them convert, so the
+                    // row list is refreshed here rather than left to the post-import push.
+                    SendFilesToWebView();
+                    Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
+                }
+
                 await ImportPreparedAsync(wb, plan);
             }
             catch (Exception ex)
@@ -386,16 +448,18 @@ namespace Talliark.Addin.Modules.WebView
         }
 
         /// <summary>
-        /// Collects every importable file in a dropped directory tree. All file types
-        /// are collected here; the confirmation dialog is what filters them, so the
-        /// counts it shows reflect what the folder actually contains.
+        /// Creates — or returns, for a directory seen earlier in the same drop — the folder
+        /// named after <paramref name="dirPath"/>. A directory dropped without a named
+        /// destination carries its own name as the one piece of intent the user gave, so
+        /// that name is honoured instead of being flattened away.
         /// </summary>
-        private void AddDirectoryCandidates(
+        private string CreateFolderForDirectory(
             Excel.Workbook wb,
             string dirPath,
-            Dictionary<string, string> folderIdCache,
-            List<ImportCandidate> candidates)
+            Dictionary<string, string> cache)
         {
+            if (cache.TryGetValue(dirPath, out string existing)) return existing;
+
             string folderName;
             try
             {
@@ -403,22 +467,19 @@ namespace Talliark.Addin.Modules.WebView
             }
             catch
             {
-                return;
+                return null;
             }
 
-            string sentinel = "__new__:" + folderName;
-            string folderId = ResolveFolderId(wb, sentinel, folderIdCache);
+            if (string.IsNullOrWhiteSpace(folderName)) return null;
 
-            foreach (ImportCandidate candidate in ImportPathCollector.CollectDirectory(dirPath, folderId))
-            {
-                if (!ShouldSkipDuplicateOsImport(candidate.Path))
-                    candidates.Add(candidate);
-            }
+            string id = _service.AddFolder(wb, folderName);
+            cache[dirPath] = id;
+            return id;
         }
 
         /// <summary>
-        /// Converts, embeds and refreshes for an already-confirmed plan. Shared by the
-        /// OS drop/picker path and the web dropzone path.
+        /// Converts, embeds and refreshes for an already-confirmed plan. Shared by every
+        /// OS drop route and the native file picker.
         /// </summary>
         private async Task ImportPreparedAsync(Excel.Workbook wb, ImportSelectionPlan plan)
         {
@@ -538,18 +599,6 @@ namespace Talliark.Addin.Modules.WebView
                         SendFilesToWebView();
                         break;
 
-                    case "set-selected-folder":
-                        _selectedFolderId = FileManagerMessageParser.ParseSetSelectedFolder(raw);
-                        break;
-
-                    case "add-files":
-                        HandleAddFiles(FileManagerMessageParser.ParseAddFiles(raw));
-                        break;
-
-                    case "browse-pdf-files":
-                        ShowPdfFilePicker();
-                        break;
-
                     case "rename-file":
                         HandleRenameFile(FileManagerMessageParser.ParseRenameFile(raw));
                         break;
@@ -564,18 +613,6 @@ namespace Talliark.Addin.Modules.WebView
 
                     case "move-file":
                         HandleMoveFile(FileManagerMessageParser.ParseMoveFile(raw));
-                        break;
-
-                    case "add-folder":
-                        HandleAddFolder(FileManagerMessageParser.ParseAddFolder(raw));
-                        break;
-
-                    case "rename-folder":
-                        HandleRenameFolder(FileManagerMessageParser.ParseRenameFolder(raw));
-                        break;
-
-                    case "remove-folder":
-                        HandleRemoveFolder(FileManagerMessageParser.ParseRemoveFolder(raw));
                         break;
 
                     case "ocr-pdfs":
@@ -685,52 +722,6 @@ namespace Talliark.Addin.Modules.WebView
             }
         }
 
-        private async void HandleAddFiles(AddFilesRequest req)
-        {
-            if (IsOcrLocked) return;
-
-            Excel.Workbook wb = _workbook;
-            if (wb == null) return;
-            if (!RequireWritable(wb)) return;
-
-            try
-            {
-                // Cache resolved folder ids so that a dropped directory only creates one folder
-                // even if it contains many files.
-                var resolvedFolderIds = new Dictionary<string, string>(StringComparer.Ordinal);
-                var candidates = new List<ImportCandidate>();
-
-                foreach (var file in req.Files)
-                {
-                    try
-                    {
-                        string folderId = ResolveFolderId(wb, file.FolderId, resolvedFolderIds);
-                        candidates.Add(new ImportCandidate
-                        {
-                            Name = file.Name,
-                            Base64 = file.Base64,
-                            FolderId = folderId,
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Talliark] AddPdf failed for '{file.Name}': {ex.Message}");
-                    }
-                }
-
-                ImportSelectionPlan plan = ImportPreparationService.Plan(this, candidates);
-                if (plan.Cancelled || plan.IsEmpty)
-                    return;
-
-                await ImportPreparedAsync(wb, plan);
-            }
-            catch (Exception ex)
-            {
-                TalliarkLog.Trace($"HandleAddFiles failed: {ex}");
-                ShowImportFailure(ex);
-            }
-        }
-
         private void ShowPdfFilePicker()
         {
             if (IsOcrLocked) return;
@@ -753,33 +744,7 @@ namespace Talliark.Addin.Modules.WebView
                 selectedPaths = dialog.FileNames.ToArray();
             }
 
-            BeginInvoke(new Action(() => ProcessOsPaths(selectedPaths)));
-        }
-
-        /// <summary>
-        /// Resolves the folderId for a file. Handles the "__new__:FolderName" sentinel that
-        /// the dropzone sends when a directory is dropped — the folder is created on first
-        /// encounter and its new GUID is cached for subsequent files in the same batch.
-        /// </summary>
-        private string ResolveFolderId(
-            Excel.Workbook wb,
-            string folderId,
-            Dictionary<string, string> cache)
-        {
-            if (string.IsNullOrEmpty(folderId))
-                return null;
-
-            const string newPrefix = "__new__:";
-            if (!folderId.StartsWith(newPrefix, StringComparison.Ordinal))
-                return folderId;
-
-            if (cache.TryGetValue(folderId, out string cached))
-                return cached;
-
-            string folderName = folderId.Substring(newPrefix.Length);
-            string newId = _service.AddFolder(wb, folderName);
-            cache[folderId] = newId;
-            return newId;
+            BeginInvoke(new Action(() => ProcessOsPaths(selectedPaths, _sidebar.SelectedFolderId, FileDropScope.SelectedFolder)));
         }
 
         private void HandleRenameFile(RenameFileRequest req)
@@ -831,36 +796,6 @@ namespace Talliark.Addin.Modules.WebView
             if (!RequireWritable(wb)) return;
             TalliarkContent content = _service.MoveFile(wb, req.Id, req.FolderId);
             SendFilesToWebView(content);
-            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
-        }
-
-        private void HandleAddFolder(AddFolderRequest req)
-        {
-            Excel.Workbook wb = _workbook;
-            if (wb == null) return;
-            if (!RequireWritable(wb)) return;
-            _service.AddFolder(wb, req.Name);
-            SendFilesToWebView();
-            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
-        }
-
-        private void HandleRenameFolder(RenameFolderRequest req)
-        {
-            Excel.Workbook wb = _workbook;
-            if (wb == null) return;
-            if (!RequireWritable(wb)) return;
-            _service.RenameFolder(wb, req.Id, req.NewName);
-            SendFilesToWebView();
-            Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
-        }
-
-        private void HandleRemoveFolder(RemoveFolderRequest req)
-        {
-            Excel.Workbook wb = _workbook;
-            if (wb == null) return;
-            if (!RequireWritable(wb)) return;
-            _service.RemoveFolder(wb, req.Id);
-            SendFilesToWebView();
             Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
         }
 
@@ -923,6 +858,10 @@ namespace Talliark.Addin.Modules.WebView
 
                 string json = FileManagerMessageSerializer.BuildFilesLoaded(content.Folders, content.Pdfs, linkCounts);
                 PostToWebView(json);
+
+                // One read of the workbook feeds both surfaces, so the native row list and
+                // the web table can never disagree about counts or order.
+                _sidebar.Update(content.Folders, content.Pdfs);
             }
             catch (Exception ex)
             {
@@ -1067,15 +1006,17 @@ namespace Talliark.Addin.Modules.WebView
                     _webView.DragOver -= NativeFileDrop_DragEnter;
                     _webView.DragDrop -= NativeFileDrop_DragDrop;
 
-                    _nativeDropZone.DragEnter -= NativeFileDrop_DragEnter;
-                    _nativeDropZone.DragOver -= NativeFileDrop_DragEnter;
-                    _nativeDropZone.DragLeave -= NativeFileDrop_DragLeave;
-                    _nativeDropZone.DragDrop -= NativeFileDrop_DragDrop;
-
                     DragEnter -= NativeFileDrop_DragEnter;
                     DragOver -= NativeFileDrop_DragEnter;
                     DragLeave -= NativeFileDrop_DragLeave;
                     DragDrop -= NativeFileDrop_DragDrop;
+
+                    _sidebar.FolderSelected -= OnSidebarFolderSelected;
+                    _sidebar.FolderCreateRequested -= OnSidebarFolderCreateRequested;
+                    _sidebar.FolderRenameRequested -= OnSidebarFolderRenameRequested;
+                    _sidebar.FolderRemoveRequested -= OnSidebarFolderRemoveRequested;
+                    _sidebar.PathsDropped -= OnSidebarPathsDropped;
+                    _sidebar.BrowseRequested -= ShowPdfFilePicker;
 
                     // Deferred while init is in flight: disposing a WebView2 mid-initialization
                     // is a native fail-fast in the runtime, and Excel blames the add-in for it.
@@ -1089,16 +1030,15 @@ namespace Talliark.Addin.Modules.WebView
             TalliarkLog.Trace("EXIT file manager");
         }
 
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            PositionNativeDropZone();
-        }
-
         private void SendResetUiToWebView()
         {
             if (_disposed) return;
             if (!_webViewReady) return;
+
+            // Both surfaces reset together. The sidebar clearing first raises folder-selected,
+            // which reaches a web view that is about to be told to reset anyway — harmless,
+            // and cheaper than a second ordering rule for the other direction.
+            _sidebar.Reset();
 
             try
             {
@@ -1117,144 +1057,6 @@ namespace Talliark.Addin.Modules.WebView
             string addinDir = Path.GetDirectoryName(new Uri(codeBase).LocalPath)
                 ?? AppDomain.CurrentDomain.BaseDirectory;
             return Path.Combine(addinDir, "webui");
-        }
-
-        /// <summary>
-        /// Native Windows Forms panel for drag-drop file interaction.
-        /// Color tokens MUST match src/web/shared/base.css design system:
-        ///   - ForeColor (31,41,55) = --color-text-primary
-        ///   - BackColor (255,255,255) = --color-surface
-        ///   - fillColor drag-over (238,242,255) = --color-surface-light
-        ///   - borderColor drag-over (124,106,247) = --color-accent
-        ///   - borderColor rest (212,212,224) = --color-border
-        ///   - mutedBrush (92,92,112) = --color-text-muted
-        /// If design tokens change, both CSS and these hardcoded values must be updated together.
-        /// </summary>
-        private sealed class NativeDropZonePanel : Panel
-        {
-            private bool _dragOver;
-            private bool _hoverOver;
-            private bool _locked;
-
-            public NativeDropZonePanel()
-            {
-                DoubleBuffered = true;
-                BackColor = Color.White;
-                ForeColor = Color.FromArgb(31, 41, 55);
-                Cursor = Cursors.Hand;
-                MouseEnter += (s, e) => { if (!_locked) { _hoverOver = true; Invalidate(); } };
-                MouseLeave += (s, e) => { _hoverOver = false; Invalidate(); };
-            }
-
-            /// <summary>True while OCR is running; the panel ignores clicks and paints as paused.</summary>
-            public bool IsLocked => _locked;
-
-            public void SetDragOver(bool dragOver)
-            {
-                if (_locked || _dragOver == dragOver)
-                    return;
-
-                _dragOver = dragOver;
-                Invalidate();
-            }
-
-            public void SetLocked(bool locked)
-            {
-                if (_locked == locked)
-                    return;
-
-                _locked = locked;
-                _dragOver = false;
-                _hoverOver = false;
-                Cursor = locked ? Cursors.No : Cursors.Hand;
-                Invalidate();
-            }
-
-            protected override void OnClick(EventArgs e)
-            {
-                if (_locked)
-                    return;
-
-                base.OnClick(e);
-            }
-
-            protected override void OnPaint(PaintEventArgs e)
-            {
-                base.OnPaint(e);
-
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-                var bounds = ClientRectangle;
-                bounds.Inflate(-1, -1);
-
-                Color fillColor = _locked
-                    ? Color.FromArgb(236, 236, 242)
-                    : _dragOver ? Color.FromArgb(238, 242, 255) : Color.White;
-                Color borderColor = _locked
-                    ? Color.FromArgb(212, 212, 224)
-                    : _dragOver
-                        ? Color.FromArgb(124, 106, 247)
-                        : _hoverOver ? Color.FromArgb(180, 168, 252) : Color.FromArgb(212, 212, 224);
-
-                using (var fill = new SolidBrush(fillColor))
-                using (var border = new Pen(borderColor, 2f))
-                using (var textBrush = new SolidBrush(_locked ? Color.FromArgb(92, 92, 112) : ForeColor))
-                using (var mutedBrush = new SolidBrush(Color.FromArgb(92, 92, 112)))
-                using (var titleFont = new Font(Font.FontFamily, 11f, FontStyle.Bold))
-                using (var bodyFont = new Font(Font.FontFamily, 11f, FontStyle.Regular))
-                {
-                    border.DashStyle = DashStyle.Dash;
-                    e.Graphics.FillRectangle(fill, bounds);
-                    e.Graphics.DrawRectangle(border, bounds);
-
-                    var title = _locked ? "Adding files is paused" : "Drop documents or folders here";
-                    var body = _locked ? "OCR is running" : "or click to browse";
-                    var titleSize = e.Graphics.MeasureString(title, titleFont);
-                    var bodySize = e.Graphics.MeasureString(body, bodyFont);
-
-                    // Stack: icon → title → body, centered as a unit
-                    const float iconH = 24f;
-                    const float iconGap = 6f;
-                    const float textGap = 5f;
-                    float totalHeight = iconH + iconGap + titleSize.Height + textGap + bodySize.Height;
-                    float stackTop = bounds.Top + (bounds.Height - totalHeight) / 2f;
-
-                    float iconY = stackTop;
-                    float titleY = stackTop + iconH + iconGap;
-                    float bodyY = titleY + titleSize.Height + textGap;
-
-                    Color iconColor = (_hoverOver && !_dragOver) ? Color.FromArgb(124, 106, 247) : Color.FromArgb(92, 92, 112);
-                    float penWidth = (_hoverOver && !_dragOver) ? 2f : 1.5f;
-
-                    using (var pen = new Pen(iconColor, penWidth))
-                    using (var iconBrush = new SolidBrush(iconColor))
-                    {
-                        float iconX = bounds.Left + (bounds.Width - iconH) / 2f;
-                        // Document rectangle
-                        e.Graphics.DrawRectangle(pen, iconX + 3, iconY, iconH - 6, iconH);
-                        // Folded corner
-                        var cornerPoints = new[]
-                        {
-                            new PointF(iconX + iconH - 6, iconY),
-                            new PointF(iconX + iconH, iconY + 6),
-                            new PointF(iconX + iconH - 6, iconY + 6)
-                        };
-                        e.Graphics.FillPolygon(iconBrush, cornerPoints);
-                    }
-                    e.Graphics.DrawString(
-                        title,
-                        titleFont,
-                        textBrush,
-                        bounds.Left + (bounds.Width - titleSize.Width) / 2f,
-                        titleY);
-                    e.Graphics.DrawString(
-                        body,
-                        bodyFont,
-                        mutedBrush,
-                        bounds.Left + (bounds.Width - bodySize.Width) / 2f,
-                        bodyY);
-                }
-            }
         }
     }
 }

@@ -303,42 +303,6 @@
       }
     },
 
-    "AddFilePayload": {
-      "description": "A single file to be added, as sent from the web UI.",
-      "type": "object",
-      "required": ["name", "base64"],
-      "additionalProperties": false,
-      "properties": {
-        "name":     { "type": "string" },
-        "base64":   { "type": "string" },
-        "folderId": { "type": "string", "description": "Optional target folder GUID." }
-      }
-    },
-
-    "AddFilesMessage": {
-      "description": "Sent by the file-manager web app when the user drops or picks files.",
-      "type": "object",
-      "required": ["type", "files"],
-      "additionalProperties": false,
-      "properties": {
-        "type":  { "const": "add-files" },
-        "files": { "type": "array", "items": { "$ref": "#/definitions/AddFilePayload" }, "minItems": 1 }
-      }
-    },
-
-    "BrowsePdfFilesMessage": {
-      "description": "Sent by the file-manager web app when the user asks to browse for PDFs. The C# host owns the native file picker and imports selected file paths.",
-      "type": "object",
-      "required": ["type"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "const": "browse-pdf-files" }
-      },
-      "examples": [
-        { "type": "browse-pdf-files" }
-      ]
-    },
-
     "RenameFileMessage": {
       "description": "Sent by the file-manager web app when the user renames a file.",
       "type": "object",
@@ -388,49 +352,19 @@
       }
     },
 
-    "AddFolderMessage": {
-      "description": "Sent by the file-manager web app when the user creates a new folder.",
-      "type": "object",
-      "required": ["type", "name"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "const": "add-folder" },
-        "name": { "type": "string" }
-      }
-    },
-
-    "RenameFolderMessage": {
-      "description": "Sent by the file-manager web app when the user renames a folder.",
-      "type": "object",
-      "required": ["type", "id", "newName"],
-      "additionalProperties": false,
-      "properties": {
-        "type":    { "const": "rename-folder" },
-        "id":      { "type": "string" },
-        "newName": { "type": "string" }
-      }
-    },
-
-    "RemoveFolderMessage": {
-      "description": "Sent by the file-manager web app when the user deletes a folder. Files in the folder become uncategorised.",
-      "type": "object",
-      "required": ["type", "id"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "const": "remove-folder" },
-        "id":   { "type": "string" }
-      }
-    },
-
-    "SetSelectedFolderMessage": {
-      "description": "Sent when the user changes the active folder in the file manager. Used by the host when importing files from OS drag/drop (Explorer) so new PDFs match the current selection. Omit folderId when 'All Files' is selected.",
+    "FolderSelectedMessage": {
+      "description": "Sent by the C# host when the user picks a folder in the native sidebar. The web UI owns no folder list of its own, so this is what filters the file table. Omit folderId when 'All Files' is selected.",
       "type": "object",
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
-        "type":     { "const": "set-selected-folder" },
-        "folderId": { "type": "string", "description": "GUID of the selected folder, absent for uncategorised / All Files." }
-      }
+        "type":     { "const": "folder-selected" },
+        "folderId": { "type": "string", "description": "GUID of the selected folder, absent for All Files." }
+      },
+      "examples": [
+        { "type": "folder-selected" },
+        { "type": "folder-selected", "folderId": "3fa85f64-5717-4562-b3fc-2c963f66afa6" }
+      ]
     },
 
     "RectPayload": {
@@ -1462,16 +1396,11 @@
     { "$ref": "#/definitions/ViewerFoldersUpdatedMessage" },
     { "$ref": "#/definitions/ManagerReadyMessage" },
     { "$ref": "#/definitions/FilesLoadedMessage" },
-    { "$ref": "#/definitions/AddFilesMessage" },
-    { "$ref": "#/definitions/BrowsePdfFilesMessage" },
+    { "$ref": "#/definitions/FolderSelectedMessage" },
     { "$ref": "#/definitions/RenameFileMessage" },
     { "$ref": "#/definitions/RemoveFileMessage" },
     { "$ref": "#/definitions/SelectFileMessage" },
     { "$ref": "#/definitions/MoveFileMessage" },
-    { "$ref": "#/definitions/AddFolderMessage" },
-    { "$ref": "#/definitions/RenameFolderMessage" },
-    { "$ref": "#/definitions/RemoveFolderMessage" },
-    { "$ref": "#/definitions/SetSelectedFolderMessage" },
     { "$ref": "#/definitions/LinkRectangleCreatedMessage" },
     { "$ref": "#/definitions/LinkRectangleUpdatedMessage" },
     { "$ref": "#/definitions/CacheBuildStartedMessage" },

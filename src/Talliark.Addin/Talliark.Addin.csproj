@@ -299,6 +299,7 @@
     <Compile Include="Modules\WebView\FileManagerHost.cs" />
     <Compile Include="Modules\WebView\FileManagerMessageParser.cs" />
     <Compile Include="Modules\WebView\FileManagerMessageSerializer.cs" />
+    <Compile Include="Modules\WebView\FileManagerSidebar.cs" />
     <Compile Include="Modules\WebView\ReconcileHost.cs">
       <SubType>Form</SubType>
     </Compile>

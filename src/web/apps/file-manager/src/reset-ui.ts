@@ -1,24 +1,26 @@
 import type { FileEntry } from "./types/index.js";
-import type { FolderPanel } from "./components/folder-panel/folder-panel.js";
 import type { FileTable } from "./components/file-table/file-table.js";
 import type { TableToolbar } from "./components/table-toolbar/table-toolbar.js";
-import { registerUiResetHandler, sendSelectedFolder } from "./host-bridge.js";
+import { registerUiResetHandler } from "./host-bridge.js";
 
 export interface FileManagerUiHandles {
-  folderPanel: FolderPanel;
   fileTable: FileTable;
   toolbar: TableToolbar;
   setSelectedFolderId: (folderId: string | null) => void;
   getCurrentFiles: () => FileEntry[];
 }
 
-/** Clears transient UI state (selection, filters, folder pick) back to defaults. */
+/**
+ * Clears transient UI state (selection, filters, folder pick) back to defaults.
+ *
+ * The native sidebar is reset host-side in the same breath, so the next `folder-selected`
+ * this app receives will already be the All Files row. The local clear keeps the table
+ * correct in the window before that message arrives.
+ */
 export function resetFileManagerUi(handles: FileManagerUiHandles): void {
   handles.setSelectedFolderId(null);
-  handles.folderPanel.reset();
   handles.fileTable.reset();
   handles.toolbar.reset();
-  sendSelectedFolder(null);
   handles.fileTable.update(handles.getCurrentFiles(), null);
 }
 

@@ -13,29 +13,6 @@ namespace Talliark.Addin.Modules.WebView
         public static string GetMessageType(string json) =>
             WebMessageParser.GetMessageType(json);
 
-        public static AddFilesRequest ParseAddFiles(string json)
-        {
-            var dict = Deserialize(json);
-            var filesRaw = dict["files"] as System.Collections.ArrayList;
-            if (filesRaw == null)
-                throw new FormatException("add-files message missing 'files' array.");
-
-            var files = new List<AddFileEntry>();
-            foreach (var item in filesRaw)
-            {
-                var entry = item as Dictionary<string, object>;
-                if (entry == null) continue;
-                files.Add(new AddFileEntry
-                {
-                    Name     = GetString(entry, "name"),
-                    Base64   = GetString(entry, "base64"),
-                    FolderId = GetStringOrNull(entry, "folderId"),
-                });
-            }
-
-            return new AddFilesRequest { Files = files };
-        }
-
         public static RenameFileRequest ParseRenameFile(string json)
         {
             var dict = Deserialize(json);
@@ -66,35 +43,6 @@ namespace Talliark.Addin.Modules.WebView
                 Id       = GetString(dict, "id"),
                 FolderId = GetStringOrNull(dict, "folderId"),
             };
-        }
-
-        public static AddFolderRequest ParseAddFolder(string json)
-        {
-            var dict = Deserialize(json);
-            return new AddFolderRequest { Name = GetString(dict, "name") };
-        }
-
-        public static RenameFolderRequest ParseRenameFolder(string json)
-        {
-            var dict = Deserialize(json);
-            return new RenameFolderRequest
-            {
-                Id      = GetString(dict, "id"),
-                NewName = GetString(dict, "newName"),
-            };
-        }
-
-        public static RemoveFolderRequest ParseRemoveFolder(string json)
-        {
-            var dict = Deserialize(json);
-            return new RemoveFolderRequest { Id = GetString(dict, "id") };
-        }
-
-        /// <returns>Folder GUID, or null when omitted (All Files / uncategorised).</returns>
-        public static string ParseSetSelectedFolder(string json)
-        {
-            var dict = Deserialize(json);
-            return GetStringOrNull(dict, "folderId");
         }
 
         public static OcrPdfsRequest ParseOcrPdfs(string json)
@@ -141,18 +89,6 @@ namespace Talliark.Addin.Modules.WebView
 
     // ── Request DTOs ──────────────────────────────────────────────────────────
 
-    internal sealed class AddFileEntry
-    {
-        public string Name     { get; set; }
-        public string Base64   { get; set; }
-        public string FolderId { get; set; }
-    }
-
-    internal sealed class AddFilesRequest
-    {
-        public List<AddFileEntry> Files { get; set; }
-    }
-
     internal sealed class RenameFileRequest
     {
         public string Id      { get; set; }
@@ -173,22 +109,6 @@ namespace Talliark.Addin.Modules.WebView
     {
         public string Id       { get; set; }
         public string FolderId { get; set; }
-    }
-
-    internal sealed class AddFolderRequest
-    {
-        public string Name { get; set; }
-    }
-
-    internal sealed class RenameFolderRequest
-    {
-        public string Id      { get; set; }
-        public string NewName { get; set; }
-    }
-
-    internal sealed class RemoveFolderRequest
-    {
-        public string Id { get; set; }
     }
 
     internal sealed class OcrPdfsRequest

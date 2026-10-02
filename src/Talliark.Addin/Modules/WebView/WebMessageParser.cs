@@ -11,7 +11,8 @@ namespace Talliark.Addin.Modules.WebView
         /// <summary>
         /// Serializer for inbound WebView messages. Uses <see cref="int.MaxValue"/> for
         /// <see cref="JavaScriptSerializer.MaxJsonLength"/> because the default (2097152) rejects
-        /// <c>add-files</c> payloads carrying base64-encoded PDFs.
+        /// <c>ocr-status</c> and viewer messages carrying gzipped base64 OCR payloads, which
+        /// run well past it.
         /// </summary>
         internal static readonly JavaScriptSerializer Serializer = CreateSerializer();
 

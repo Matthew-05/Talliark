@@ -22,6 +22,15 @@ interface OcrStatusMessage {
 }
 
 /**
+ * The user picked a row in the native folder sidebar. `folderId` is absent for All Files,
+ * which filters to every document rather than to none.
+ */
+interface FolderSelectedMessage {
+  type: "folder-selected";
+  folderId?: string;
+}
+
+/**
  * Progress for one file, as webview-messages-v1 defines it.
  *
  * `stage` is stated by the host; `message` is prose beside it and must not be
@@ -42,15 +51,9 @@ interface ResetUiMessage {
   type: "reset-ui";
 }
 
-type HostMessage = FilesLoadedMessage | OcrStatusMessage | ResetUiMessage;
+type HostMessage = FilesLoadedMessage | FolderSelectedMessage | OcrStatusMessage | ResetUiMessage;
 
 // ── Outbound (web → host) ─────────────────────────────────────────────────────
-
-export interface AddFilePayload {
-  name: string;
-  base64: string;
-  folderId?: string;
-}
 
 interface WebView2Bridge extends EventTarget {
   postMessage(message: string): void;
@@ -77,6 +80,7 @@ export function registerUiResetHandler(handler: () => void): void {
 
 export function initHostBridge(
   onFilesLoaded: (folders: FolderEntry[], files: FileEntry[]) => void,
+  onFolderSelected?: (folderId: string | null) => void,
   onOcrStatus?: (pdfId: string, status: string, progress: OcrProgress) => void
 ): void {
   const webview = getWebView();
@@ -97,6 +101,8 @@ export function initHostBridge(
     if (msg.type === "files-loaded") {
       console.log(`[Talliark] files-loaded received: ${msg.files.length} files`);
       onFilesLoaded(msg.folders, msg.files);
+    } else if (msg.type === "folder-selected" && onFolderSelected) {
+      onFolderSelected(msg.folderId ?? null);
     } else if (msg.type === "ocr-status" && onOcrStatus) {
       onOcrStatus(msg.pdfId, msg.status, {
         message: msg.message,
@@ -113,14 +119,6 @@ export function initHostBridge(
   });
 
   send({ type: "manager-ready" });
-}
-
-export function sendAddFiles(files: AddFilePayload[]): void {
-  send({ type: "add-files", files });
-}
-
-export function sendBrowsePdfFiles(): void {
-  send({ type: "browse-pdf-files" });
 }
 
 export function sendRenameFile(id: string, newName: string): void {
@@ -147,29 +145,10 @@ export function sendMoveFile(id: string, folderId: string | null): void {
   send(msg);
 }
 
-export function sendAddFolder(name: string): void {
-  send({ type: "add-folder", name });
-}
-
-export function sendRenameFolder(id: string, newName: string): void {
-  send({ type: "rename-folder", id, newName });
-}
-
-export function sendRemoveFolder(id: string): void {
-  send({ type: "remove-folder", id });
-}
-
 export function sendOcrPdfs(pdfIds: string[]): void {
   send({ type: "ocr-pdfs", pdfIds });
 }
 
 export function sendCancelOcr(): void {
   send({ type: "cancel-ocr" });
-}
-
-/** Notifies host of the actively selected folder (for OS drag-drop import). Omit folderId → All Files. */
-export function sendSelectedFolder(folderId: string | null): void {
-  const msg: Record<string, unknown> = { type: "set-selected-folder" };
-  if (folderId) msg["folderId"] = folderId;
-  send(msg);
 }

@@ -1,29 +1,18 @@
-/* Two-column app shell.
-   Minimum supported width: 600px (sidebar 260px + content 340px).
-   See DropzoneLayout constants in FileManagerHost.cs for layout synchronization. */
+/* Single-column app shell.
+   The folder list is a native WinForms panel docked beside this view, so #app only
+   lays out the toolbar and the file table. Its width is the WebView2's width, which is
+   FileManagerHost's client area less FileManagerSidebarLayout.Width. */
 
 #app {
-  display: grid;
-  grid-template-columns: 260px 1fr;
   height: 100vh;
-  gap: 0;
   overflow: hidden;
   user-select: none;
   cursor: default;
-  min-width: 600px;
 }
 
 #app input[type="text"] {
   user-select: text;
   cursor: text;
-}
-
-.file-manager__sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-  overflow: hidden;
 }
 
 .file-manager__content {

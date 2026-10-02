@@ -1,7 +1,6 @@
 import type { FileEntry, FolderEntry } from "./types/index.js";
-import { initHostBridge, sendSelectedFolder, sendRemoveFile, sendMoveFile, sendOcrPdfs, sendCancelOcr } from "./host-bridge.js";
+import { initHostBridge, sendRemoveFile, sendMoveFile, sendOcrPdfs, sendCancelOcr } from "./host-bridge.js";
 import type { OcrProgress } from "./host-bridge.js";
-import { FolderPanel } from "./components/folder-panel/folder-panel.js";
 import { FileTable } from "./components/file-table/file-table.js";
 import { TableToolbar } from "./components/table-toolbar/table-toolbar.js";
 import { wireFileManagerUiReset } from "./reset-ui.js";
@@ -9,14 +8,11 @@ import { wireFileManagerUiReset } from "./reset-ui.js";
 export function mountApp(root: HTMLElement): void {
   root.className = "file-manager";
 
-  const leftCol = document.createElement("div");
-  leftCol.className = "file-manager__sidebar";
-
-  const rightCol = document.createElement("div");
-  rightCol.className = "file-manager__content";
-
-  root.appendChild(leftCol);
-  root.appendChild(rightCol);
+  // The folder list is a native WinForms panel docked beside this view, so there is one
+  // column here: the toolbar and the table. Selection arrives as `folder-selected`.
+  const content = document.createElement("div");
+  content.className = "file-manager__content";
+  root.appendChild(content);
 
   let selectedFolderId: string | null = null;
   let currentFolders: FolderEntry[] = [];
@@ -33,7 +29,7 @@ export function mountApp(root: HTMLElement): void {
     return { selectedHasActiveOcr, anyOcrRunning };
   }
 
-  const toolbar = new TableToolbar(rightCol, {
+  const toolbar = new TableToolbar(content, {
     onRemoveSelected() {
       const ids = fileTable.getSelectedIds();
       for (const id of ids) sendRemoveFile(id);
@@ -58,7 +54,7 @@ export function mountApp(root: HTMLElement): void {
     },
   });
 
-  const fileTable = new FileTable(rightCol, {
+  const fileTable = new FileTable(content, {
     onSelectionChange(ids: string[]) {
       selectedIds = ids;
       const { selectedHasActiveOcr, anyOcrRunning } = computeToolbarState();
@@ -66,24 +62,10 @@ export function mountApp(root: HTMLElement): void {
     },
   });
 
-  const folderPanel = new FolderPanel(leftCol, {
-    onSelectionChange(folderId: string | null) {
-      selectedFolderId = folderId;
-      sendSelectedFolder(folderId);
-      fileTable.update(currentFiles, selectedFolderId);
-    },
-  });
-
-  /** Locks/unlocks every mutating control (file rename/select, folder CRUD). */
+  /** Locks/unlocks every mutating control in this view. Folder CRUD is native and locked host-side. */
   function applyOcrLock(locked: boolean): void {
     fileTable.setLocked(locked);
-    folderPanel.setLocked(locked);
   }
-
-  // Spacer to reserve space for native C# dropzone panel at the bottom
-  const dropzoneSpacer = document.createElement("div");
-  dropzoneSpacer.className = "native-dropzone-spacer";
-  leftCol.appendChild(dropzoneSpacer);
 
   let currentFiles: FileEntry[] = [];
 
@@ -92,11 +74,16 @@ export function mountApp(root: HTMLElement): void {
     currentFiles = files;
     currentFolders = folders;
     const t0 = performance.now();
-    folderPanel.update(folders, files);
     fileTable.update(files, selectedFolderId);
     fileTable.updateFolders(folders);
     toolbar.updateFolders(currentFolders);
     console.log(`[Talliark] DOM update: ${(performance.now() - t0).toFixed(1)}ms`);
+  }
+
+  /** The user picked a row in the native sidebar; refilter without touching the folder list. */
+  function onFolderSelected(folderId: string | null): void {
+    selectedFolderId = folderId;
+    fileTable.update(currentFiles, selectedFolderId);
   }
 
   function onOcrStatus(
@@ -116,10 +103,9 @@ export function mountApp(root: HTMLElement): void {
     applyOcrLock(anyOcrRunning);
   }
 
-  initHostBridge(onFilesLoaded, onOcrStatus);
+  initHostBridge(onFilesLoaded, onFolderSelected, onOcrStatus);
 
   wireFileManagerUiReset({
-    folderPanel,
     fileTable,
     toolbar,
     setSelectedFolderId: (folderId) => { selectedFolderId = folderId; },
