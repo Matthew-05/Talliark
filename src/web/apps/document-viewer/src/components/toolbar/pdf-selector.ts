@@ -222,6 +222,7 @@ export class PdfSelector {
     const filtered = trimmed
       ? inFolder.filter((e) => e.name.toLowerCase().includes(trimmed))
       : inFolder;
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
 
     if (filtered.length === 0) {
       const empty = document.createElement("li");
