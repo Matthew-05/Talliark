@@ -19,6 +19,7 @@ from engines.ocr_engine import (
     needs_adaptive_retry,
     needs_garbled_text_retry,
     select_pages_requiring_ocr,
+    select_direct_orientation_pages,
     should_merge_faint_ink_retry,
     should_select_rotated_retry,
     summarize_geometry_quality,
@@ -436,6 +437,35 @@ class DirectGeometryTests(unittest.TestCase):
                 },
             )
         )
+
+    def test_strong_sideways_ocr_is_still_checked_and_rotation_is_accepted(self) -> None:
+        primary = {
+            "mean_confidence": 93.78,
+            "word_count": 730,
+            "character_count": 3740,
+        }
+        upright = {
+            "mean_confidence": 93.79,
+            "word_count": 730,
+            "character_count": 3742,
+        }
+
+        self.assertEqual(select_direct_orientation_pages({2: primary}), [2])
+        self.assertTrue(should_select_rotated_retry(primary, upright))
+
+    def test_strong_ocr_rotation_is_rejected_when_upright_retry_degrades(self) -> None:
+        primary = {
+            "mean_confidence": 94.0,
+            "word_count": 700,
+            "character_count": 3700,
+        }
+        degraded = {
+            "mean_confidence": 80.0,
+            "word_count": 700,
+            "character_count": 3700,
+        }
+
+        self.assertFalse(should_select_rotated_retry(primary, degraded))
 
     @patch("engines.ocr_engine._detect_direct_page_rotation")
     def test_rotation_detection_ignores_weak_and_upright_suggestions(

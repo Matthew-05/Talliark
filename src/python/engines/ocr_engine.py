@@ -835,6 +835,17 @@ def detect_direct_page_rotations(
     return rotations
 
 
+def select_direct_orientation_pages(stats: dict[int, dict]) -> list[int]:
+    """Return every direct-OCR page for independent orientation detection.
+
+    Recognition confidence is not an orientation signal: Tesseract can read one
+    sideways direction accurately while still reporting that the page needs a
+    quarter-turn. Restricting OSD to weak OCR results therefore misses valid
+    corrections.
+    """
+    return sorted(stats)
+
+
 def extract_direct_text_geometry(
     pdf_bytes: bytes,
     page_numbers: list[int],
@@ -903,18 +914,27 @@ def extract_direct_text_geometry(
 
 
 def should_select_rotated_retry(primary: dict, candidate: dict) -> bool:
-    """Accept orientation correction only when recognition clearly improves."""
+    """Accept a confident orientation retry when recognition remains trustworthy."""
     primary_confidence = float(primary.get("mean_confidence", 0.0))
     candidate_confidence = float(candidate.get("mean_confidence", 0.0))
     primary_words = int(primary.get("word_count", 0))
     candidate_words = int(candidate.get("word_count", 0))
     primary_characters = int(primary.get("character_count", 0))
     candidate_characters = int(candidate.get("character_count", 0))
-    return (
-        candidate_confidence >= max(50.0, primary_confidence + 8.0)
-        and candidate_words >= max(5, primary_words * 0.5)
+    has_coverage = (
+        candidate_words >= max(5, primary_words * 0.5)
         and candidate_characters >= max(20, primary_characters * 0.5)
     )
+    if not has_coverage:
+        return False
+
+    if primary_confidence >= 75.0:
+        # Strong sideways OCR may already be accurate. OSD is authoritative once
+        # its own confidence gate has passed, provided the upright retry stays
+        # within normal confidence noise and retains meaningful coverage.
+        return candidate_confidence >= max(50.0, primary_confidence - 2.0)
+
+    return candidate_confidence >= max(50.0, primary_confidence + 8.0)
 
 
 def should_merge_faint_ink_retry(primary: dict, candidate: dict) -> bool:

@@ -217,14 +217,22 @@ Two consequences worth stating before anything is built:
 
 ### 4.1 OCR orientation corrections
 
-Direct OCR performs an orientation retry only for weak or sparse page results.
-When Tesseract proposes a confident quarter-turn and the rotated retry materially
-improves recognition, the worker returns that accepted clockwise correction as a
-zero-based page rotation. In an ordinary full OCR run, the worker applies that
-correction to the sanitized PDF's intrinsic page rotation and rotates character
-geometry into the corrected displayed coordinate space before table, value and
-financial detection run. Geometry-only and Reconcile jobs retain their independent
-source snapshots and do not persist orientation corrections.
+Direct OCR checks orientation independently for every page it recognizes; OCR
+confidence is not used as an orientation signal because Tesseract can read one
+sideways direction accurately. A non-zero quarter-turn must meet Tesseract's `10.0`
+orientation-confidence floor. For weak primary OCR, its upright retry must improve
+mean word confidence by at least eight points and retain at least half the words and
+characters. For a primary result already at or above `75.0`, the retry may instead
+remain within two confidence points while meeting the same coverage guard. The
+two-point tolerance admits normal OCR score jitter without accepting a correction
+whose upright reading materially degraded.
+
+The worker returns an accepted clockwise correction as a zero-based page rotation.
+In an ordinary full OCR run, it applies that correction to the sanitized PDF's
+intrinsic page rotation and rotates character geometry into the corrected displayed
+coordinate space before table, value and financial detection run. Geometry-only and
+Reconcile jobs retain their independent source snapshots and do not persist
+orientation corrections.
 
 Manual viewer rotations remain separate in `PageRotations`. The viewer combines
 those manual turns with the corrected PDF's intrinsic rotation, while export reads

@@ -33,6 +33,7 @@ from engines.ocr_engine import (
     needs_adaptive_retry,
     needs_garbled_text_retry,
     select_pages_requiring_ocr,
+    select_direct_orientation_pages,
     should_merge_faint_ink_retry,
     should_select_rotated_retry,
     summarize_geometry_quality,
@@ -183,12 +184,7 @@ def _run_direct_ocr(
         progress_callback=progress_callback,
     )
 
-    orientation_candidates = [
-        page_number
-        for page_number, page_stats in stats.items()
-        if float(page_stats["mean_confidence"]) < 75.0
-        or int(page_stats["character_count"]) < 40
-    ]
+    orientation_candidates = select_direct_orientation_pages(stats)
     rotations = detect_direct_page_rotations(
         pdf_bytes,
         orientation_candidates,
