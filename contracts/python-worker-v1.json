@@ -57,6 +57,13 @@
       ]
     },
 
+    "OcrPageRotations": {
+      "description": "Sparse zero-based page map of accepted clockwise OCR corrections that have already been applied to the returned full-mode PDF's intrinsic page rotation. The host uses the delta to keep workbook link rectangles aligned. Absent from geometry-only and analysis results.",
+      "type": "object",
+      "propertyNames": { "pattern": "^(0|[1-9][0-9]*)$" },
+      "additionalProperties": { "type": "integer", "enum": [90, 180, 270] }
+    },
+
     "ExportPdfJob": {
       "description": "Sent by the C# host when an embedded document with sidecar geometry is exported. This command changes only the returned export bytes; it never changes the PDF or geometry stored in the workbook.",
       "type": "object",
@@ -244,7 +251,7 @@
         "direct_retry_page_count": { "type": "integer", "minimum": 0, "description": "Direct OCR pages retried at 400 DPI because 300-DPI confidence or coverage was weak." },
         "direct_retry_page_numbers": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "One-based direct OCR pages retried at 400 DPI." },
         "direct_400_selected_page_numbers": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "Retried pages where 400-DPI geometry materially beat the 300-DPI result and was selected." },
-        "direct_rotated_page_numbers": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "Direct-OCR pages whose validated orientation retry was selected. Their character boxes are inverse-mapped into the unchanged source-page coordinate space." },
+        "direct_rotated_page_numbers": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true, "description": "Direct-OCR pages whose validated orientation retry was selected. In an ordinary full OCR result, the accepted correction is applied to the returned PDF and geometry and reported in page_rotations." },
         "direct_mean_confidence": { "type": "number", "minimum": 0, "maximum": 100, "description": "Mean Tesseract word confidence across the selected direct OCR page results." },
         "pdf_sanitized": { "type": "boolean", "description": "True when the returned PDF was rewritten as passive content before workbook storage." },
         "removed_embedded_files": { "type": "integer", "minimum": 0, "description": "Embedded or attached files removed while normalizing the returned PDF." },
@@ -285,6 +292,7 @@
         "document_values_base64": { "type": "string", "description": "Gzip-compressed document-values-v1 JSON, base64-encoded when optional value detection succeeds. Published for every document." },
         "financial_structure_base64": { "type": "string", "description": "Gzip-compressed financial-structure-v1 JSON, base64-encoded. Published only for documents in the financial tier; absent means the tier did not run, not that the document has no notes -- the model's apparatus field is what records that." },
         "reconcile_base64": { "type": "string", "description": "Gzip-compressed reconcile-v1 JSON, base64-encoded. Present only when the job set analysis. Absent on an ordinary cache build, because Reconcile is a scan the user runs and never a background pass." },
+        "page_rotations": { "$ref": "#/definitions/OcrPageRotations" },
         "diagnostics":      { "$ref": "#/definitions/OcrDiagnostics" }
       },
       "examples": [
@@ -293,6 +301,7 @@
           "status": "success",
           "pdf_base64": "JVBERi0xLjU=",
           "geometry_base64": "H4sIAAAAAAAAA+3BMQEAAADCoPVP7WsIoAAAAAAAAPwYAwAABtXgAA==",
+          "page_rotations": { "2": 90 },
           "diagnostics": {
             "ocr_engine": "tesseract 5.5.0",
             "rasterizer": "pymupdf",

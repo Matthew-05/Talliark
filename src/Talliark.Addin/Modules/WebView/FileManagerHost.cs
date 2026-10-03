@@ -684,7 +684,16 @@ namespace Talliark.Addin.Modules.WebView
                         if (status == PdfStatus.Ocr)
                         {
                             anyComplete = true;
-                            Globals.ThisAddIn.RefreshTaskPanePdf(_workbook, pdfId);
+                            if (detail?.PdfOrientationChanged == true)
+                            {
+                                // OCR persisted a new intrinsic page orientation and moved
+                                // stored links with it, so refresh the whole viewer data set.
+                                Globals.ThisAddIn.NotifyViewerLinksChanged(_workbook);
+                            }
+                            else
+                            {
+                                Globals.ThisAddIn.RefreshTaskPanePdf(_workbook, pdfId);
+                            }
                         }
                     });
 

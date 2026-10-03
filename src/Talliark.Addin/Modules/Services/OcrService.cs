@@ -396,6 +396,7 @@ namespace Talliark.Addin.Modules.Services
                                 var storageClock = Stopwatch.StartNew();
                                 try
                                 {
+                                    bool pdfOrientationChanged = false;
                                     if (job.Analysis)
                                     {
                                         SaveReconcileResult(workbook, job, parsed);
@@ -420,6 +421,13 @@ namespace Talliark.Addin.Modules.Services
                                             parsed.DocumentValuesBase64 ?? string.Empty,
                                             parsed.FinancialStructureBase64 ?? string.Empty);
                                     }
+                                    if (!job.Analysis)
+                                    {
+                                        pdfOrientationChanged = new RotatePageService().ApplyOcrRotationCorrections(
+                                            job.PdfId,
+                                            parsed.PageRotations,
+                                            workbook);
+                                    }
                                     storageClock.Stop();
                                     storageMs = storageClock.ElapsedMilliseconds;
 
@@ -427,7 +435,9 @@ namespace Talliark.Addin.Modules.Services
                                     onStatusUpdate(
                                         job.PdfId,
                                         job.Analysis ? "complete" : PdfStatus.Ocr,
-                                        null);
+                                        pdfOrientationChanged
+                                            ? new OcrStatusDetail { PdfOrientationChanged = true }
+                                            : null);
                                     callbackClock.Stop();
                                     callbackMs += callbackClock.ElapsedMilliseconds;
                                 }
@@ -622,6 +632,8 @@ ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
                         DocumentValuesBase64 = PythonWorkerSession.GetString(obj, "document_values_base64"),
                         FinancialStructureBase64 = PythonWorkerSession.GetString(obj, "financial_structure_base64"),
                         ReconcileBase64 = PythonWorkerSession.GetString(obj, "reconcile_base64"),
+                        PageRotations = ParsePageRotations(
+                            PythonWorkerSession.GetDictionary(obj, "page_rotations")),
                         Diagnostics = PythonWorkerSession.GetDictionary(obj, "diagnostics"),
                     };
                 }
@@ -672,6 +684,27 @@ ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
             sb.Append(job.DetectTables ? "true" : "false");
             sb.Append('}');
             return sb.ToString();
+        }
+
+        private static Dictionary<int, int> ParsePageRotations(
+            Dictionary<string, object> raw)
+        {
+            var rotations = new Dictionary<int, int>();
+            if (raw == null) return rotations;
+
+            foreach (KeyValuePair<string, object> entry in raw)
+            {
+                if (!int.TryParse(entry.Key, out int pageIndex) || pageIndex < 0)
+                    throw new InvalidOperationException(
+                        "The OCR worker returned an invalid page rotation index.");
+
+                int rotation = Convert.ToInt32(entry.Value);
+                if (rotation != 90 && rotation != 180 && rotation != 270)
+                    throw new InvalidOperationException(
+                        "The OCR worker returned an invalid page rotation correction.");
+                rotations[pageIndex] = rotation;
+            }
+            return rotations;
         }
 
         /// <summary>
@@ -846,6 +879,7 @@ foreach (string id in pdfIds)
 
             public string FinancialStructureBase64 { get; set; }
             public string ReconcileBase64 { get; set; }
+            public Dictionary<int, int> PageRotations { get; set; }
             public string Error { get; set; }
 
             /// <summary>

@@ -215,6 +215,24 @@ Two consequences worth stating before anything is built:
   arithmetic recall. See
   [`engines/financial-table/README.md`](engines/financial-table/README.md) §4.
 
+### 4.1 OCR orientation corrections
+
+Direct OCR performs an orientation retry only for weak or sparse page results.
+When Tesseract proposes a confident quarter-turn and the rotated retry materially
+improves recognition, the worker returns that accepted clockwise correction as a
+zero-based page rotation. In an ordinary full OCR run, the worker applies that
+correction to the sanitized PDF's intrinsic page rotation and rotates character
+geometry into the corrected displayed coordinate space before table, value and
+financial detection run. Geometry-only and Reconcile jobs retain their independent
+source snapshots and do not persist orientation corrections.
+
+Manual viewer rotations remain separate in `PageRotations`. The viewer combines
+those manual turns with the corrected PDF's intrinsic rotation, while export reads
+only the embedded PDF rotation. The result is that an OCR correction affects both
+viewer and export, but a later manual viewer turn still does not change export.
+Any linked rectangles already stored for a corrected page are transformed by the
+same OCR rotation delta when the corrected PDF is saved.
+
 ## 5. Span categories replace the value / noise binary
 
 D3 settles a question `docs/internal/engines/values/value-precision.md` left as "the detector alone

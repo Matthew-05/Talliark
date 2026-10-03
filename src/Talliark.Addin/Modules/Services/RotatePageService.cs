@@ -55,6 +55,57 @@ namespace Talliark.Addin.Modules.Services
             store.SaveContent(new TalliarkContent(content.Version, content.Folders, content.Pdfs));
 
             // ── 2. Transform link rectangles on the rotated page ─────────────
+            IList<LinkedRectangle> allLinks = TransformLinks(
+                pdfId,
+                new Dictionary<int, int> { [pageIndex] = delta / 90 },
+                workbook);
+
+            var resultRotations = new Dictionary<int, int> { [pageIndex] = newRotation };
+            return (resultRotations, allLinks);
+        }
+
+        /// <summary>
+        /// Applies the same clockwise delta that the worker already persisted into the
+        /// embedded PDF's intrinsic page rotation to workbook-owned link rectangles.
+        /// Manual viewer rotations remain a separate metadata layer.
+        /// </summary>
+        internal bool ApplyOcrRotationCorrections(
+            string pdfId,
+            IDictionary<int, int> appliedCorrections,
+            Excel.Workbook workbook)
+        {
+            if (appliedCorrections == null || appliedCorrections.Count == 0) return false;
+            if (string.IsNullOrWhiteSpace(pdfId))
+                throw new ArgumentException("pdfId must be non-empty.", nameof(pdfId));
+            if (workbook == null)
+                throw new ArgumentNullException(nameof(workbook));
+
+            WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
+
+            var store = new TalliarkCustomXmlPartStore(workbook);
+            if (!store.TryGetMetadata(pdfId, out PdfMetadata _))
+                throw new InvalidOperationException($"PDF '{pdfId}' not found in workbook.");
+
+            var deltaTurnsByPage = new Dictionary<int, int>();
+            foreach (KeyValuePair<int, int> correction in appliedCorrections)
+            {
+                if (correction.Key < 0 ||
+                    (correction.Value != 90 && correction.Value != 180 && correction.Value != 270))
+                    throw new InvalidOperationException(
+                        "OCR returned an invalid page rotation correction.");
+
+                deltaTurnsByPage[correction.Key] = correction.Value / 90;
+            }
+
+            TransformLinks(pdfId, deltaTurnsByPage, workbook);
+            return true;
+        }
+
+        private static IList<LinkedRectangle> TransformLinks(
+            string pdfId,
+            IDictionary<int, int> deltaTurnsByPage,
+            Excel.Workbook workbook)
+        {
             var session = Globals.ThisAddIn.GetStorageSession(workbook);
             List<LinkedRectangle> allLinks = session.GetLinks().ToList();
 
@@ -63,10 +114,11 @@ namespace Talliark.Addin.Modules.Services
             {
                 LinkedRectangle link = allLinks[i];
                 if (!string.Equals(link.PdfId, pdfId, StringComparison.Ordinal)
-                    || link.Rectangle.PageIndex != pageIndex)
+                    || !deltaTurnsByPage.TryGetValue(
+                        link.Rectangle.PageIndex, out int deltaTurns))
                     continue;
 
-                PdfRectangle transformed = TransformRect(link.Rectangle, delta / 90);
+                PdfRectangle transformed = TransformRect(link.Rectangle, deltaTurns);
                 allLinks[i] = new LinkedRectangle(link.Id, link.PdfId, link.LinkedCell, transformed)
                 {
                     LinkType = link.LinkType,
@@ -79,8 +131,7 @@ namespace Talliark.Addin.Modules.Services
             if (anyChanged)
                 session.SetLinks(allLinks);
 
-            var resultRotations = new Dictionary<int, int> { [pageIndex] = newRotation };
-            return (resultRotations, allLinks);
+            return allLinks;
         }
 
         /// <summary>

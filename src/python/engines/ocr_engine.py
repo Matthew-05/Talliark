@@ -681,6 +681,78 @@ def _remap_rotated_page_geometry(page_geometry: dict, rotation: int) -> None:
         )
 
 
+def apply_page_rotation_corrections(
+    pdf_bytes: bytes,
+    geometry: dict,
+    page_rotations: dict[int, int],
+) -> bytes:
+    """Persist accepted OCR corrections in the PDF and rotate geometry with it.
+
+    Direct OCR maps upright retry boxes back into the source page so every
+    candidate can be compared in one coordinate space. Once a retry is accepted,
+    this performs the opposite transform: the sanitized PDF's intrinsic page
+    rotation becomes upright and text geometry moves into that new displayed
+    coordinate space before any downstream detector runs.
+    """
+    if not page_rotations:
+        return pdf_bytes
+
+    import pymupdf as fitz
+
+    pages = {
+        int(page.get("pageIndex")): page
+        for page in geometry.get("pages", [])
+        if isinstance(page, dict) and isinstance(page.get("pageIndex"), int)
+    }
+    document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        for page_index, correction in sorted(page_rotations.items()):
+            if (
+                page_index < 0
+                or page_index >= document.page_count
+                or correction not in (90, 180, 270)
+            ):
+                raise ValueError("Invalid accepted OCR page rotation.")
+
+            page = document.load_page(page_index)
+            page.set_rotation((int(page.rotation) + correction) % 360)
+
+            page_geometry = pages.get(page_index)
+            if page_geometry is None:
+                continue
+            for character in page_geometry.get("characters", []):
+                x = float(character["x"])
+                y = float(character["y"])
+                width = float(character["width"])
+                height = float(character["height"])
+                if correction == 90:
+                    mapped = (1.0 - y - height, x, height, width)
+                elif correction == 180:
+                    mapped = (
+                        1.0 - x - width,
+                        1.0 - y - height,
+                        width,
+                        height,
+                    )
+                else:
+                    mapped = (y, 1.0 - x - width, height, width)
+                (
+                    character["x"],
+                    character["y"],
+                    character["width"],
+                    character["height"],
+                ) = mapped
+
+        return document.tobytes(
+            garbage=4,
+            clean=True,
+            deflate=True,
+            use_objstms=1,
+        )
+    finally:
+        document.close()
+
+
 def _detect_direct_page_rotation(
     pdf_bytes: bytes,
     page_number: int,

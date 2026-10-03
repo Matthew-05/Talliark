@@ -49,6 +49,7 @@ namespace Talliark.Addin.Modules.Services
             pdfs[index] = new PdfMetadata(existing.Id, newName.Trim(), existing.FolderId, existing.DateAdded, existing.FileSizeBytes)
             {
                 OcrStatus = existing.OcrStatus,
+                PageRotations = existing.PageRotations,
             };
 
             var updated = new TalliarkContent(content.Version, content.Folders, pdfs);
@@ -159,6 +160,7 @@ namespace Talliark.Addin.Modules.Services
             new PdfMetadata(existing.Id, existing.Name, folderId, existing.DateAdded, existing.FileSizeBytes)
             {
                 OcrStatus = existing.OcrStatus,
+                PageRotations = existing.PageRotations,
             };
 
         public void UpdatePdfAfterOcr(Excel.Workbook workbook, string id, string newBase64,
@@ -187,6 +189,7 @@ namespace Talliark.Addin.Modules.Services
             var updated = new PdfMetadata(existing.Id, existing.Name, existing.FolderId, existing.DateAdded, existing.FileSizeBytes)
             {
                 OcrStatus = PdfStatus.Ocr,
+                PageRotations = existing.PageRotations,
             };
             store.UpsertMetadata(updated);
         }
@@ -217,6 +220,7 @@ namespace Talliark.Addin.Modules.Services
             var updated = new PdfMetadata(existing.Id, existing.Name, existing.FolderId, existing.DateAdded, existing.FileSizeBytes)
             {
                 OcrStatus = PdfStatus.Ocr,
+                PageRotations = existing.PageRotations,
             };
             store.UpsertMetadata(updated);
         }

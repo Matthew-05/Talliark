@@ -5,11 +5,12 @@ namespace Talliark.Addin.Modules.Services
     /// <summary>
     /// What an OCR run reports about one PDF alongside its status.
     ///
-    /// Terminal updates carry nothing but a message — an error string, or null to
+    /// Terminal updates normally carry only a message — an error string, or null to
     /// clear — so a plain string converts implicitly and those call sites read as
-    /// they always did. Progress updates carry the stage the work is in, which the
-    /// worker or the host states outright; nothing downstream infers it from
-    /// <see cref="Message"/>.
+    /// they always did. A successful OCR update may additionally carry the host-only
+    /// <see cref="PdfOrientationChanged"/> signal. Progress updates carry the stage
+    /// the work is in, which the worker or the host states outright; nothing
+    /// downstream infers it from <see cref="Message"/>.
     ///
     /// <see cref="FileIndex"/> and <see cref="FileCount"/> describe the run rather
     /// than the file, and only the host knows them, so it attaches them here rather
@@ -29,6 +30,13 @@ namespace Talliark.Addin.Modules.Services
         public string Unit { get; set; }
         public int? FileIndex { get; set; }
         public int? FileCount { get; set; }
+
+        /// <summary>
+        /// Host-only terminal signal that OCR changed persisted page orientation and
+        /// therefore also transformed stored link rectangles. It is not part of the
+        /// WebView progress contract.
+        /// </summary>
+        internal bool PdfOrientationChanged { get; set; }
 
         public static implicit operator OcrStatusDetail(string message)
         {

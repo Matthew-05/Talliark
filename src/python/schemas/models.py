@@ -51,6 +51,10 @@ class OcrResult:
     # Present only when the job asked for analysis. Absent on an ordinary cache
     # build, because Reconcile does not run in one.
     reconcile_base64: str = ""
+    # Accepted OCR orientation corrections already applied to the returned
+    # full-mode PDF and geometry, keyed by zero-based page index. The host uses
+    # the same delta to keep workbook-owned link rectangles aligned.
+    page_rotations: dict[int, int] = None
     error: str = ""      # populated on error
     # OcrDiagnostics per contracts/python-worker-v1.json. Host debug logging
     # only — the host must tolerate this being absent and must not branch on it.
@@ -71,6 +75,11 @@ class OcrResult:
                 d["financial_structure_base64"] = self.financial_structure_base64
             if self.reconcile_base64:
                 d["reconcile_base64"] = self.reconcile_base64
+            if self.page_rotations:
+                d["page_rotations"] = {
+                    str(page_index): rotation
+                    for page_index, rotation in sorted(self.page_rotations.items())
+                }
             if self.diagnostics:
                 d["diagnostics"] = self.diagnostics
         else:

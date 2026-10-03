@@ -25,6 +25,7 @@ from engines.geometry_engine import (
 )
 from engines.ocr_engine import (
     active_ocr_engine,
+    apply_page_rotation_corrections,
     detect_direct_page_rotations,
     extract_direct_text_geometry,
     merge_geometry_pages,
@@ -162,7 +163,7 @@ def _run_direct_ocr(
     pdf_bytes: bytes,
     page_numbers: list[int],
     progress_callback,
-) -> tuple[dict[int, dict], dict[int, dict], dict]:
+) -> tuple[dict[int, dict], dict[int, dict], dict, dict[int, int]]:
     """Recognize selected pages and apply the direct geometry retry ladder."""
     diagnostics = {
         "evaluated_profiles": ["direct-hocr-300"],
@@ -171,6 +172,7 @@ def _run_direct_ocr(
         "direct_rotated_page_numbers": [],
         "adaptive_ocr_ms": 0,
     }
+    accepted_rotations: dict[int, int] = {}
     progress_callback(
         f"Direct OCR on {len(page_numbers)} page(s) at 300 DPI…", Stage.OCR
     )
@@ -213,6 +215,7 @@ def _run_direct_ocr(
                 pages[page_number] = rotated_pages[page_number]
                 stats[page_number] = rotated_stats[page_number]
                 diagnostics["direct_rotated_page_numbers"].append(page_number)
+                accepted_rotations[page_number - 1] = rotations[page_number]
 
     retry_pages = [
         page_number
@@ -326,7 +329,7 @@ def _run_direct_ocr(
                 pages[page_number] = cropped_pages[page_number]
                 stats[page_number] = retry
 
-    return pages, stats, diagnostics
+    return pages, stats, diagnostics, accepted_rotations
 
 
 def _handle_job(job: OcrJob) -> None:
@@ -362,6 +365,7 @@ def _handle_job(job: OcrJob) -> None:
         "removed_links": 0,
     }
     page_count = 0
+    page_rotations: dict[int, int] = {}
 
     def elapsed_ms(started: float) -> int:
         return int((time.perf_counter() - started) * 1000)
@@ -430,7 +434,7 @@ def _handle_job(job: OcrJob) -> None:
             diagnostics["ocr_engine"] = active_ocr_engine()
             diagnostics["rasterizer"] = "pymupdf"
             direct_started = time.perf_counter()
-            direct_pages, direct_stats, direct_diagnostics = _run_direct_ocr(
+            direct_pages, direct_stats, direct_diagnostics, page_rotations = _run_direct_ocr(
                 pdf_bytes,
                 direct_page_numbers,
                 on_progress,
@@ -450,6 +454,19 @@ def _handle_job(job: OcrJob) -> None:
                 round(sum(confidences) / len(confidences), 2) if confidences else 0.0
             )
             geometry = merge_geometry_pages(geometry, direct_pages)
+            # Only an ordinary full OCR run replaces the embedded PDF bytes.
+            # Persist accepted corrections there as intrinsic page rotation and
+            # move geometry into the corrected displayed space before table and
+            # value analysis. Reconcile and geometry-only jobs retain their
+            # independent source snapshots and therefore report no correction.
+            if page_rotations and job.mode == "full" and not job.analysis:
+                pdf_bytes = apply_page_rotation_corrections(
+                    pdf_bytes,
+                    geometry,
+                    page_rotations,
+                )
+            else:
+                page_rotations = {}
             direct_summary = summarize_geometry_quality(geometry)
             unresolved = sorted(
                 set(direct_page_numbers) & set(direct_summary["garbled_page_numbers"])
@@ -671,6 +688,7 @@ def _handle_job(job: OcrJob) -> None:
                 document_values_base64=document_values_base64,
                 financial_structure_base64=financial_structure_base64,
                 reconcile_base64=reconcile_base64,
+                page_rotations=page_rotations,
                 diagnostics=diagnostics,
             ).to_dict()
         )

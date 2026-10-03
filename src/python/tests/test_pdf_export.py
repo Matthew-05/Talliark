@@ -5,6 +5,7 @@ import unittest
 import pymupdf as fitz
 
 from engines.geometry_engine import extract_text_geometry
+from engines.ocr_engine import apply_page_rotation_corrections
 from engines.pdf_export_engine import add_searchable_text_layer
 
 
@@ -156,6 +157,21 @@ class PdfExportTests(unittest.TestCase):
                 ):
                     self.assertAlmostEqual(actual_edge, expected_edge, delta=0.006)
 
+    def test_preserves_ocr_corrected_intrinsic_rotation(self) -> None:
+        geometry = _geometry("Auto-oriented page")
+        corrected_source = apply_page_rotation_corrections(
+            _blank_pdf(),
+            geometry,
+            {0: 90},
+        )
+
+        exported = add_searchable_text_layer(corrected_source, geometry)
+        document = fitz.open(stream=exported, filetype="pdf")
+        try:
+            self.assertEqual(document[0].rotation, 90)
+            self.assertIn("Auto-oriented page", document[0].get_text())
+        finally:
+            document.close()
 
 if __name__ == "__main__":
     unittest.main()

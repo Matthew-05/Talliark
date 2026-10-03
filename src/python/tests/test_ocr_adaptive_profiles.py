@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 from schemas.models import OcrJob
 
 from engines.ocr_engine import (
+    apply_page_rotation_corrections,
     detect_direct_page_rotations,
     _dominant_image_clip,
     _geometry_page_from_hocr,
@@ -364,6 +365,49 @@ class DirectGeometryTests(unittest.TestCase):
                 )
                 for value, expected_value in zip(actual, expected):
                     self.assertAlmostEqual(value, expected_value)
+
+    def test_accepted_rotation_is_persisted_and_geometry_moves_with_page(self) -> None:
+        document = fitz.open()
+        page = document.new_page(width=600, height=800)
+        page.set_rotation(90)
+        pdf_bytes = document.tobytes()
+        document.close()
+        geometry = {
+            "version": 1,
+            "coordinateSpace": "normalized",
+            "pages": [
+                {
+                    "pageIndex": 0,
+                    "characters": [
+                        {
+                            "char": "A",
+                            "x": 0.20,
+                            "y": 0.30,
+                            "width": 0.10,
+                            "height": 0.05,
+                            "lineIndex": 0,
+                        }
+                    ],
+                }
+            ],
+        }
+
+        corrected = apply_page_rotation_corrections(
+            pdf_bytes,
+            geometry,
+            {0: 270},
+        )
+
+        result = fitz.open(stream=corrected, filetype="pdf")
+        try:
+            self.assertEqual(result[0].rotation, 0)
+        finally:
+            result.close()
+        character = geometry["pages"][0]["characters"][0]
+        self.assertAlmostEqual(character["x"], 0.30)
+        self.assertAlmostEqual(character["y"], 0.70)
+        self.assertAlmostEqual(character["width"], 0.05)
+        self.assertAlmostEqual(character["height"], 0.10)
 
     def test_rotated_retry_requires_material_recognition_improvement(self) -> None:
         primary = {
