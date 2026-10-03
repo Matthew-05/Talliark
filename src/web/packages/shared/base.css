@@ -10,9 +10,13 @@
   --color-border:       #d4d4e0;
   --color-text:         #1a1a28;
   --color-text-muted:   #5c5c70;
+  --color-text-faint:   #9a9aa8;
   --color-accent:       #7c6af7;
   --color-accent-hover: #6a5ae0;
+  --color-accent-muted: #8b7bc4;
   --color-accent-rgb:   124, 106, 247;
+  --color-info:         #4b76d8;
+  --color-warning:      #b07a00;
   --color-danger:       #c42b2b;
   --color-danger-hover: #a82424;
   --color-success:      #1f8f4a;
@@ -23,10 +27,12 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --gap:       12px;
+  --opacity-disabled: 0.45;
 
   /* Typography */
   --font-sans: "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Code", "Fira Code", monospace;
+  --font-size-xs:   11px;
   --font-size-sm:   12px;
   --font-size-base: 13px;
 }
@@ -70,6 +76,20 @@ input {
   display: flex;
   flex-direction: column;
   height: 100vh;
+}
+
+/* ── Disabled ───────────────────────────────────────────────────── */
+
+/* The one look for a control a user cannot act on. Opt-in, not a blanket
+   `:disabled` rule, because two controls here say "inert" on purpose and a fade
+   would undo it: `.table-toggle` greys its text instead, and the value spans in
+   `values-overlay` disable for a beat after a click, where dimming the span
+   would dim the document rather than the control. Reach for this on a wrapper
+   around a disabled input, which `:disabled` cannot match. Native controls keep
+   their own `:disabled` rule and take the same fade from the token. */
+.talliark-disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
 }
 
 /* ── Standard modal ───────────────────────────────────────────── */

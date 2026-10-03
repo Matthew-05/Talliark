@@ -118,8 +118,8 @@
 
 .pdf-selector__link-count {
   flex-shrink: 0;
-  opacity: 0.5;
-  font-size: 0.78em;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
   white-space: nowrap;
 }
 

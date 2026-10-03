@@ -732,7 +732,9 @@ export class FileTable {
     // Links cell
     const linksTd = document.createElement("td");
     linksTd.className = "col-links";
-    linksTd.textContent = String(file.linkCount ?? 0);
+    const linkCount = file.linkCount ?? 0;
+    linksTd.textContent = String(linkCount);
+    if (linkCount === 0) linksTd.classList.add("col-links--none");
 
     // Status cell
     const statusTd = document.createElement("td");

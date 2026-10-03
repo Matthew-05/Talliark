@@ -1,7 +1,7 @@
 /* Single-column app shell.
    The folder list is a native WinForms panel docked beside this view, so #app only
    lays out the toolbar and the file table. Its width is the WebView2's width, which is
-   FileManagerHost's client area less FileManagerSidebarLayout.Width. */
+   FileManagerHost's client area less FileManagerHost.SidebarWidth. */
 
 #app {
   height: 100vh;

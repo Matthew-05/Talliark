@@ -64,7 +64,7 @@
   font-size: var(--font-size-sm);
 }
 .reconcile-search__input:focus { border-color: var(--color-accent); outline: none; }
-.reconcile-search__input:disabled { opacity: .55; }
+.reconcile-search__input:disabled { opacity: var(--opacity-disabled); }
 .reconcile-search__count { min-width: 48px; color: var(--color-text-muted); font-size: 10px; text-align: center; }
 
 .reconcile-viewer__footing-highlight,

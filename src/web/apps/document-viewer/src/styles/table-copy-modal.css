@@ -30,11 +30,6 @@
   box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.2);
 }
 
-.table-copy-modal__option:has(> input:disabled) {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 .table-copy-modal__option > input {
   width: 15px;
   height: 15px;
@@ -85,7 +80,7 @@
 
 .table-copy-modal__range input:disabled {
   cursor: default;
-  opacity: 0.62;
+  opacity: var(--opacity-disabled);
 }
 
 .table-copy-modal__error {

@@ -73,7 +73,7 @@
 }
 
 .btn-toolbar-move:disabled {
-  opacity: 0.38;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -139,7 +139,7 @@
 }
 
 .btn-toolbar-danger:disabled {
-  opacity: 0.38;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -157,7 +157,7 @@
   cursor: pointer;
   white-space: nowrap;
   background: rgba(220, 160, 40, 0.12);
-  color: #b07a00;
+  color: var(--color-warning);
 }
 
 .btn-toolbar-cancel:hover {

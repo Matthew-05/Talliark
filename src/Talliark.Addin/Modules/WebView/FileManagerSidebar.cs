@@ -204,8 +204,8 @@ namespace Talliark.Addin.Modules.WebView
 
         private readonly List<FolderRow> _rows = new List<FolderRow>();
         private readonly Font _rowFont = new Font("Segoe UI", 9.75f);
-        private readonly Font _countFont = new Font("Segoe UI", 7.5f, FontStyle.Bold);
-        private readonly Font _headerFont = new Font("Segoe UI", 8.25f, FontStyle.Bold);
+        private readonly Font _countFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+        private readonly Font _headerFont = new Font("Segoe UI", 10f, FontStyle.Bold);
         private readonly Font _deleteFont = new Font("Segoe UI", 8.25f, FontStyle.Bold);
         private readonly Font _glyphFont = new Font("Segoe UI", 9.75f);
 

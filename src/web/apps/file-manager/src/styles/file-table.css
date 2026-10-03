@@ -53,7 +53,15 @@
 
 .file-table tbody td.col-links {
   color: var(--color-text-muted);
-  font-size: 11.5px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+/* No links is the absence of something rather than a count worth reading, so a
+   zero steps back out of the emphasis the linked rows get. */
+.file-table tbody td.col-links--none {
+  color: var(--color-text-faint);
+  font-weight: 400;
 }
 
 /* Sized against the widest active label, "● Quality check" (~96px of content:
@@ -88,7 +96,7 @@
   padding: 8px 10px;
   text-align: left;
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
@@ -324,7 +332,7 @@
   background: var(--color-surface-2);
   border-style: dashed;
   border-color: var(--color-border);
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
 .select-all-cb:disabled:checked::after,
@@ -352,13 +360,13 @@
 .col-size,
 .col-date {
   color: var(--color-text-muted);
-  font-size: 11.5px;
+  font-size: var(--font-size-sm);
 }
 
 .col-folder {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 11.5px;
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -549,12 +557,12 @@
   color: var(--color-text-muted);
 }
 
-.file-status--text   { color: #4b76d8; }
+.file-status--text   { color: var(--color-info); }
 .file-status--ocr    { color: var(--color-success); }
-.file-status--none   { color: #9a9aa8; }
-.file-status--queued { color: #8b7bc4; }
+.file-status--none   { color: var(--color-text-faint); }
+.file-status--queued { color: var(--color-accent-muted); }
 
-.file-status--processing { color: #b07a00; }
+.file-status--processing { color: var(--color-warning); }
 .file-status--processing .file-status__label {
   color: var(--color-text);
   font-weight: 600;

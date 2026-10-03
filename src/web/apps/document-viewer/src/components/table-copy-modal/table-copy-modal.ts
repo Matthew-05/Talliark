@@ -56,6 +56,9 @@ export class TableCopyModal {
       const disabled = !rangeInput.checked;
       startInput.input.disabled = disabled;
       endInput.input.disabled = disabled;
+      // A label wraps the range inputs, so `:disabled` never matches it. The
+      // shared class is what carries the disabled look to the whole option.
+      rangeOption.label.classList.toggle("talliark-disabled", disabled);
       error.textContent = "";
     };
     belowInput.addEventListener("change", updateRangeState);
