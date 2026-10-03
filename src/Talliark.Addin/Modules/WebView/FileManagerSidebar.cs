@@ -82,6 +82,13 @@ namespace Talliark.Addin.Modules.WebView
         private const int ActionSize = 22;
         private const int ActionGap = 4;
 
+        /// <summary>The words the delete confirmation's two pills carry.</summary>
+        private const string ConfirmAcceptText = "Confirm";
+        private const string ConfirmDeclineText = "Cancel";
+
+        /// <summary>Horizontal padding either side of the word inside a confirm pill.</summary>
+        private const int ConfirmButtonPadding = 6;
+
         /// <summary>Breathing room between a folder name and its count badge.</summary>
         private const int BadgeGap = 10;
 
@@ -120,6 +127,15 @@ namespace Talliark.Addin.Modules.WebView
         private static readonly Color AccentFaint = Color.FromArgb(0xB4, 0xA8, 0xFC);
         private static readonly Color Danger = Color.FromArgb(0xC4, 0x2B, 0x2B);
 
+        /// <summary>Mirrors <c>--color-danger-hover</c>; the deepening a solid danger button takes on hover.</summary>
+        private static readonly Color DangerHover = Color.FromArgb(0xA8, 0x24, 0x24);
+
+        /// <summary>
+        /// A danger tint light enough to sit behind a glyph the way <see cref="AccentSoft"/> sits behind
+        /// a drop target — the rest state of a destructive affordance whose hover is the full danger.
+        /// </summary>
+        private static readonly Color DangerSoft = Color.FromArgb(0xFB, 0xE9, 0xE9);
+
         /// <summary>White at 65% / 75% / 90%, standing in for the CSS rgba() literals.</summary>
         private static readonly Color OnAccentCount = Color.FromArgb(166, 255, 255, 255);
         private static readonly Color OnAccentAction = Color.FromArgb(191, 255, 255, 255);
@@ -130,7 +146,7 @@ namespace Talliark.Addin.Modules.WebView
 
         private enum EditMode { None, Create, Rename, ConfirmDelete }
 
-        private enum HitZone { None, Row, Rename, Delete, CreateOk, CreateCancel, ConfirmYes, ConfirmNo }
+        private enum HitZone { None, Row, Rename, Delete, CreateOk, CreateCancel, ConfirmAccept, ConfirmDecline }
 
         /// <summary>Which of the two drop surfaces the pointer is over.</summary>
         private enum DropRegion { None, Row, Panel }
@@ -665,8 +681,18 @@ namespace Talliark.Addin.Modules.WebView
                 if (actionsVisible)
                 {
                     Color actionColor = onAccent ? OnAccentAction : TextMuted;
-                    DrawRowAction(g, DeleteRect(visible), "✕", actionColor, index, HitZone.Delete, onAccent);
-                    DrawRowAction(g, RenameRect(visible), "✎", actionColor, index, HitZone.Rename, onAccent);
+
+                    // Each action hovers in its own meaning: delete deepens toward danger,
+                    // rename toward the accent. On a selected row both fall back to the one
+                    // hover language that reads on the accent fill — white over it.
+                    DrawRowAction(g, DeleteRect(visible), "✕", actionColor,
+                        onAccent ? OnAccentActionHover : DangerSoft,
+                        onAccent ? Color.White : Danger,
+                        index, HitZone.Delete);
+                    DrawRowAction(g, RenameRect(visible), "✎", actionColor,
+                        onAccent ? OnAccentActionHover : AccentSoft,
+                        onAccent ? Color.White : AccentHover,
+                        index, HitZone.Rename);
                 }
 
                 if (_editMode == EditMode.ConfirmDelete && isEditing)
@@ -688,9 +714,9 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
                 name ?? string.Empty,
                 _rowFont,
                 new Rectangle(
-                    rect.Left + RowPadding,
+                    rect.Left + ColumnInset + RowPadding,
                     rect.Top,
-                    Math.Max(0, rightLimit - rect.Left - RowPadding * 2),
+                    Math.Max(0, rightLimit - rect.Left - ColumnInset - RowPadding * 2),
                     rect.Height),
                 color,
                 TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
@@ -701,9 +727,9 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
         private int DrawCountBadge(Graphics g, Rectangle rect, int index, Color color, bool actionsVisible)
         {
             if (_editMode == EditMode.ConfirmDelete && _editRow == index)
-                return rect.Left + RowPadding;
+                return rect.Left + ColumnInset + RowPadding;
 
-            int right = RowsRightEdge - ColumnInset;
+            int right = RowsRightEdge - ColumnInset - RowPadding;
             if (actionsVisible)
                 right = RenameRect(rect).Left - BadgeGap;
 
@@ -726,7 +752,13 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
             return area.Left - BadgeGap;
         }
 
-        private void DrawRowAction(Graphics g, Rectangle rect, string glyph, Color color, int index, HitZone zone, bool isSelected)
+        /// <summary>
+        /// Draws a row action glyph with its hover pad. The pad and glyph colours arrive as
+        /// parameters because the two actions mean different things — delete hovers in the
+        /// danger tint, rename in the accent one — and the caller is the one that knows which
+        /// row state (plain or selected) the hover has to read against.
+        /// </summary>
+        private void DrawRowAction(Graphics g, Rectangle rect, string glyph, Color color, Color hoverFill, Color hoverGlyph, int index, HitZone zone)
         {
             HitZone hover = _hoverRow == index ? _hoverZone : HitZone.None;
 
@@ -734,13 +766,13 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
             {
                 // Inset from the glyph box so the hover pad does not run into its neighbour.
                 const int pad = 2;
-                var hoverFill = new Rectangle(
+                var hoverFillRect = new Rectangle(
                     rect.Left + pad,
                     rect.Top + pad,
                     Math.Max(0, rect.Width - pad * 2),
                     Math.Max(0, rect.Height - pad * 2));
-                using (var brush = new SolidBrush(isSelected ? OnAccentActionHover : SurfaceHover))
-                    FillRounded(g, hoverFill, 4, brush);
+                using (var brush = new SolidBrush(hoverFill))
+                    FillRounded(g, hoverFillRect, 4, brush);
             }
 
             TextRenderer.DrawText(
@@ -748,7 +780,7 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
                 glyph,
                 _glyphFont,
                 rect,
-                hover == zone && !isSelected ? TextPrimary : color,
+                hover == zone ? hoverGlyph : color,
                 TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix);
         }
@@ -774,10 +806,10 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
 
         private void DrawDeleteConfirmation(Graphics g, Rectangle rect, bool isSelected)
         {
-            var noRect = ConfirmNoRect(rect);
-            var yesRect = ConfirmYesRect(rect);
+            var declineRect = ConfirmDeclineRect(rect);
+            var acceptRect = ConfirmAcceptRect(rect);
             int labelWidth = TextRenderer.MeasureText(g, DeletePrompt, _deleteFont).Width;
-            var labelRect = new Rectangle(yesRect.Left - ActionGap - labelWidth, rect.Top, labelWidth, rect.Height);
+            var labelRect = new Rectangle(acceptRect.Left - ActionGap - labelWidth, rect.Top, labelWidth, rect.Height);
 
             DrawName(g, rect, RowAt(_editRow).Name, isSelected ? Color.White : TextPrimary, labelRect.Left - ActionGap);
 
@@ -789,8 +821,54 @@ private void DrawName(Graphics g, Rectangle rect, string name, Color color, int 
                 isSelected ? OnAccentConfirm : Danger,
                 TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
 
-            DrawRowAction(g, yesRect, "Yes", _hoverZone == HitZone.ConfirmYes ? Accent : (isSelected ? OnAccentAction : TextMuted), _editRow, HitZone.ConfirmYes, isSelected);
-            DrawRowAction(g, noRect, "No", _hoverZone == HitZone.ConfirmNo ? TextPrimary : (isSelected ? OnAccentAction : TextMuted), _editRow, HitZone.ConfirmNo, isSelected);
+            DrawConfirmButton(g, acceptRect, ConfirmAcceptText, HitZone.ConfirmAccept, destructive: true);
+            DrawConfirmButton(g, declineRect, ConfirmDeclineText, HitZone.ConfirmDecline, destructive: false);
+        }
+
+        /// <summary>
+        /// Draws one Confirm/Cancel pill for the inline delete confirmation, in the language the web
+        /// modal's buttons speak: Confirm is the danger button — danger tint at rest, solid
+        /// danger with a white label on hover — and Cancel is the secondary one — surface and
+        /// border at rest, surface-hover on hover. The pill carries its own fill, so both
+        /// read the same whether the row behind them is selected or not.
+        /// </summary>
+        private void DrawConfirmButton(Graphics g, Rectangle row, string label, HitZone zone, bool destructive)
+        {
+            var pill = new Rectangle(row.Left + 1, row.Top + 5, row.Width - 2, row.Height - 10);
+            bool hover = _hoverZone == zone;
+
+            Color fill = destructive ? DangerSoft : Surface;
+            Color edge = destructive ? Danger : Border;
+            Color labelColor = destructive ? Danger : TextPrimary;
+            if (hover)
+            {
+                if (destructive)
+                {
+                    fill = Danger;
+                    labelColor = Color.White;
+                }
+                else
+                {
+                    fill = SurfaceHover;
+                }
+            }
+
+            using (GraphicsPath path = RoundedPath(pill, DropZoneRadius))
+            {
+                using (var brush = new SolidBrush(fill))
+                    g.FillPath(brush, path);
+                using (var pen = new Pen(edge))
+                    g.DrawPath(pen, path);
+            }
+
+            TextRenderer.DrawText(
+                g,
+                label,
+                _deleteFont,
+                pill,
+                labelColor,
+                TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix);
         }
 
         private void OnEditHostPaint(object sender, PaintEventArgs e)
@@ -965,11 +1043,22 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         private Rectangle CreateCancelRect(Rectangle row) =>
             new Rectangle(RowsRightEdge - ColumnInset - ActionSize * 2, row.Top, ActionSize, row.Height);
 
-        private Rectangle ConfirmNoRect(Rectangle row) =>
-            new Rectangle(RowsRightEdge - ColumnInset - ActionSize, row.Top, ActionSize, row.Height);
+        /// <summary>
+        /// Each pill is as wide as its own word plus padding, so "Confirm" and "Cancel" never
+        /// share a width that fits only the shorter one. Measured rather than fixed because
+        /// the words are the pill's own constants and the font never changes at runtime.
+        /// </summary>
+        private Rectangle ConfirmDeclineRect(Rectangle row)
+        {
+            int width = TextRenderer.MeasureText(ConfirmDeclineText, _deleteFont).Width + ConfirmButtonPadding * 2;
+            return new Rectangle(RowsRightEdge - ColumnInset - width, row.Top, width, row.Height);
+        }
 
-        private Rectangle ConfirmYesRect(Rectangle row) =>
-            new Rectangle(RowsRightEdge - ColumnInset - ActionSize * 2 - ActionGap, row.Top, ActionSize, row.Height);
+        private Rectangle ConfirmAcceptRect(Rectangle row)
+        {
+            int width = TextRenderer.MeasureText(ConfirmAcceptText, _deleteFont).Width + ConfirmButtonPadding * 2;
+            return new Rectangle(ConfirmDeclineRect(row).Left - ActionGap - width, row.Top, width, row.Height);
+        }
 
         /// <summary>
         /// Row index under <paramref name="point"/>, or -1 when the point is not on a
@@ -1024,8 +1113,8 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             {
                 if (_editMode == EditMode.ConfirmDelete)
                 {
-                    if (ConfirmYesRect(row).Contains(point)) return HitZone.ConfirmYes;
-                    if (ConfirmNoRect(row).Contains(point)) return HitZone.ConfirmNo;
+                    if (ConfirmAcceptRect(row).Contains(point)) return HitZone.ConfirmAccept;
+                    if (ConfirmDeclineRect(row).Contains(point)) return HitZone.ConfirmDecline;
                     return HitZone.Row;
                 }
 
@@ -1250,14 +1339,14 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
                 case HitZone.CreateCancel:
                     CancelEdit();
                     break;
-                case HitZone.ConfirmYes:
+                case HitZone.ConfirmAccept:
                     {
                         string id = RowAt(_editRow)?.Id;
                         CancelEdit();
                         if (id != null) FolderRemoveRequested?.Invoke(id);
                         break;
                     }
-                case HitZone.ConfirmNo:
+                case HitZone.ConfirmDecline:
                     CancelEdit();
                     break;
                 case HitZone.Rename:
