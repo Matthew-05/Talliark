@@ -16,13 +16,74 @@ namespace Talliark.Addin.Modules.Services
         private static readonly int SumFill  = ColorTranslator.ToOle(Color.FromArgb(254, 243, 199));
         private static readonly int TableFill = ColorTranslator.ToOle(Color.FromArgb(237, 233, 254));
 
+        private static readonly int LinkBorderColor = ColorTranslator.ToOle(Color.FromArgb(150, 150, 150));
+        private static readonly int LinkBorderWeight = (int)Excel.XlBorderWeight.xlThin;
+
+        private static readonly Excel.XlBordersIndex[] LinkBorderEdges =
+        {
+            Excel.XlBordersIndex.xlEdgeTop,
+            Excel.XlBordersIndex.xlEdgeBottom,
+            Excel.XlBordersIndex.xlEdgeLeft,
+            Excel.XlBordersIndex.xlEdgeRight,
+        };
+
         private static readonly IAutoDateFormatPolicy AutoDateFormatPolicy =
             new DefaultAutoDateFormatPolicy();
 
-        /// <summary>Applies the standard link-rectangle cell style.</summary>
+        /// <summary>
+        /// Applies the standard link-rectangle cell style: a fill plus a thin border
+        /// on every edge that does not already carry a border, so existing borders
+        /// are preserved rather than overwritten.
+        /// </summary>
         public static void ApplyLinkStyle(Excel.Range cell, LinkType linkType)
         {
             cell.Interior.Color = GetFillColor(linkType);
+            ApplyLinkBorders(cell);
+        }
+
+        private static void ApplyLinkBorders(Excel.Range range)
+        {
+            foreach (Excel.XlBordersIndex edge in LinkBorderEdges)
+            {
+                Excel.Border border = range.Borders[edge];
+                if (HasNoLineStyle(border))
+                {
+                    border.LineStyle = Excel.XlLineStyle.xlContinuous;
+                    border.Weight = (Excel.XlBorderWeight)LinkBorderWeight;
+                    border.Color = LinkBorderColor;
+                }
+            }
+        }
+
+        private static void ClearLinkBorders(Excel.Range range)
+        {
+            foreach (Excel.XlBordersIndex edge in LinkBorderEdges)
+            {
+                Excel.Border border = range.Borders[edge];
+                if (BorderInt(border.LineStyle) == (int)Excel.XlLineStyle.xlContinuous
+                    && BorderInt(border.Weight) == LinkBorderWeight
+                    && BorderInt(border.Color) == LinkBorderColor)
+                {
+                    border.LineStyle = Excel.XlLineStyle.xlLineStyleNone;
+                }
+            }
+        }
+
+        /// <summary>True when the edge carries no line at all, meaning the add-in is
+        /// free to add its own border there without overwriting anything.</summary>
+        private static bool HasNoLineStyle(Excel.Border border)
+        {
+            return BorderInt(border.LineStyle) == (int)Excel.XlLineStyle.xlLineStyleNone;
+        }
+
+        /// <summary>
+        /// Border.LineStyle and Border.Color come back from the PIA as object, so
+        /// they must be unboxed before comparison — a boxed value compared with
+        /// == is a reference comparison and is always false.
+        /// </summary>
+        private static int BorderInt(object value)
+        {
+            return value is int i ? i : System.Convert.ToInt32(value);
         }
 
         /// <summary>Applies Auto-link date or number formatting inferred from <paramref name="sourceText"/>.</summary>
@@ -78,10 +139,15 @@ namespace Talliark.Addin.Modules.Services
             ApplySumNumberFormat(cell, new[] { sourceText });
         }
 
-        /// <summary>Removes the link-rectangle cell background fill.</summary>
+        /// <summary>
+        /// Removes the link-rectangle cell background fill and the borders the
+        /// add-in applied. Borders that already existed before the link (or that
+        /// do not match the applied thin gray style) are left untouched.
+        /// </summary>
         public static void ClearLinkStyle(Excel.Range cell)
         {
             cell.Interior.Pattern = Excel.XlPattern.xlPatternNone;
+            ClearLinkBorders(cell);
         }
 
         /// <summary>
@@ -97,6 +163,8 @@ namespace Talliark.Addin.Modules.Services
             foreach (Excel.Range cell in cells)
             {
                 if (cell == null) continue;
+
+                ClearLinkBorders(cell);
 
                 var ws = (Excel.Worksheet)cell.Worksheet;
                 if (!bySheet.TryGetValue(ws, out List<Excel.Range> list))
