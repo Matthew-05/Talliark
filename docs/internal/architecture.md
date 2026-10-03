@@ -241,6 +241,12 @@ viewer and export, but a later manual viewer turn still does not change export.
 Any linked rectangles already stored for a corrected page are transformed by the
 same OCR rotation delta when the corrected PDF is saved.
 
+Export materializes sidecar OCR lines in displayed-page coordinates. On pages with
+intrinsic rotation, their PDF text advance is rotated with the page so PDF.js sees
+the same left-to-right order and font bounds after display. Re-import reconstructs
+geometry from the full PDF.js text transform plus font ascent and descent rather
+than assuming the text origin is always the displayed left edge.
+
 ## 5. Span categories replace the value / noise binary
 
 D3 settles a question `docs/internal/engines/values/value-precision.md` left as "the detector alone

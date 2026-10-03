@@ -13,6 +13,27 @@ interface PdfTextItem {
   hasEOL: boolean;
 }
 
+interface PdfTextStyle {
+  fontFamily?: string;
+  ascent?: number;
+  descent?: number;
+}
+
+interface PdfViewportGeometry {
+  width: number;
+  height: number;
+  transform: number[];
+}
+
+export interface PdfTextItemPlacement {
+  normLeft: number;
+  normTop: number;
+  normRight: number;
+  normBottom: number;
+  inlineStartX: number;
+  inlineEndX: number;
+}
+
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -48,6 +69,58 @@ function measureCharWidths(
   return chars.map((char) => ctx.measureText(char).width);
 }
 
+/** Resolve a PDF.js text item into the displayed page coordinate space. */
+export function pdfTextItemPlacement(
+  item: Pick<PdfTextItem, "transform" | "width" | "height">,
+  viewport: PdfViewportGeometry,
+  style?: PdfTextStyle,
+): PdfTextItemPlacement {
+  const transform = pdfjsLib.Util.transform(viewport.transform, item.transform);
+  const rawInlineScale = Math.hypot(item.transform[0] ?? 0, item.transform[1] ?? 0);
+  const displayInlineScale = Math.hypot(transform[0] ?? 0, transform[1] ?? 0);
+  const inlineUnitX = displayInlineScale > 0 ? (transform[0] ?? 0) / displayInlineScale : 1;
+  const inlineUnitY = displayInlineScale > 0 ? (transform[1] ?? 0) / displayInlineScale : 0;
+  const inlineLength = item.width * (
+    rawInlineScale > 0 ? displayInlineScale / rawInlineScale : 1
+  );
+
+  const rawBlockScale = Math.hypot(item.transform[2] ?? 0, item.transform[3] ?? 0);
+  const displayBlockScale = Math.hypot(transform[2] ?? 0, transform[3] ?? 0);
+  const blockUnitX = displayBlockScale > 0 ? (transform[2] ?? 0) / displayBlockScale : 0;
+  const blockUnitY = displayBlockScale > 0 ? (transform[3] ?? 0) / displayBlockScale : -1;
+  const emHeight = item.height * (
+    rawBlockScale > 0 ? displayBlockScale / rawBlockScale : 1
+  );
+  const ascent = typeof style?.ascent === "number" && Number.isFinite(style.ascent)
+    ? style.ascent
+    : 1;
+  const descent = typeof style?.descent === "number" && Number.isFinite(style.descent)
+    ? style.descent
+    : 0;
+
+  const originX = transform[4] ?? 0;
+  const originY = transform[5] ?? 0;
+  const inlineEndX = originX + inlineUnitX * inlineLength;
+  const inlineEndY = originY + inlineUnitY * inlineLength;
+  const corners = [
+    [originX + blockUnitX * ascent * emHeight, originY + blockUnitY * ascent * emHeight],
+    [originX + blockUnitX * descent * emHeight, originY + blockUnitY * descent * emHeight],
+    [inlineEndX + blockUnitX * ascent * emHeight, inlineEndY + blockUnitY * ascent * emHeight],
+    [inlineEndX + blockUnitX * descent * emHeight, inlineEndY + blockUnitY * descent * emHeight],
+  ];
+  const xs = corners.map(([x]) => x ?? 0);
+  const ys = corners.map(([, y]) => y ?? 0);
+
+  return {
+    normLeft: Math.min(...xs) / viewport.width,
+    normTop: Math.min(...ys) / viewport.height,
+    normRight: Math.max(...xs) / viewport.width,
+    normBottom: Math.max(...ys) / viewport.height,
+    inlineStartX: originX / viewport.width,
+    inlineEndX: inlineEndX / viewport.width,
+  };
+}
+
 async function buildPageEntries(page: pdfjsLib.PDFPageProxy): Promise<CharacterEntry[]> {
   const viewport = page.getViewport({ scale: 1 });
   const textContent = await page.getTextContent();
@@ -73,15 +146,6 @@ async function buildPageEntries(page: pdfjsLib.PDFPageProxy): Promise<CharacterE
       continue;
     }
 
-    const tx = item.transform[4] ?? 0;
-    const ty = item.transform[5] ?? 0;
-    const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
-
-    const normLeft = vx / viewport.width;
-    const normBottom = vy / viewport.height;
-    const normRight = (vx + item.width) / viewport.width;
-    const normTop = (vy - item.height) / viewport.height;
-
     const chars = [...item.str];
     if (chars.length === 0) {
       itemIndex++;
@@ -89,6 +153,8 @@ async function buildPageEntries(page: pdfjsLib.PDFPageProxy): Promise<CharacterE
     }
 
     const style = textContent.styles[item.fontName];
+    const placement = pdfTextItemPlacement(item, viewport, style);
+    const { normLeft, normTop, normRight, normBottom } = placement;
     const fontFamily = style?.fontFamily ?? "sans-serif";
     const fontSize = item.height;
 
@@ -102,13 +168,16 @@ async function buildPageEntries(page: pdfjsLib.PDFPageProxy): Promise<CharacterE
     const scale = totalMeasured > 0 ? itemWidth / totalMeasured : itemWidth / chars.length;
 
     let xOffset = 0;
+    const reversed = placement.inlineEndX < placement.inlineStartX;
     for (let i = 0; i < chars.length; i++) {
       const charWidth = totalMeasured > 0 ? (charWidths[i] ?? 0) * scale : itemWidth / chars.length;
+      const charRight = reversed ? normRight - xOffset : normLeft + xOffset + charWidth;
+      const charLeft = reversed ? charRight - charWidth : normLeft + xOffset;
       const entry: CharacterEntry = {
         char: chars[i] ?? "",
-        normLeft: normLeft + xOffset,
+        normLeft: charLeft,
         normTop,
-        normRight: normLeft + xOffset + charWidth,
+        normRight: charRight,
         normBottom,
         lineIndex,
         itemIndex,

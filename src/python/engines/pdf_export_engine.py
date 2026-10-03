@@ -152,23 +152,20 @@ def _insert_line(page: fitz.Page, text: str, displayed_rect: fitz.Rect) -> bool:
         return False
 
     rotation = int(page.rotation) % 360
-    if rotation in (90, 270):
-        # Counter-rotated text advances toward displayed-page left, and its
-        # baseline origin uses the font's descender side of the displayed box.
-        baseline = fitz.Point(
-            displayed_rect.x1,
-            displayed_rect.y0 - font.descender * fontsize,
-        )
-    else:
-        baseline = fitz.Point(
-            displayed_rect.x0,
-            displayed_rect.y0 + font.ascender * fontsize,
-        )
+    # Page insertion coordinates are unrotated, while sidecar geometry is in the
+    # displayed page. Start every line at its displayed left edge, then inverse-
+    # map the baseline. Using the intrinsic rotation for the inserted text makes
+    # its displayed advance left-to-right; the prior counter-rotation reversed
+    # character order on quarter-turned pages.
+    baseline = fitz.Point(
+        displayed_rect.x0,
+        displayed_rect.y0 + font.ascender * fontsize,
+    )
     if rotation:
         baseline = baseline * page.derotation_matrix
 
     natural_width = max(font.text_length(text, fontsize=fontsize), 0.01)
-    horizontal_scale = displayed_rect.width / natural_width * 0.98
+    horizontal_scale = displayed_rect.width / natural_width
     scale = (
         fitz.Matrix(1, horizontal_scale)
         if rotation in (90, 270)
@@ -180,7 +177,7 @@ def _insert_line(page: fitz.Page, text: str, displayed_rect: fitz.Rect) -> bool:
         fontname=font_name,
         fontsize=fontsize,
         render_mode=3,
-        rotate=(360 - rotation) % 360,
+        rotate=rotation,
         morph=(baseline, scale),
         overlay=True,
     )

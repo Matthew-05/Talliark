@@ -155,7 +155,9 @@ class PdfExportTests(unittest.TestCase):
                 for actual_edge, expected_edge in zip(
                     _bounds(actual), _bounds(expected)
                 ):
-                    self.assertAlmostEqual(actual_edge, expected_edge, delta=0.006)
+                    self.assertAlmostEqual(actual_edge, expected_edge, delta=0.002)
+                visible = [character for character in actual if character["char"].strip()]
+                self.assertLess(visible[0]["x"], visible[-1]["x"])
 
     def test_preserves_ocr_corrected_intrinsic_rotation(self) -> None:
         geometry = _geometry("Auto-oriented page")
