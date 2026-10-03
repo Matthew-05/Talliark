@@ -1,5 +1,5 @@
 import type { FileEntry, FolderEntry } from "../../types/index.js";
-import { sendRenameFile, sendRemoveFile, sendSelectFile, sendRowDragStarted } from "../../host-bridge.js";
+import { sendExportFile, sendRenameFile, sendRemoveFile, sendSelectFile, sendRowDragStarted } from "../../host-bridge.js";
 import type { OcrProgress } from "../../host-bridge.js";
 // Imported as its own entry point rather than through the package barrel:
 // the barrel re-exports the pdf.js geometry module, whose top-level worker
@@ -20,6 +20,9 @@ const LOCKED_HINT = "Unavailable while OCR is running";
  * does not send a file to the folder list by accident.
  */
 const DRAG_THRESHOLD = 5;
+
+/** Gap kept between the context menu and the WebView viewport edges. */
+const CONTEXT_MENU_VIEWPORT_MARGIN = 8;
 
 type SortKey = "name" | "linkCount" | "status" | "fileSizeBytes" | "dateAdded" | "folder";
 type SortDirection = "ascending" | "descending";
@@ -119,6 +122,8 @@ export class FileTable {
     this._contextMenu = document.createElement("div");
     this._contextMenu.className = "file-table__context-menu";
     this._contextMenu.innerHTML = `
+      <button class="file-table__context-item" data-action="export" title="Adds searchable text when OCR is available">Export PDF</button>
+      <span class="file-table__context-separator" aria-hidden="true"></span>
       <button class="file-table__context-item" data-action="rename">Rename</button>
       <button class="file-table__context-item" data-action="delete">Delete</button>
     `;
@@ -806,15 +811,36 @@ export class FileTable {
     this._contextMenuRow = tr;
 
     this._contextMenu.style.position = "fixed";
-    this._contextMenu.style.left = `${x}px`;
-    this._contextMenu.style.top = `${y}px`;
+    this._contextMenu.style.left = "0";
+    this._contextMenu.style.top = "0";
     this._contextMenu.classList.add("file-table__context-menu--visible");
+
+    const bounds = this._contextMenu.getBoundingClientRect();
+    const maximumLeft = Math.max(
+      CONTEXT_MENU_VIEWPORT_MARGIN,
+      window.innerWidth - bounds.width - CONTEXT_MENU_VIEWPORT_MARGIN,
+    );
+    const left = Math.min(Math.max(x, CONTEXT_MENU_VIEWPORT_MARGIN), maximumLeft);
+
+    // Prefer opening below the pointer. If that would cross the bottom edge,
+    // anchor the menu above the pointer instead, then clamp unusually tall menus.
+    const preferredTop = y + bounds.height + CONTEXT_MENU_VIEWPORT_MARGIN <= window.innerHeight
+      ? y
+      : y - bounds.height;
+    const maximumTop = Math.max(
+      CONTEXT_MENU_VIEWPORT_MARGIN,
+      window.innerHeight - bounds.height - CONTEXT_MENU_VIEWPORT_MARGIN,
+    );
+    const top = Math.min(Math.max(preferredTop, CONTEXT_MENU_VIEWPORT_MARGIN), maximumTop);
+
+    this._contextMenu.style.left = `${left}px`;
+    this._contextMenu.style.top = `${top}px`;
 
     // Attach event listeners to menu items
     const items = this._contextMenu.querySelectorAll<HTMLButtonElement>(".file-table__context-item");
     items.forEach(item => {
       item.removeEventListener("click", this._handleContextMenuClick);
-      item.addEventListener("click", (e) => this._handleContextMenuClick(e));
+      item.addEventListener("click", this._handleContextMenuClick);
     });
   }
 
@@ -832,7 +858,9 @@ export class FileTable {
     if (this._locked) { this._hideContextMenu(); return; }
     if (!this._contextMenuFile || !this._contextMenuNameSpan || !this._contextMenuRow) return;
 
-    if (action === "rename") {
+    if (action === "export") {
+      sendExportFile(this._contextMenuFile.id);
+    } else if (action === "rename") {
       this._startRename(this._contextMenuFile, this._contextMenuNameSpan, this._contextMenuRow);
     } else if (action === "delete") {
       sendRemoveFile(this._contextMenuFile.id);

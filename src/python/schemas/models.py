@@ -131,6 +131,43 @@ class ConvertResult:
         return d
 
 
+@dataclass
+class ExportPdfJob:
+    """Inbound request to materialize sidecar geometry in exported PDF bytes."""
+    job_id: str
+    command: str
+    pdf_base64: str
+    geometry_base64: str
+
+    @staticmethod
+    def from_dict(d: dict) -> "ExportPdfJob":
+        return ExportPdfJob(
+            job_id=d["job_id"],
+            command=d["command"],
+            pdf_base64=d["pdf_base64"],
+            geometry_base64=d["geometry_base64"],
+        )
+
+
+@dataclass
+class ExportPdfResult:
+    """Terminal response for searchable-PDF export."""
+    job_id: str
+    status: str
+    pdf_base64: str = ""
+    error: str = ""
+
+    def to_dict(self) -> dict:
+        if self.status == "success":
+            return {
+                "job_id": self.job_id,
+                "status": "success",
+                "command": "export-pdf",
+                "pdf_base64": self.pdf_base64,
+            }
+        return {"job_id": self.job_id, "status": "error", "error": self.error}
+
+
 class Stage:
     """
     The steps a job moves through, mirroring the ProgressStage enum in

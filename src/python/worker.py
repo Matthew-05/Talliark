@@ -1,8 +1,9 @@
 """Talliark worker — stdin/stdout JSON-line protocol.
 
 OCR is geometry-first: the worker sanitizes the visual PDF, recognizes only the
-pages that need OCR, and returns text geometry beside the passive PDF. It never
-writes an OCR text layer into the PDF.
+pages that need OCR, and returns text geometry beside the passive PDF. Stored
+PDFs never receive an OCR text layer; the export-pdf command can materialize
+that sidecar geometry in a separate user-requested output PDF.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import time
 
 import pymupdf as fitz
 
+from engines.binary_codec import json_from_base64
 from engines.conversion_engine import ConversionError, convert_to_pdf
 from engines.geometry_engine import (
     extract_text_geometry,
@@ -35,6 +37,7 @@ from engines.ocr_engine import (
     summarize_geometry_quality,
 )
 from engines.pdf_security import sanitize_pdf_bytes
+from engines.pdf_export_engine import add_searchable_text_layer
 from engines.financial.detector import detect_financial_structure, structure_to_base64 as financial_structure_to_base64
 from engines.values.detector import detect_values, values_to_base64
 from engines.reconcile.detector import detect_reconcile, reconcile_to_base64
@@ -44,6 +47,8 @@ from engines.table_cell_engine import recover_table_geometry
 from schemas.models import (
     ConvertJob,
     ConvertResult,
+    ExportPdfJob,
+    ExportPdfResult,
     OcrJob,
     OcrProgress,
     OcrResult,
@@ -127,6 +132,28 @@ def _handle_convert_job(job: ConvertJob) -> None:
                 job_id=job.job_id,
                 status="error",
                 error=f"Conversion failed: {exc}",
+            ).to_dict()
+        )
+
+
+def _handle_export_pdf_job(job: ExportPdfJob) -> None:
+    try:
+        pdf_bytes = base64.b64decode(job.pdf_base64)
+        geometry = json_from_base64(job.geometry_base64)
+        exported = add_searchable_text_layer(pdf_bytes, geometry)
+        _write(
+            ExportPdfResult(
+                job_id=job.job_id,
+                status="success",
+                pdf_base64=base64.b64encode(exported).decode("ascii"),
+            ).to_dict()
+        )
+    except Exception as exc:  # noqa: BLE001
+        _write(
+            ExportPdfResult(
+                job_id=job.job_id,
+                status="error",
+                error=str(exc),
             ).to_dict()
         )
 
@@ -670,6 +697,8 @@ def main() -> None:
             command = data.get("command", "ocr")
             if command == "convert":
                 convert_job = ConvertJob.from_dict(data)
+            elif command == "export-pdf":
+                export_pdf_job = ExportPdfJob.from_dict(data)
             else:
                 ocr_job = OcrJob.from_dict(data)
         except (json.JSONDecodeError, KeyError, AttributeError) as exc:
@@ -678,6 +707,8 @@ def main() -> None:
 
         if command == "convert":
             _handle_convert_job(convert_job)
+        elif command == "export-pdf":
+            _handle_export_pdf_job(export_pdf_job)
         else:
             _handle_job(ocr_job)
 

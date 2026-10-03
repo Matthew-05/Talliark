@@ -29,6 +29,12 @@ namespace Talliark.Addin.Modules.WebView
             return new RemoveFileRequest { Id = GetString(dict, "id") };
         }
 
+        public static ExportFileRequest ParseExportFile(string json)
+        {
+            var dict = Deserialize(json);
+            return new ExportFileRequest { Id = GetString(dict, "id") };
+        }
+
         public static SelectFileRequest ParseSelectFile(string json)
         {
             var dict = Deserialize(json);
@@ -112,6 +118,11 @@ namespace Talliark.Addin.Modules.WebView
     }
 
     internal sealed class RemoveFileRequest
+    {
+        public string Id { get; set; }
+    }
+
+    internal sealed class ExportFileRequest
     {
         public string Id { get; set; }
     }

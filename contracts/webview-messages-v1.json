@@ -326,6 +326,20 @@
       }
     },
 
+    "ExportFileMessage": {
+      "description": "Sent by the file-manager web app when the user exports one embedded PDF. The host writes the stored PDF to a user-selected path and adds an invisible searchable text layer when sidecar OCR geometry is available.",
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "export-file" },
+        "id":   { "type": "string" }
+      },
+      "examples": [
+        { "type": "export-file", "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" }
+      ]
+    },
+
     "SelectFileMessage": {
       "description": "Sent by the file-manager web app when the user selects a single file in the list. The host forwards it to an open document-viewer as a ShowPdfMessage; it is dropped when no viewer surface is open. Not sent for multi-row (shift-click) selections or when a row is deselected.",
       "type": "object",
@@ -1426,6 +1440,7 @@
     { "$ref": "#/definitions/FolderSelectedMessage" },
     { "$ref": "#/definitions/RenameFileMessage" },
     { "$ref": "#/definitions/RemoveFileMessage" },
+    { "$ref": "#/definitions/ExportFileMessage" },
     { "$ref": "#/definitions/SelectFileMessage" },
     { "$ref": "#/definitions/MoveFileMessage" },
     { "$ref": "#/definitions/RowDragStartedMessage" },

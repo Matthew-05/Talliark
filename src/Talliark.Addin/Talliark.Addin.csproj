@@ -259,6 +259,7 @@
     <Compile Include="Modules\Services\ReconcileResultService.cs" />
     <Compile Include="Modules\Services\ReconcileWorkspaceService.cs" />
     <Compile Include="Modules\Services\PdfImportService.cs" />
+    <Compile Include="Modules\Services\PdfExportService.cs" />
     <Compile Include="Modules\Services\PdfStatus.cs" />
     <Compile Include="Modules\Services\PdfTextLayerDetector.cs" />
     <Compile Include="Modules\Services\RotatePageService.cs" />
@@ -270,7 +271,9 @@
     <Compile Include="Modules\UI\LinkTextPromptDialog.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Modules\UI\CardPanel.cs" />
+    <Compile Include="Modules\UI\CardPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Modules\UI\DialogTheme.cs" />
     <Compile Include="Modules\UI\IProgressReporter.cs" />
     <Compile Include="Modules\UI\NonPdfImportDialog.cs">
@@ -296,10 +299,14 @@
     <Compile Include="Modules\WebView\DocumentLinkerMessageSerializer.cs" />
     <Compile Include="Modules\WebView\DocumentViewerController.cs" />
     <Compile Include="Modules\WebView\ExcelGridFocusRestoreService.cs" />
-    <Compile Include="Modules\WebView\FileManagerHost.cs" />
+    <Compile Include="Modules\WebView\FileManagerHost.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Modules\WebView\FileManagerMessageParser.cs" />
     <Compile Include="Modules\WebView\FileManagerMessageSerializer.cs" />
-    <Compile Include="Modules\WebView\FileManagerSidebar.cs" />
+    <Compile Include="Modules\WebView\FileManagerSidebar.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Modules\WebView\ReconcileHost.cs">
       <SubType>Form</SubType>
     </Compile>

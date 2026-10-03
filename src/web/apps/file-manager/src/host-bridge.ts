@@ -147,6 +147,10 @@ export function sendRemoveFile(id: string): void {
   send({ type: "remove-file", id });
 }
 
+export function sendExportFile(id: string): void {
+  send({ type: "export-file", id });
+}
+
 /**
  * Tells the host which single file the user just selected, so an open document
  * viewer can swap to it. Sent on selection only — never on deselection, and not

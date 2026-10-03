@@ -611,3 +611,9 @@
 .file-table__context-item:active {
   background: rgba(var(--color-accent-rgb, 80, 130, 220), 0.1);
 }
+
+.file-table__context-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--color-border);
+}

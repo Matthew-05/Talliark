@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:talliark:schemas:python-worker:1",
   "title": "Talliark Python Worker Protocol v1",
-  "description": "Defines the newline-delimited JSON messages exchanged between the C# host and the Python worker over stdin/stdout. The worker handles two commands: 'ocr' (extract sidecar text geometry from a PDF without adding a PDF text layer) and 'convert' (turn a non-PDF source document into a PDF, or into HTML for the host to render).",
+  "description": "Defines the newline-delimited JSON messages exchanged between the C# host and the Python worker over stdin/stdout. The worker handles three commands: 'ocr' (extract sidecar text geometry from a PDF without adding a PDF text layer), 'convert' (turn a non-PDF source document into a PDF, or into HTML for the host to render), and 'export-pdf' (materialize stored sidecar geometry as an invisible searchable text layer in an exported PDF).",
 
   "definitions": {
 
@@ -54,6 +54,27 @@
       },
       "examples": [
         { "job_id": "b2c3", "command": "convert", "source_base64": "iVBORw0KGgo=", "source_extension": ".png", "source_name": "scan.png" }
+      ]
+    },
+
+    "ExportPdfJob": {
+      "description": "Sent by the C# host when an embedded document with sidecar geometry is exported. This command changes only the returned export bytes; it never changes the PDF or geometry stored in the workbook.",
+      "type": "object",
+      "required": ["job_id", "command", "pdf_base64", "geometry_base64"],
+      "additionalProperties": false,
+      "properties": {
+        "job_id":         { "type": "string", "description": "Opaque identifier echoed in the response." },
+        "command":        { "const": "export-pdf", "description": "Operation to perform." },
+        "pdf_base64":     { "type": "string", "description": "Base-64 encoded stored PDF bytes." },
+        "geometry_base64": { "type": "string", "description": "Gzip-compressed text-geometry-v1 JSON, base64-encoded." }
+      },
+      "examples": [
+        {
+          "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "command": "export-pdf",
+          "pdf_base64": "JVBERi0xLjU=",
+          "geometry_base64": "H4sIAAAAAAAAA+3BMQEAAADCoPVP7WsIoAAAAAAAAPwYAwAABtXgAA=="
+        }
       ]
     },
 
@@ -234,6 +255,22 @@
       }
     },
 
+    "ExportPdfSuccessMessage": {
+      "description": "Emitted when searchable-PDF export completes successfully.",
+      "type": "object",
+      "required": ["job_id", "status", "command", "pdf_base64"],
+      "additionalProperties": false,
+      "properties": {
+        "job_id":     { "type": "string" },
+        "status":     { "const": "success" },
+        "command":    { "const": "export-pdf" },
+        "pdf_base64": { "type": "string", "description": "Base-64 encoded PDF bytes with invisible sidecar text added wherever an equivalent visible source line was not already present." }
+      },
+      "examples": [
+        { "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "status": "success", "command": "export-pdf", "pdf_base64": "JVBERi0xLjU=" }
+      ]
+    },
+
     "OcrSuccessMessage": {
       "description": "Emitted by the worker to stdout when OCR completes successfully. Exactly one per job.",
       "type": "object",
@@ -312,7 +349,7 @@
     },
 
     "OcrErrorMessage": {
-      "description": "Emitted by the worker to stdout when OCR fails. Exactly one per job.",
+      "description": "Emitted by the worker to stdout when an operation fails. Exactly one per job.",
       "type": "object",
       "required": ["job_id", "status", "error"],
       "additionalProperties": false,
@@ -332,9 +369,11 @@
   "oneOf": [
     { "$ref": "#/definitions/OcrJob" },
     { "$ref": "#/definitions/ConvertJob" },
+    { "$ref": "#/definitions/ExportPdfJob" },
     { "$ref": "#/definitions/OcrProgressMessage" },
     { "$ref": "#/definitions/OcrSuccessMessage" },
     { "$ref": "#/definitions/ConvertSuccessMessage" },
+    { "$ref": "#/definitions/ExportPdfSuccessMessage" },
     { "$ref": "#/definitions/OcrErrorMessage" }
   ]
 }

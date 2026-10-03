@@ -45,6 +45,7 @@ namespace Talliark.Addin.Modules.WebView
         private WebViewStartupSurface _startup;
         private readonly FileManagerSidebar _sidebar = new FileManagerSidebar();
         private readonly ManageFilesService _service = new ManageFilesService();
+        private readonly PdfExportService _exportService = new PdfExportService();
         private OcrService _ocrService;
 
         /// <summary>PDF IDs currently being processed by OCR. Populated before the await, cleared in finally.</summary>
@@ -615,6 +616,10 @@ namespace Talliark.Addin.Modules.WebView
                         HandleRemoveFile(FileManagerMessageParser.ParseRemoveFile(raw));
                         break;
 
+                    case "export-file":
+                        _ = HandleExportFileAsync(FileManagerMessageParser.ParseExportFile(raw));
+                        break;
+
                     case "select-file":
                         HandleSelectFile(FileManagerMessageParser.ParseSelectFile(raw));
                         break;
@@ -787,6 +792,94 @@ namespace Talliark.Addin.Modules.WebView
             _service.RemovePdf(wb, req.Id);
             SendFilesToWebView();
             Globals.ThisAddIn.NotifyViewerPdfRemoved(_workbook, req.Id);
+        }
+
+        /// <summary>
+        /// Exports one read-only snapshot. The save path is chosen before background work
+        /// begins; workbook Custom XML is read on the UI thread, and only detached strings
+        /// are passed to the worker thread.
+        /// </summary>
+        private async Task HandleExportFileAsync(ExportFileRequest req)
+        {
+            if (IsOcrLocked || string.IsNullOrWhiteSpace(req?.Id)) return;
+
+            PdfExportSource source;
+            try
+            {
+                source = _exportService.LoadSource(_workbook, req.Id);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Could not load the PDF for export.\n\n" + ex.Message,
+                    "Talliark Export", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string outputPath;
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Title = "Export PDF";
+                dialog.Filter = "PDF files (*.pdf)|*.pdf";
+                dialog.DefaultExt = "pdf";
+                dialog.AddExtension = true;
+                dialog.OverwritePrompt = true;
+                dialog.FileName = source.SuggestedFileName;
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+                outputPath = dialog.FileName;
+            }
+
+            PdfExportResult result;
+            UseWaitCursor = true;
+            try
+            {
+                result = await _exportService.ExportAsync(source, outputPath);
+            }
+            catch (Exception ex)
+            {
+                if (!_disposed && !IsDisposed)
+                {
+                    MessageBox.Show(this, "Could not export the PDF.\n\n" + ex.Message,
+                        "Talliark Export", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+            finally
+            {
+                if (!_disposed && !IsDisposed)
+                    UseWaitCursor = false;
+            }
+
+            if (!_disposed && !IsDisposed)
+            {
+                string ocrResult = result.OcrTextLayerAdded
+                    ? "Added from stored OCR geometry"
+                    : "Not added (no stored OCR geometry)";
+                MessageBox.Show(this,
+                    "PDF exported successfully.\n\n" +
+                    "File: " + result.OutputPath + "\n" +
+                    "Size: " + FormatFileSize(result.OutputBytes) + "\n" +
+                    "OCR text layer: " + ocrResult,
+                    "Talliark Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private static string FormatFileSize(long bytes)
+        {
+            if (bytes < 1024)
+                return bytes + " bytes";
+
+            double size = bytes;
+            string[] units = { "KB", "MB", "GB", "TB" };
+            int unitIndex = -1;
+            do
+            {
+                size /= 1024;
+                unitIndex++;
+            }
+            while (size >= 1024 && unitIndex < units.Length - 1);
+
+            return size.ToString(size >= 10 ? "0.0" : "0.00") + " " + units[unitIndex];
         }
 
         /// <summary>
