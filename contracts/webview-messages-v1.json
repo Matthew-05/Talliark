@@ -352,6 +352,33 @@
       }
     },
 
+    "RowDragStartedMessage": {
+      "description": "Sent by the file-manager web app when a press on a file row has travelled far enough to count as a drag, carrying the current selection. This is not an OLE drag and never becomes one: the host answers it by taking the mouse, so from here the release belongs to the native sidebar and the web UI will not see it. The host replies with a RowDragEndedMessage whatever the outcome.",
+      "type": "object",
+      "required": ["type", "ids"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "row-drag-started" },
+        "ids":  { "type": "array", "items": { "type": "string" }, "description": "GUIDs of the files being dragged." }
+      },
+      "examples": [
+        { "type": "row-drag-started", "ids": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"] }
+      ]
+    },
+
+    "RowDragEndedMessage": {
+      "description": "Sent by the C# host once a row drag is over — files moved, refused, or abandoned. The web UI clears its own drag highlight on this, which it cannot do itself: the host holds the mouse from the start of the drag until the release, so no web event ever reports the end.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "row-drag-ended" }
+      },
+      "examples": [
+        { "type": "row-drag-ended" }
+      ]
+    },
+
     "FolderSelectedMessage": {
       "description": "Sent by the C# host when the user picks a folder in the native sidebar. The web UI owns no folder list of its own, so this is what filters the file table. Omit folderId when 'All Files' is selected.",
       "type": "object",
@@ -1401,6 +1428,8 @@
     { "$ref": "#/definitions/RemoveFileMessage" },
     { "$ref": "#/definitions/SelectFileMessage" },
     { "$ref": "#/definitions/MoveFileMessage" },
+    { "$ref": "#/definitions/RowDragStartedMessage" },
+    { "$ref": "#/definitions/RowDragEndedMessage" },
     { "$ref": "#/definitions/LinkRectangleCreatedMessage" },
     { "$ref": "#/definitions/LinkRectangleUpdatedMessage" },
     { "$ref": "#/definitions/CacheBuildStartedMessage" },

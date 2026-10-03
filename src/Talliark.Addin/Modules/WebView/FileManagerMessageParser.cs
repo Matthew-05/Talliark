@@ -45,6 +45,22 @@ namespace Talliark.Addin.Modules.WebView
             };
         }
 
+        public static RowDragStartedRequest ParseRowDragStarted(string json)
+        {
+            var dict = Deserialize(json);
+            var idsRaw = dict["ids"] as System.Collections.ArrayList;
+            if (idsRaw == null)
+                throw new FormatException("row-drag-started message missing 'ids' array.");
+
+            var ids = new List<string>();
+            foreach (var item in idsRaw)
+            {
+                if (item is string s && !string.IsNullOrWhiteSpace(s))
+                    ids.Add(s);
+            }
+            return new RowDragStartedRequest { FileIds = ids };
+        }
+
         public static OcrPdfsRequest ParseOcrPdfs(string json)
         {
             var dict = Deserialize(json);
@@ -109,6 +125,11 @@ namespace Talliark.Addin.Modules.WebView
     {
         public string Id       { get; set; }
         public string FolderId { get; set; }
+    }
+
+    internal sealed class RowDragStartedRequest
+    {
+        public List<string> FileIds { get; set; }
     }
 
     internal sealed class OcrPdfsRequest

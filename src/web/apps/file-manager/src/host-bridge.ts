@@ -51,7 +51,21 @@ interface ResetUiMessage {
   type: "reset-ui";
 }
 
-type HostMessage = FilesLoadedMessage | FolderSelectedMessage | OcrStatusMessage | ResetUiMessage;
+/**
+ * The host has finished the row drag the file table asked for — moved, refused or
+ * abandoned. The table cannot detect this itself: from the moment the drag starts the host
+ * holds the mouse, so no further web event reports the release.
+ */
+interface RowDragEndedMessage {
+  type: "row-drag-ended";
+}
+
+type HostMessage =
+  | FilesLoadedMessage
+  | FolderSelectedMessage
+  | OcrStatusMessage
+  | ResetUiMessage
+  | RowDragEndedMessage;
 
 // ── Outbound (web → host) ─────────────────────────────────────────────────────
 
@@ -81,7 +95,8 @@ export function registerUiResetHandler(handler: () => void): void {
 export function initHostBridge(
   onFilesLoaded: (folders: FolderEntry[], files: FileEntry[]) => void,
   onFolderSelected?: (folderId: string | null) => void,
-  onOcrStatus?: (pdfId: string, status: string, progress: OcrProgress) => void
+  onOcrStatus?: (pdfId: string, status: string, progress: OcrProgress) => void,
+  onRowDragEnded?: () => void
 ): void {
   const webview = getWebView();
   if (!webview) return;
@@ -115,6 +130,8 @@ export function initHostBridge(
       });
     } else if (msg.type === "reset-ui") {
       _onResetUi?.();
+    } else if (msg.type === "row-drag-ended") {
+      onRowDragEnded?.();
     }
   });
 
@@ -143,6 +160,18 @@ export function sendMoveFile(id: string, folderId: string | null): void {
   const msg: Record<string, unknown> = { type: "move-file", id };
   if (folderId) msg["folderId"] = folderId;
   send(msg);
+}
+
+/**
+ * Reports a drag of file rows toward the native folder sidebar.
+ *
+ * This is a notice, not a request for a result: the host takes the mouse, decides the
+ * destination, performs the move itself and answers with `row-drag-ended`. A drag started
+ * while the host refuses it — OCR running, nothing selected — ends in the same message, so
+ * the table never has to guess whether its drag is still live.
+ */
+export function sendRowDragStarted(ids: string[]): void {
+  send({ type: "row-drag-started", ids });
 }
 
 export function sendOcrPdfs(pdfIds: string[]): void {

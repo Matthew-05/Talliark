@@ -28,6 +28,12 @@ namespace Talliark.Addin.Modules.WebView
     /// therefore disables WebView2 external drops and takes <see cref="DataFormats.FileDrop"/>
     /// paths in three ways: a folder row, the file table (into the selected folder), and the
     /// navigation-cancellation handler, which catches any file:/// URL that slips through.
+    /// <para>
+    /// The same boundary blocks the other direction, and the workaround is the mirror of the
+    /// one above: a document dragged out of the web table is not an OLE drag and cannot become
+    /// one, so the web sends <c>row-drag-started</c>, the sidebar takes the mouse, and the
+    /// release is handled here. See <see cref="HandleRowDragStarted"/>.
+    /// </para>
     /// </remarks>
     public sealed class FileManagerHost : Form
     {
@@ -104,6 +110,8 @@ namespace Talliark.Addin.Modules.WebView
             _sidebar.FolderRenameRequested += OnSidebarFolderRenameRequested;
             _sidebar.FolderRemoveRequested += OnSidebarFolderRemoveRequested;
             _sidebar.PathsDropped += OnSidebarPathsDropped;
+            _sidebar.FilesDropped += OnSidebarFilesDropped;
+            _sidebar.RowDragEnded += OnSidebarRowDragEnded;
             _sidebar.BrowseRequested += ShowPdfFilePicker;
             Controls.Add(_sidebar);
 
@@ -615,6 +623,10 @@ namespace Talliark.Addin.Modules.WebView
                         HandleMoveFile(FileManagerMessageParser.ParseMoveFile(raw));
                         break;
 
+                    case "row-drag-started":
+                        HandleRowDragStarted(FileManagerMessageParser.ParseRowDragStarted(raw));
+                        break;
+
                     case "ocr-pdfs":
                         _ = HandleOcrPdfsAsync(FileManagerMessageParser.ParseOcrPdfs(raw));
                         break;
@@ -797,6 +809,55 @@ namespace Talliark.Addin.Modules.WebView
             TalliarkContent content = _service.MoveFile(wb, req.Id, req.FolderId);
             SendFilesToWebView(content);
             Globals.ThisAddIn.NotifyViewerFoldersChanged(_workbook);
+        }
+
+        /// <summary>
+        /// Arms a row drag on the native folder list. The web UI cannot finish this gesture by
+        /// itself: an HTML5 drag never leaves Chromium, and a mouse drag out of the file table
+        /// releases into a WinForms panel it cannot see. So the web reports the drag instead,
+        /// the sidebar takes the mouse, and this host hears the release.
+        /// </summary>
+        private void HandleRowDragStarted(RowDragStartedRequest req)
+        {
+            if (_disposed) return;
+
+            var ids = new List<string>(req?.FileIds ?? new List<string>());
+
+            // A file in an active OCR run is not ours to move — the same refusal
+            // HandleMoveFile makes. The rest of the selection still moves.
+            ids.RemoveAll(id => _activeOcrIds.Contains(id));
+
+            // A refusal means the sidebar never armed, so nothing it raises will ever report
+            // the end of this drag. It has to be reported from here or the web table is left
+            // showing a drag that finished before it began.
+            if (!_sidebar.BeginRowDrag(ids)) SendRowDragEnded();
+        }
+
+        private void OnSidebarFilesDropped(List<string> fileIds, string folderId)
+        {
+            if (_disposed || fileIds == null || fileIds.Count == 0) return;
+
+            Excel.Workbook wb = _workbook;
+            if (wb == null) return;
+            if (!RequireWritable(wb)) return;
+
+            // One load and one save for the whole selection, then one push, so the file table
+            // and the folder list both land on the same list of counts in the same frame.
+            TalliarkContent content = _service.MoveFiles(wb, fileIds, folderId);
+            SendFilesToWebView(content);
+            Globals.ThisAddIn.NotifyViewerFoldersChanged(wb);
+        }
+
+        /// <summary>The row drag is over; the web table is waiting to be told.</summary>
+        private void OnSidebarRowDragEnded()
+        {
+            SendRowDragEnded();
+        }
+
+        private void SendRowDragEnded()
+        {
+            if (_disposed || !_webViewReady) return;
+            PostToWebView(FileManagerMessageSerializer.BuildRowDragEnded());
         }
 
         /// <summary>

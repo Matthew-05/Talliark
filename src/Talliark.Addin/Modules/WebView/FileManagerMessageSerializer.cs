@@ -135,6 +135,16 @@ namespace Talliark.Addin.Modules.WebView
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Builds the host→web <c>row-drag-ended</c> message. It carries no outcome because
+        /// the web UI has no use for one: it only needs to know its drag highlight is stale
+        /// now, and the file list that says where the files actually went arrives separately.
+        /// </summary>
+        public static string BuildRowDragEnded()
+        {
+            return "{\"type\":\"row-drag-ended\"}";
+        }
+
         private static void AppendString(StringBuilder sb, string value)
         {
             sb.Append('"');

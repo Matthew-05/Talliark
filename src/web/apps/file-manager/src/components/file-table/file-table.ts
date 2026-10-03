@@ -1,5 +1,5 @@
 import type { FileEntry, FolderEntry } from "../../types/index.js";
-import { sendRenameFile, sendRemoveFile, sendSelectFile } from "../../host-bridge.js";
+import { sendRenameFile, sendRemoveFile, sendSelectFile, sendRowDragStarted } from "../../host-bridge.js";
 import type { OcrProgress } from "../../host-bridge.js";
 // Imported as its own entry point rather than through the package barrel:
 // the barrel re-exports the pdf.js geometry module, whose top-level worker
@@ -13,6 +13,13 @@ export interface FileTableOptions {
 
 /** Tooltip shown on every control disabled by the OCR lock. */
 const LOCKED_HINT = "Unavailable while OCR is running";
+
+/**
+ * Pointer travel, in CSS pixels, that turns a press on a row into a drag. Small enough that
+ * a sloppy click still selects, large enough that the pointer wobble of a deliberate press
+ * does not send a file to the folder list by accident.
+ */
+const DRAG_THRESHOLD = 5;
 
 type SortKey = "name" | "linkCount" | "status" | "fileSizeBytes" | "dateAdded" | "folder";
 type SortDirection = "ascending" | "descending";
@@ -72,6 +79,20 @@ export class FileTable {
    */
   private _lastClickedSelected = true;
 
+  /**
+   * A press that has not yet become a drag: the row it started on and where the pointer was
+   * at the time. Null unless the left button is down on a row.
+   */
+  private _pressOrigin: { id: string; x: number; y: number } | null = null;
+
+  /**
+   * True from the moment a drag is reported to the host until the host answers
+   * `row-drag-ended`. The host holds the mouse for the whole gesture, so the table is told
+   * the drag is over from the host and from nowhere else — including the case where the host
+   * refuses the drag outright and the release lands back here.
+   */
+  private _dragActive = false;
+
   constructor(container: HTMLElement, options: FileTableOptions) {
     this._onSelectionChange = options.onSelectionChange;
 
@@ -107,6 +128,14 @@ export class FileTable {
     document.addEventListener("click", () => this._hideContextMenu());
 
     document.addEventListener("keydown", (e) => this._onDocumentKeyDown(e));
+
+    // A drag is recognised from raw mouse travel rather than from HTML5 drag events, which
+    // Chromium settles internally and never hands to the host. These two also cover a press
+    // that ends outside the table, on the toolbar or the header, which would otherwise be left
+    // waiting for a threshold that never arrives and would start a phantom drag on the next
+    // pointer move anywhere in the window.
+    document.addEventListener("mousemove", (e) => this._onDocumentMouseMove(e));
+    document.addEventListener("mouseup", () => this._onDocumentMouseUp());
 
     container.appendChild(this._root);
   }
@@ -372,6 +401,10 @@ export class FileTable {
       this._lastClickedSelected = true;
       this._onSelectionChange([]);
       this._hideContextMenu();
+      // The host ends a live drag when OCR takes the sidebar, so the flag would otherwise
+      // still be set here, keeping the next click on a row from being a click.
+      this._pressOrigin = null;
+      this._dragActive = false;
     }
     this._render();
   }
@@ -452,6 +485,61 @@ export class FileTable {
 
     e.preventDefault();
     this._onSelectAll(true);
+  }
+
+  /**
+   * Turns a press that has travelled far enough into a drag of the current selection.
+   *
+   * The whole selection travels, not only the pressed row, so that checkboxes and
+   * shift-click ranges mean what they look like they mean. A press on an unselected row
+   * selects it first, which is what dragging one row out of a file list does everywhere
+   * else. Past this point the table has no further part in the gesture: the host takes the
+   * mouse and resolves the drop on the native folder list.
+   */
+  private _onDocumentMouseMove(e: MouseEvent): void {
+    const origin = this._pressOrigin;
+    if (origin === null) return;
+
+    const travelled = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
+    if (travelled < DRAG_THRESHOLD) return;
+
+    this._pressOrigin = null;
+
+    if (!this._selectedIds.has(origin.id)) {
+      this._selectedIds.clear();
+      this._selectedIds.add(origin.id);
+      this._lastClickedId = origin.id;
+      this._lastClickedSelected = true;
+      this._onSelectionChange(this.getSelectedIds());
+      this._render();
+    }
+
+    this._dragActive = true;
+    for (const id of this._selectedIds) this._setRowDragging(id, true);
+    sendRowDragStarted(this.getSelectedIds());
+  }
+
+  private _onDocumentMouseUp(): void {
+    this._pressOrigin = null;
+  }
+
+  private _setRowDragging(id: string, dragging: boolean): void {
+    const row = Array.from(this._tbody.rows).find((r) => r.dataset["id"] === id);
+    row?.classList.toggle("is-dragging", dragging);
+  }
+
+  /**
+   * Clears the drag highlight once the host reports the drag is over. Everything about the
+   * outcome — which folder, whether the move happened — arrives separately as a file list,
+   * so this only has to stop the rows looking held.
+   */
+  endRowDrag(): void {
+    this._pressOrigin = null;
+    this._dragActive = false;
+
+    // Swept by class rather than by id: the host may have pushed a new file list, and the
+    // rows that were marked are whatever was on screen when the drag started.
+    for (const row of Array.from(this._tbody.rows)) row.classList.remove("is-dragging");
   }
 
   private _onSelectAll(checked: boolean): void {
@@ -551,6 +639,16 @@ export class FileTable {
     tr.dataset["id"] = file.id;
     if (this._selectedIds.has(file.id)) tr.classList.add("is-selected");
 
+    // Press on a row: the first move past the threshold hands the gesture to the host, which
+    // owns the mouse from there and resolves the drop on the native folder list. Interactive
+    // controls keep their own presses, and a locked table keeps all of them.
+    tr.addEventListener("mousedown", (e) => {
+      if (this._locked || e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("input, button")) return;
+      this._pressOrigin = { id: file.id, x: e.clientX, y: e.clientY };
+    });
+
     // Row-level right-click → context menu (suppressed entirely while locked)
     tr.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -565,6 +663,9 @@ export class FileTable {
     // behavior.
     tr.addEventListener("click", (e) => {
       if (this._locked) return;
+      // A drag the host declined leaves the release here, and it must not read as a click
+      // that reselects the row the user was trying to move somewhere else.
+      if (this._dragActive) return;
       const target = e.target as HTMLElement;
       if (target.closest("input, button")) return;
       e.preventDefault();

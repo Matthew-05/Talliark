@@ -45,6 +45,16 @@ namespace Talliark.Addin.Modules.WebView
     /// ambient one, which is why the two report different <see cref="FileDropScope"/>.
     /// </para>
     /// <para>
+    /// Two drags reach those surfaces, and they arrive by unrelated mechanisms. An Explorer
+    /// drop is real OLE, so it lands in the DragEnter/DragDrop handlers. A file dragged out
+    /// of the web table never becomes OLE at all — an HTML5 drag is settled inside Chromium
+    /// and a WebView2 control will not hand one to the host — so the web UI reports the drag
+    /// instead, and <see cref="BeginRowDrag"/> takes the mouse. Both then share the same
+    /// hit test, highlight and rows, and differ only in what the release means: a row drag
+    /// moves files, and it is not offered the drop strip, whose "wherever you are looking"
+    /// meaning belongs to importing.
+    /// </para>
+    /// <para>
     /// The panel raises intent and nothing else: it never touches the workbook. The host
     /// owns every service call and pushes the result back through <see cref="Update"/>, so
     /// a refused write leaves the row list untouched rather than optimistic.
@@ -146,6 +156,24 @@ namespace Talliark.Addin.Modules.WebView
         public event Action<string[], string, FileDropScope> PathsDropped;
 
         /// <summary>
+        /// Raised with (fileIds, folderId) when a web-originated row drag is released over a
+        /// folder row. <c>folderId</c> is <c>null</c> for the All Files row: it is a filter
+        /// and has no destination, but a drag released there means "uncategorised", which is
+        /// the same thing <c>move-file</c> says by omitting its folderId.
+        /// </summary>
+        public event Action<List<string>, string> FilesDropped;
+
+        /// <summary>
+        /// Raised once when a live row drag is over, whatever the release decided — moved,
+        /// refused, or released onto nothing. The web UI cannot work this out for itself: it
+        /// holds no capture and hears no release, so without this its drag highlight outlives
+        /// the gesture.
+        /// </summary>
+        public event Action RowDragEnded;
+
+
+
+        /// <summary>
         /// Raised when the user asks to browse for documents, by clicking the drop strip.
         /// </summary>
         public event Action BrowseRequested;
@@ -173,6 +201,13 @@ namespace Talliark.Addin.Modules.WebView
         private int _pressRow = -1;
         private HitZone _pressZone = HitZone.None;
         private bool _pressDropZone;
+
+        /// <summary>
+        /// File GUIDs held by a web-originated row drag, or <c>null</c> when no such drag is
+        /// live. Armed from a <c>row-drag-started</c> message and disarmed by the release,
+        /// which reaches this control because the host took the mouse when it armed.
+        /// </summary>
+        private List<string> _rowDragIds;
 
         private EditMode _editMode = EditMode.None;
 
@@ -291,6 +326,10 @@ namespace Talliark.Addin.Modules.WebView
 
             if (locked) CancelEdit();
 
+            // OCR taking the list mid-drag ends the drag: the files it is carrying are the
+            // ones being locked, and the move would land on a list that refuses drops.
+            if (locked) EndRowDrag();
+
             // Locking removes the row actions from hit testing, so whatever is hovered
             // now resolves to a different zone or none.
             _hoverRow = -1;
@@ -310,6 +349,7 @@ namespace Talliark.Addin.Modules.WebView
         public void Reset()
         {
             CancelEdit();
+            EndRowDrag();
             _dropRegion = DropRegion.None;
             _dropRow = -1;
             _hoverRegion = DropRegion.None;
@@ -904,6 +944,15 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             base.OnMouseMove(e);
             if (_disposed) return;
 
+            // A row drag owns the pointer until its release, and says so with the drop
+            // highlight rather than with hover: the pointer may be over the web table or off
+            // the window by now, and neither of those can be a target.
+            if (_rowDragIds != null)
+            {
+                RefreshRowDrag(e.Location);
+                return;
+            }
+
             DropRegion region = HitTestRegion(e.Location);
             RefreshHover(e.Location);
 
@@ -917,6 +966,14 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         {
             base.OnMouseLeave(e);
             if (_disposed) return;
+
+            if (_rowDragIds != null)
+            {
+                // Leaving the column does not end a row drag. The mouse is held, so the
+                // pointer is likely over the file table and the release is still coming; the
+                // highlight stays where it was because only the release may clear it.
+                return;
+            }
 
             // A press that never sees a MouseUp (drag out of the window, capture stolen by
             // a modal) must not leave the focus guard latched forever.
@@ -936,6 +993,10 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         {
             base.OnMouseDown(e);
             if (_disposed || e.Button != MouseButtons.Left) return;
+
+            // A press here during a row drag is not a second gesture: the press that started
+            // the drag is in the web view, and this control is only holding the mouse for it.
+            if (_rowDragIds != null) return;
 
             int index = HitTestRow(e.Location);
             _pressDropZone = HitTestRegion(e.Location) == DropRegion.Panel;
@@ -969,7 +1030,18 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            if (_disposed || e.Button != MouseButtons.Left)
+            if (_disposed) return;
+
+            if (_rowDragIds != null)
+            {
+                // Any other button's release is ignored rather than treated as a click: the
+                // left button is the one that started this drag, and a release here is the
+                // only thing that ends it.
+                if (e.Button == MouseButtons.Left) CompleteRowDrag(e.Location);
+                return;
+            }
+
+            if (e.Button != MouseButtons.Left)
             {
                 ClearPress();
                 return;
@@ -1281,18 +1353,7 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
 
             DropRegion region = ResolveDropRegion(e);
             int row = region == DropRegion.Row ? HitTestRow(PointToClient(new Point(e.X, e.Y))) : -1;
-
-            if (_dropRegion != region || _dropRow != row)
-            {
-                DropRegion previousRegion = _dropRegion;
-                int previousRow = _dropRow;
-                _dropRegion = region;
-                _dropRow = row;
-
-                InvalidateRow(previousRow);
-                InvalidateRow(row);
-                if (previousRegion != region) InvalidateDropZone();
-            }
+            SetDropHighlight(region, row);
 
             e.Effect = region == DropRegion.None ? DragDropEffects.None : DragDropEffects.Copy;
         }
@@ -1370,6 +1431,130 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             // DragEventArgs carries screen coordinates, unlike every other WinForms
             // mouse event.
             return HitTestRegion(PointToClient(new Point(e.X, e.Y)));
+        }
+
+        /// <summary>
+        /// Lights the drop highlight, repainting only what moved. Both drag origins resolve
+        /// to a region and a row and then report them here, so an Explorer drop and a row
+        /// drag cannot drift apart on what a target looks like.
+        /// </summary>
+        private void SetDropHighlight(DropRegion region, int row)
+        {
+            if (_dropRegion == region && _dropRow == row) return;
+
+            DropRegion previousRegion = _dropRegion;
+            int previousRow = _dropRow;
+            _dropRegion = region;
+            _dropRow = row;
+
+            InvalidateRow(previousRow);
+            InvalidateRow(row);
+            if (previousRegion != region) InvalidateDropZone();
+        }
+
+        // ── Row drag: files dragged out of the web table            ────
+
+        /// <summary>
+        /// Arms a row drag and takes the mouse, so the release is ours even though the press
+        /// was in the web view beside us. Returns false when the drag cannot be honoured —
+        /// nothing to carry, or OCR holding the list — and the caller must then tell the web
+        /// view no drag began, because it cannot work that out from this side.
+        /// </summary>
+        public bool BeginRowDrag(IList<string> fileIds)
+        {
+            if (_disposed || _locked || fileIds == null || fileIds.Count == 0) return false;
+
+            _rowDragIds = new List<string>(fileIds);
+
+            // Both of these were reachable from the web view's side of the press: an edit the
+            // user opened there, and a strip press that gave us the capture we are about to
+            // reuse for the drag.
+            CancelEdit();
+            ClearPress();
+
+            // The capture is the whole mechanism. A mouse-down inside WebView2 puts Chromium
+            // in a capture of its own, and without ours the release would go back to the file
+            // table and this list would never learn where the files were dropped. SetCapture
+            // is last-write-wins on this thread, so this takes it; the read-back matters
+            // because a drag whose release we would never see is worse than no drag, leaving
+            // a highlight lit over a list that cannot be acted on.
+            Capture = true;
+            if (!Capture)
+            {
+                // Hand the gesture back rather than fake it. The caller reports the refusal,
+                // and no release will arrive to clear a highlight that is never lit.
+                ClearRowDrag();
+                return false;
+            }
+
+            Cursor = Cursors.No;
+            return true;
+        }
+
+        /// <summary>
+        /// Disarms a live row drag, clears its highlight and reports that the drag is over.
+        /// A no-op when none is live, so the host can call it unconditionally.
+        /// </summary>
+        public void EndRowDrag()
+        {
+            if (_rowDragIds == null) return;
+            ClearRowDrag();
+            RowDragEnded?.Invoke();
+        }
+
+        /// <summary>Unarms without reporting, for the paths that never had a drag to report.</summary>
+        private void ClearRowDrag()
+        {
+            _rowDragIds = null;
+
+            int previous = _dropRow;
+            _dropRegion = DropRegion.None;
+            _dropRow = -1;
+            InvalidateRow(previous);
+            InvalidateDropZone();
+
+            if (Capture) Capture = false;
+            Cursor = Cursors.Default;
+        }
+
+        /// <summary>
+        /// Tracks the pointer during a row drag. A folder row is the only target: the strip
+        /// below the list is an import surface and its "wherever you are looking" reading has
+        /// no bearing on a file that is already in the workbook.
+        /// </summary>
+        private void RefreshRowDrag(Point location)
+        {
+            DropRegion region = HitTestRegion(location);
+            int row = region == DropRegion.Row ? HitTestRow(location) : -1;
+            if (row < 0 || RowAt(row) == null) region = DropRegion.None;
+
+            SetDropHighlight(region, region == DropRegion.Row ? row : -1);
+
+            // SizeAll over a target, No over everything else. The four arrows say "these files
+            // land here"; the refused cursor says the same thing over the drop strip, the
+            // gaps and the whole file table, which is most of the window once the pointer
+            // crosses the border. Neither is a hand — a hand is what the drop strip shows at
+            // rest, and reusing it here would make importing and moving look like one act.
+            Cursor = region == DropRegion.None ? Cursors.No : Cursors.SizeAll;
+        }
+
+        /// <summary>
+        /// Settles a row drag on the release. That release can land anywhere, because the
+        /// mouse is held: over the file table, over a different window, or nowhere at all.
+        /// Only a folder row answers it, and anything else is a cancelled drag rather than a
+        /// move to no destination in particular.
+        /// </summary>
+        private void CompleteRowDrag(Point location)
+        {
+            int row = HitTestRow(location);
+            bool onRow = HitTestRegion(location) == DropRegion.Row;
+            FolderRow target = onRow ? RowAt(row) : null;
+
+            List<string> ids = _rowDragIds;
+            EndRowDrag();
+
+            if (target == null) return;
+            FilesDropped?.Invoke(ids, target.Id);
         }
 
         // ── Scrolling                                             ────

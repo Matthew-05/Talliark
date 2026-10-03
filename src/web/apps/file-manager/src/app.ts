@@ -103,7 +103,9 @@ export function mountApp(root: HTMLElement): void {
     applyOcrLock(anyOcrRunning);
   }
 
-  initHostBridge(onFilesLoaded, onFolderSelected, onOcrStatus);
+  initHostBridge(onFilesLoaded, onFolderSelected, onOcrStatus, () => {
+    fileTable.endRowDrag();
+  });
 
   wireFileManagerUiReset({
     fileTable,

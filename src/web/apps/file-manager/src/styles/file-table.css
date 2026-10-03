@@ -216,6 +216,28 @@
   background: rgba(var(--color-accent-rgb, 80, 130, 220), 0.13);
 }
 
+.file-table tbody tr:not(.file-table__empty-row) {
+  /* A drag begins as an ordinary press, and without this the browser starts selecting the
+     row text under the pointer for the few milliseconds before the host takes the mouse.
+     Rows are picked as units here, so selecting text inside one is not a feature to keep. */
+  user-select: none;
+}
+
+/*
+ * The only cursor this table changes, and only while a drag is live: `move`, the four-arrow
+ * relocation cursor, so it matches the SizeAll the sidebar shows for the same drag. Deliberately
+ * not `grab`/`grabbing` — those are hands on Windows, and a hand here reads as a link or a
+ * draggable somewhere else rather than as "these rows are being moved".
+ *
+ * A hovered row keeps the arrow. The drag affordance is the sidebar lighting a folder row,
+ * which is where the drop actually happens.
+ */
+.file-table tbody tr.is-dragging,
+.file-table tbody tr.is-dragging:hover {
+  cursor: move;
+  opacity: 0.45;
+}
+
 .file-table tbody td {
   padding: 8px 10px;
   vertical-align: middle;

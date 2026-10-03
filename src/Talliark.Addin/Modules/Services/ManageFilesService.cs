@@ -94,15 +94,72 @@ namespace Talliark.Addin.Modules.Services
 
             PdfMetadata existing = pdfs[index];
             string normalised = string.IsNullOrWhiteSpace(folderId) ? null : folderId.Trim();
-            pdfs[index] = new PdfMetadata(existing.Id, existing.Name, normalised, existing.DateAdded, existing.FileSizeBytes)
-            {
-                OcrStatus = existing.OcrStatus,
-            };
+            pdfs[index] = WithFolder(existing, normalised);
 
             var updated = new TalliarkContent(content.Version, content.Folders, pdfs);
             store.SaveContent(updated);
             return updated;
         }
+
+        /// <summary>
+        /// Moves a whole selection into one folder, loading and saving the workbook once.
+        /// A drag carries every selected row, and moving them one at a time would save and
+        /// re-send the file list once per row.
+        /// </summary>
+        /// <remarks>
+        /// Ids the workbook does not contain are skipped rather than failing the batch, and a
+        /// document already filed in the target folder is left alone, so a drag that changes
+        /// nothing writes nothing. A returned content that equals the loaded one means no save
+        /// happened; callers may still push it, and it is correct.
+        /// </remarks>
+        public TalliarkContent MoveFiles(Excel.Workbook workbook, IList<string> ids, string folderId)
+        {
+            if (workbook == null) throw new ArgumentNullException(nameof(workbook));
+            if (ids == null) throw new ArgumentNullException(nameof(ids));
+
+            var wanted = new HashSet<string>(
+                ids.Where(id => !string.IsNullOrWhiteSpace(id)),
+                StringComparer.Ordinal);
+            if (wanted.Count == 0)
+                throw new ArgumentException("ids must contain at least one id.", nameof(ids));
+
+            WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
+
+            var store = new TalliarkCustomXmlPartStore(workbook);
+            TalliarkContent content = store.LoadContent();
+
+            string normalised = string.IsNullOrWhiteSpace(folderId) ? null : folderId.Trim();
+            List<PdfMetadata> pdfs = content.Pdfs.ToList();
+            bool changed = false;
+
+            for (int i = 0; i < pdfs.Count; i++)
+            {
+                PdfMetadata existing = pdfs[i];
+                if (existing == null || !wanted.Contains(existing.Id)) continue;
+                if (string.Equals(existing.FolderId, normalised, StringComparison.Ordinal)) continue;
+
+                pdfs[i] = WithFolder(existing, normalised);
+                changed = true;
+            }
+
+            if (!changed) return content;
+
+            var updated = new TalliarkContent(content.Version, content.Folders, pdfs);
+            store.SaveContent(updated);
+            return updated;
+        }
+
+        /// <summary>
+        /// A copy of <paramref name="existing"/> filed under <paramref name="folderId"/>. Every
+        /// write that changes a document's folder goes through here, because replacing a
+        /// <see cref="PdfMetadata"/> instance is where everything it was not told about —
+        /// its OCR state — is silently dropped.
+        /// </summary>
+        private static PdfMetadata WithFolder(PdfMetadata existing, string folderId) =>
+            new PdfMetadata(existing.Id, existing.Name, folderId, existing.DateAdded, existing.FileSizeBytes)
+            {
+                OcrStatus = existing.OcrStatus,
+            };
 
         public void UpdatePdfAfterOcr(Excel.Workbook workbook, string id, string newBase64,
             string geometryBase64, string tableStructureBase64, string documentValuesBase64,
