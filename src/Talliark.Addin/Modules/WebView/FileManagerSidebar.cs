@@ -65,7 +65,7 @@ namespace Talliark.Addin.Modules.WebView
     /// this side, only <c>--color-*</c> values need matching.
     /// </para>
     /// </remarks>
-    internal sealed class FileManagerSidebar : Panel
+    internal sealed class FileManagerSidebar : Panel, IMessageFilter
     {
         // ── Layout metrics                                        ────
         // One inset governs the column: the row pills and the drop strip both start and end
@@ -86,8 +86,16 @@ namespace Talliark.Addin.Modules.WebView
         private const int BadgeGap = 10;
 
         private const int EditHeight = 22;
-        private const int ScrollBarWidth = 6;
         private const int ListPadding = 6;
+
+        /// <summary>Rows per autoscroll tick once the pointer is inside the margin.</summary>
+        private const int AutoScrollStep = 6;
+
+        /// <summary>Autoscroll margin at the top and bottom of the list, in pixels.</summary>
+        private const int AutoScrollEdge = 32;
+
+        /// <summary>Autoscroll tick interval — about 60Hz, matching the web view's scroller.</summary>
+        private const int AutoScrollInterval = 16;
 
         /// <summary>
         /// The drop strip at the foot of the sidebar. It is painted by this control rather
@@ -191,7 +199,15 @@ namespace Talliark.Addin.Modules.WebView
 
         private string _selectedId;
         private bool _locked;
-        private int _scrollOffset;
+
+        /// <summary>
+        /// The list's scrollbar. A real control rather than something painted here, because the
+        /// thumb, the track paging and the grab are exactly the behaviour a hand-rolled version
+        /// gets wrong — and this list has to stay scrollable while the host holds the mouse for a
+        /// row drag, which is when it is least forgiving to be wrong about. It carries the
+        /// scroll position and nothing else: <see cref="_scrollOffset"/> is a view of its value.
+        /// </summary>
+        private readonly VScrollBar _scrollBar = new VScrollBar();
 
         private int _hoverRow = -1;
         private HitZone _hoverZone = HitZone.None;
@@ -201,6 +217,19 @@ namespace Talliark.Addin.Modules.WebView
         private int _pressRow = -1;
         private HitZone _pressZone = HitZone.None;
         private bool _pressDropZone;
+
+        /// <summary>Pointer position during a row drag, in client coordinates.</summary>
+        private Point _dragPoint;
+
+        /// <summary>
+        /// The last pointer position this control was told about. Hover is held as a row
+        /// <em>index</em>, so scrolling the list under a stationary pointer invalidates it
+        /// without producing a mouse-move to recompute it with — the wheel in particular, which
+        /// is delivered to the focused window and never to this panel.
+        /// </summary>
+        private Point _hoverPoint;
+
+        private readonly Timer _autoScrollTimer = new Timer();
 
         /// <summary>
         /// File GUIDs held by a web-originated row drag, or <c>null</c> when no such drag is
@@ -266,12 +295,31 @@ namespace Talliark.Addin.Modules.WebView
             _editBox.KeyDown += OnEditBoxKeyDown;
             _editBox.MouseWheel += OnSidebarMouseWheel;
 
+            // Sized and placed over the list band rather than docked: docking right would run it the
+            // full height of the panel, alongside the header and the drop strip as well.
+            _scrollBar.Minimum = 0;
+
+            // Never in the tab order. The sidebar has always left the keyboard to the file table
+            // beside it, and a scrollbar in that chain would take Ctrl+A from the table.
+            _scrollBar.TabStop = false;
+            _scrollBar.Scroll += OnScrollBarScroll;
+            _scrollBar.Width = SystemInformation.VerticalScrollBarWidth;
+            Controls.Add(_scrollBar);
+
             DragEnter += OnSidebarDragEnter;
             DragOver += OnSidebarDragEnter;
             DragLeave += OnSidebarDragLeave;
             DragDrop += OnSidebarDragDrop;
 
+            _autoScrollTimer.Interval = AutoScrollInterval;
+            _autoScrollTimer.Tick += OnAutoScrollTick;
+
+            // Registered here and dropped in Dispose, because the wheel arrives at the focused
+            // window and this control is not the focused one — see PreFilterMessage.
+            Application.AddMessageFilter(this);
+
             LayoutChrome();
+            SyncScrollBar();
         }
 
         /// <summary>True for the whole OCR run, which disables folder CRUD and every drop.</summary>
@@ -307,7 +355,7 @@ namespace Talliark.Addin.Modules.WebView
             }
 
             CancelEdit();
-            ClampScroll();
+            SyncScrollBar();
             Invalidate();
         }
 
@@ -365,7 +413,7 @@ namespace Talliark.Addin.Modules.WebView
             base.OnSizeChanged(e);
             if (_disposed) return;
             LayoutChrome();
-            ClampScroll();
+            SyncScrollBar();
         }
 
         protected override void Dispose(bool disposing)
@@ -373,6 +421,14 @@ namespace Talliark.Addin.Modules.WebView
             if (disposing && !_disposed)
             {
                 _disposed = true;
+
+                // A filter left registered would keep being asked about the wheel for a control
+                // that no longer exists, and an unticketed timer would outlive the window.
+                Application.RemoveMessageFilter(this);
+                _autoScrollTimer.Stop();
+                _autoScrollTimer.Tick -= OnAutoScrollTick;
+                _autoScrollTimer.Dispose();
+
                 _rowFont.Dispose();
                 _countFont.Dispose();
                 _headerFont.Dispose();
@@ -391,10 +447,27 @@ namespace Talliark.Addin.Modules.WebView
                 Math.Max(ColumnInset, ClientSize.Width - ColumnInset - ActionSize),
                 (HeaderHeight - ActionSize) / 2);
 
+            _scrollBar.Location = new Point(
+                Math.Max(0, ClientSize.Width - _scrollBar.Width),
+                ListTop);
+
+            // The bar spans the folder items' whole container — down to the drop strip —
+            // rather than stopping where the rows' clip does. No row ever paints into the
+            // padding above the strip, but the white column runs to it, and a bar that ends
+            // with the clip reads as cut short of the container's bottom edge.
+            _scrollBar.Height = Math.Max(0, DropZoneRect.Top - ListTop);
+
             PositionEditBox();
         }
 
         private int ListTop => HeaderHeight + ListPadding;
+
+        /// <summary>
+        /// The right edge the rows may paint to: the scrollbar's left when there is one, the
+        /// full width when there is not. Everything row-shaped measures from here, so the pills,
+        /// the count badge and the action glyphs all move together when the bar appears.
+        /// </summary>
+        private int RowsRightEdge => _scrollBar.Visible ? Math.Max(0, _scrollBar.Left) : ClientSize.Width;
 
         /// <summary>
         /// The drop strip, sharing <see cref="ColumnInset"/> with the row pills so both
@@ -416,17 +489,66 @@ namespace Talliark.Addin.Modules.WebView
 
         private int ContentHeight => _rows.Count * RowHeight + (_editMode == EditMode.Create ? RowHeight : 0);
 
+        /// <summary>
+        /// The list's scroll position, in pixels. The scrollbar owns it: this is a view of the
+        /// control's own value so that every reader and writer in this file stays unchanged, and
+        /// assigning it is what makes the thumb move, whether the change came from the wheel, the
+        /// autoscroller, or the user dragging the thumb.
+        /// </summary>
+        /// <remarks>
+        /// The clamp is here rather than left to the control because
+        /// <see cref="System.Windows.Forms.ScrollBar.Value"/> throws
+        /// <see cref="ArgumentOutOfRangeException"/> on an out-of-range assignment instead of
+        /// clamping. Every caller works in deltas and overshoots the end of the list routinely —
+        /// one wheel notch is 120px and the autoscroll steps 6 — so without this a single notch
+        /// past the end throws and the list does not move at all.
+        /// </remarks>
+        private int _scrollOffset
+        {
+            get => _scrollBar.Value;
+            set
+            {
+                int max = MaxScroll;
+                if (value < 0) value = 0;
+                else if (value > max) value = max;
+                _scrollBar.Value = value;
+            }
+        }
+
         private bool NeedsScroll => ContentHeight > ListHeight;
 
         private int MaxScroll => Math.Max(0, ContentHeight - ListHeight);
 
-        private void ClampScroll()
+        /// <summary>The list's own rectangle, stopping short of the scrollbar when there is one.</summary>
+        private Rectangle ListAreaRect =>
+            new Rectangle(0, ListTop, RowsRightEdge, ListHeight);
+
+        /// <summary>
+        /// Tells the scrollbar how far there is to scroll and how big a step is, then shows it
+        /// only when there is somewhere to go. The one place the two sides are kept in step;
+        /// everything else reads or writes <see cref="_scrollOffset"/>, which clamps to the
+        /// content's own range.
+        /// </summary>
+        private void SyncScrollBar()
         {
-            int max = MaxScroll;
-            int clamped = Math.Min(Math.Max(_scrollOffset, 0), max);
-            if (clamped == _scrollOffset) return;
-            _scrollOffset = clamped;
-            Invalidate();
+            _scrollBar.LargeChange = Math.Max(1, ListHeight);
+            _scrollBar.SmallChange = RowHeight;
+
+            // A Win32 scrollbar's thumb can only reach Maximum - LargeChange + 1, so a Maximum
+            // equal to the content's scroll range would leave the last page unreachable —
+            // one full page short, always. Inflating the maximum by the page is what makes the
+            // reachable bottom equal the real bottom; the offset property still clamps writes
+            // to the content's range, so nothing can scroll past the end.
+            _scrollBar.Maximum = MaxScroll + _scrollBar.LargeChange - 1;
+            _scrollBar.Visible = MaxScroll > 0;
+
+            // The range just moved, so the position needs the same clamp applied — shortening
+            // the window shrinks the range under a value this code wrote a moment ago — and
+            // hover needs re-deriving, because the list's height changed under a pointer that
+            // cannot move while the window edge is being dragged.
+            int offset = _scrollOffset;
+            _scrollOffset = offset;
+            OnListScrolled();
         }
 
         // ── Painting                                              ────
@@ -441,11 +563,7 @@ namespace Talliark.Addin.Modules.WebView
 
             PaintHeader(g);
 
-            var listArea = new Rectangle(
-                0,
-                ListTop,
-                NeedsScroll ? Math.Max(0, ClientSize.Width - ScrollBarWidth) : ClientSize.Width,
-                ListHeight);
+            Rectangle listArea = ListAreaRect;
 
             Region savedClip = g.Clip;
             g.SetClip(listArea);
@@ -454,8 +572,6 @@ namespace Talliark.Addin.Modules.WebView
             g.Clip = savedClip;
 
             PaintDropZone(g);
-
-            if (NeedsScroll) PaintScrollBar(g, listArea);
         }
 
         private int VisibleRowCount => _rows.Count + (_editMode == EditMode.Create ? 1 : 0);
@@ -481,6 +597,15 @@ namespace Talliark.Addin.Modules.WebView
 
             if (rect.Bottom < listArea.Top || rect.Top > listArea.Bottom) return;
 
+            // Text is GDI (TextRenderer) and does not obey the GDI+ clip that holds the pills
+            // inside the list band — it draws straight through it, so a row scrolled part-way
+            // past the top edge would paint its name over the header. Every text draw is given
+            // the row's intersection with the band instead, which for a fully visible row is
+            // the row itself and for a cut row lays the text out inside what is on screen. The
+            // pill keeps the natural rect: GDI+ clips it hard at the band edge, which is the
+            // look a cut pill should have.
+            Rectangle visible = Rectangle.Intersect(rect, listArea);
+
             string id = isCreate ? null : RowAt(index).Id;
             bool isSelected = !isCreate && _selectedId == id;
             bool isDropTarget = _dropRegion == DropRegion.Row && _dropRow == index && !isCreate;
@@ -502,7 +627,7 @@ namespace Talliark.Addin.Modules.WebView
             var pill = new Rectangle(
                 ColumnInset,
                 rect.Top + RowGap / 2,
-                ClientSize.Width - ColumnInset * 2,
+                RowsRightEdge - ColumnInset * 2,
                 rect.Height - RowGap);
             if (fill != Surface)
             {
@@ -530,28 +655,33 @@ namespace Talliark.Addin.Modules.WebView
             else if (isCreate)
             {
                 HitZone hover = _hoverRow == index ? _hoverZone : HitZone.None;
-                DrawConfirmGlyph(g, CreateCancelRect(rect), "✕", nameColor, HitZone.CreateCancel, hover);
-                DrawConfirmGlyph(g, CreateOkRect(rect), "✓", nameColor, HitZone.CreateOk, hover);
+                DrawConfirmGlyph(g, CreateCancelRect(visible), "✕", nameColor, HitZone.CreateCancel, hover);
+                DrawConfirmGlyph(g, CreateOkRect(visible), "✓", nameColor, HitZone.CreateOk, hover);
             }
             else
             {
-                int countLeft = DrawCountBadge(g, rect, index, countColor, actionsVisible);
+                int countLeft = DrawCountBadge(g, visible, index, countColor, actionsVisible);
 
                 if (actionsVisible)
                 {
                     Color actionColor = onAccent ? OnAccentAction : TextMuted;
-                    DrawRowAction(g, DeleteRect(rect), "✕", actionColor, index, HitZone.Delete, onAccent);
-                    DrawRowAction(g, RenameRect(rect), "✎", actionColor, index, HitZone.Rename, onAccent);
+                    DrawRowAction(g, DeleteRect(visible), "✕", actionColor, index, HitZone.Delete, onAccent);
+                    DrawRowAction(g, RenameRect(visible), "✎", actionColor, index, HitZone.Rename, onAccent);
                 }
 
                 if (_editMode == EditMode.ConfirmDelete && isEditing)
-                    DrawDeleteConfirmation(g, rect, onAccent);
+                    DrawDeleteConfirmation(g, visible, onAccent);
                 else
-                    DrawName(g, rect, RowAt(index).Name, nameColor, countLeft);
+                    DrawName(g, visible, RowAt(index).Name, nameColor, countLeft);
             }
         }
 
-        private void DrawName(Graphics g, Rectangle rect, string name, Color color, int rightLimit)
+        /// <summary>
+/// Draws a folder name. No <see cref="TextFormatFlags.NoClipping"/>: the layout rect is the
+/// row's visible slice, and without a clip a thin slice at the band's edge would paint the
+/// full-height glyphs past it — the very leak this layout rect exists to close.
+/// </summary>
+private void DrawName(Graphics g, Rectangle rect, string name, Color color, int rightLimit)
         {
             TextRenderer.DrawText(
                 g,
@@ -564,7 +694,7 @@ namespace Talliark.Addin.Modules.WebView
                     rect.Height),
                 color,
                 TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
-                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoClipping);
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
 
         /// <summary>Draws the per-folder file count and returns the x it starts at.</summary>
@@ -573,7 +703,7 @@ namespace Talliark.Addin.Modules.WebView
             if (_editMode == EditMode.ConfirmDelete && _editRow == index)
                 return rect.Left + RowPadding;
 
-            int right = ClientSize.Width - ColumnInset;
+            int right = RowsRightEdge - ColumnInset;
             if (actionsVisible)
                 right = RenameRect(rect).Left - BadgeGap;
 
@@ -661,25 +791,6 @@ namespace Talliark.Addin.Modules.WebView
 
             DrawRowAction(g, yesRect, "Yes", _hoverZone == HitZone.ConfirmYes ? Accent : (isSelected ? OnAccentAction : TextMuted), _editRow, HitZone.ConfirmYes, isSelected);
             DrawRowAction(g, noRect, "No", _hoverZone == HitZone.ConfirmNo ? TextPrimary : (isSelected ? OnAccentAction : TextMuted), _editRow, HitZone.ConfirmNo, isSelected);
-        }
-
-        private void PaintScrollBar(Graphics g, Rectangle listArea)
-        {
-            int max = MaxScroll;
-            if (max <= 0) return;
-
-            var track = new Rectangle(ClientSize.Width - ScrollBarWidth, listArea.Top, ScrollBarWidth, listArea.Height);
-            using (var brush = new SolidBrush(SurfaceHover))
-                FillRounded(g, track, 3, brush);
-
-            float ratio = (float)listArea.Height / ContentHeight;
-            int thumbHeight = Math.Max(24, (int)(listArea.Height * ratio));
-            int travel = listArea.Height - thumbHeight;
-            int thumbTop = listArea.Top + (int)(travel * (_scrollOffset / (float)max));
-
-            var thumb = new Rectangle(track.X, thumbTop, track.Width, thumbHeight);
-            using (var brush = new SolidBrush(Accent))
-                FillRounded(g, thumb, 3, brush);
         }
 
         private void OnEditHostPaint(object sender, PaintEventArgs e)
@@ -826,39 +937,39 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         // ── Row geometry                                          ────
 
         private Rectangle RowRect(int index) =>
-            new Rectangle(0, ListTop + index * RowHeight - _scrollOffset, ClientSize.Width, RowHeight);
+            new Rectangle(0, ListTop + index * RowHeight - _scrollOffset, RowsRightEdge, RowHeight);
 
         private Rectangle RowHitRect(int index) =>
-            new Rectangle(0, RowRect(index).Top, ClientSize.Width, RowHeight);
+            new Rectangle(0, RowRect(index).Top, RowsRightEdge, RowHeight);
 
         private FolderRow RowAt(int index) =>
             index >= 0 && index < _rows.Count ? _rows[index] : null;
 
         private Rectangle RenameRect(Rectangle row) =>
             new Rectangle(
-                ClientSize.Width - ColumnInset - ActionSize * 2 - ActionGap,
+                RowsRightEdge - ColumnInset - ActionSize * 2 - ActionGap,
                 row.Top,
                 ActionSize,
                 row.Height);
 
         private Rectangle DeleteRect(Rectangle row) =>
             new Rectangle(
-                ClientSize.Width - ColumnInset - ActionSize,
+                RowsRightEdge - ColumnInset - ActionSize,
                 row.Top,
                 ActionSize,
                 row.Height);
 
         private Rectangle CreateOkRect(Rectangle row) =>
-            new Rectangle(ClientSize.Width - ColumnInset - ActionSize, row.Top, ActionSize, row.Height);
+            new Rectangle(RowsRightEdge - ColumnInset - ActionSize, row.Top, ActionSize, row.Height);
 
         private Rectangle CreateCancelRect(Rectangle row) =>
-            new Rectangle(ClientSize.Width - ColumnInset - ActionSize * 2, row.Top, ActionSize, row.Height);
+            new Rectangle(RowsRightEdge - ColumnInset - ActionSize * 2, row.Top, ActionSize, row.Height);
 
         private Rectangle ConfirmNoRect(Rectangle row) =>
-            new Rectangle(ClientSize.Width - ColumnInset - ActionSize, row.Top, ActionSize, row.Height);
+            new Rectangle(RowsRightEdge - ColumnInset - ActionSize, row.Top, ActionSize, row.Height);
 
         private Rectangle ConfirmYesRect(Rectangle row) =>
-            new Rectangle(ClientSize.Width - ColumnInset - ActionSize * 2 - ActionGap, row.Top, ActionSize, row.Height);
+            new Rectangle(RowsRightEdge - ColumnInset - ActionSize * 2 - ActionGap, row.Top, ActionSize, row.Height);
 
         /// <summary>
         /// Row index under <paramref name="point"/>, or -1 when the point is not on a
@@ -867,6 +978,15 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         private int HitTestRow(Point point)
         {
             if (point.Y < ListTop) return -1;
+
+            // Both axes, not just height. During a row drag this control holds the mouse and is
+            // told about every move in the window, most of which happen over the file table with
+            // an x far beyond this column; an OLE drag over the scrollbar child reaches here the
+            // same way, the child having no drop target of its own. A height-only test would
+            // light whatever folder happens to share the pointer's height — and on release, drop
+            // onto it — so nothing is a row unless the pointer is horizontally over the rows,
+            // stopping short of the scrollbar's column like the pills do.
+            if (point.X < 0 || point.X >= RowsRightEdge) return -1;
 
             int index = (point.Y - ListTop + _scrollOffset) / RowHeight;
             if (index < 0 || index >= VisibleRowCount) return -1;
@@ -949,17 +1069,35 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             // the window by now, and neither of those can be a target.
             if (_rowDragIds != null)
             {
+                _hoverPoint = e.Location;
                 RefreshRowDrag(e.Location);
                 return;
             }
 
-            DropRegion region = HitTestRegion(e.Location);
+            _hoverPoint = e.Location;
             RefreshHover(e.Location);
+            UpdateHoverCursor(e.Location);
+        }
 
-            // The strip is a button, so it says so; rows keep the default arrow.
+        /// <summary>
+        /// Re-resolves hover against the pointer's last known position after the list has moved
+        /// under it. Without this the hover sits on a row index, the scroll slides a different
+        /// folder onto that index, and the highlight looks stuck to a row the pointer has left.
+        /// </summary>
+        private void RehoverAfterScroll()
+        {
+            // (0, 0) is the header, which resolves to no row and no strip — the correct
+            // "nothing hovered" state, so a scroll before any mouse-move is harmless.
+            RefreshHover(_hoverPoint);
+            UpdateHoverCursor(_hoverPoint);
+        }
+
+        private void UpdateHoverCursor(Point location)
+        {
+            // The strip is a button, so it says so; rows keep the arrow.
             Cursor = _locked
                 ? Cursors.No
-                : region == DropRegion.Panel ? Cursors.Hand : Cursors.Default;
+                : HitTestRegion(location) == DropRegion.Panel ? Cursors.Hand : Cursors.Default;
         }
 
         protected override void OnMouseLeave(EventArgs e)
@@ -1277,7 +1415,7 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             _editMode = EditMode.None;
             _editRow = -1;
             HideEditBox();
-            ClampScroll();
+            SyncScrollBar();
             Invalidate();
         }
 
@@ -1287,7 +1425,7 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             _editBox.Text = string.Empty;
             _holdFocus = 0;
             // Removing the virtual create row can leave the list scrolled past its end.
-            ClampScroll();
+            SyncScrollBar();
         }
 
         private void PositionEditBox()
@@ -1302,7 +1440,7 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             Rectangle pill = new Rectangle(
                 ColumnInset,
                 row.Top + RowGap / 2,
-                ClientSize.Width - ColumnInset * 2,
+                RowsRightEdge - ColumnInset * 2,
                 row.Height - RowGap);
 
             Rectangle input;
@@ -1337,8 +1475,6 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
 
             if (top < _scrollOffset) _scrollOffset = top;
             else if (bottom > _scrollOffset + ListHeight) _scrollOffset = bottom - ListHeight;
-
-            _scrollOffset = Math.Min(Math.Max(_scrollOffset, 0), MaxScroll);
         }
 
         // ── Drag and drop                                         ────
@@ -1488,6 +1624,11 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             }
 
             Cursor = Cursors.No;
+
+            // The autoscroll timer is not started here. Arming says the user has dragged past
+            // the threshold, but the host has not told this control where the pointer is, and a
+            // tick before the first mouse-move would scroll in a direction nobody asked for. It
+            // starts from RefreshRowDrag, which has a real point.
             return true;
         }
 
@@ -1507,6 +1648,8 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         {
             _rowDragIds = null;
 
+            _autoScrollTimer.Stop();
+
             int previous = _dropRow;
             _dropRegion = DropRegion.None;
             _dropRow = -1;
@@ -1524,6 +1667,14 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         /// </summary>
         private void RefreshRowDrag(Point location)
         {
+            // The autoscroller runs off this position rather than off mouse events: the host
+            // holds the mouse, so a pointer resting near an edge produces no further moves at
+            // all and a move-triggered scroll would stall with the target just out of reach.
+            _dragPoint = location;
+
+            if (NeedsScroll && InAutoScrollEdge(location)) _autoScrollTimer.Start();
+            else _autoScrollTimer.Stop();
+
             DropRegion region = HitTestRegion(location);
             int row = region == DropRegion.Row ? HitTestRow(location) : -1;
             if (row < 0 || RowAt(row) == null) region = DropRegion.None;
@@ -1559,17 +1710,162 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
 
         // ── Scrolling                                             ────
 
+        private const int WM_MOUSEWHEEL = 0x020A;
+
         private void OnSidebarMouseWheel(object sender, MouseEventArgs e)
+        {
+            ScrollRows(e.Delta);
+        }
+
+        /// <summary>
+        /// The scrollbar moved, from its own thumb, from our wheel or from the autoscroller.
+        /// Everything the list owes a repaint for happens here, so those paths cannot each
+        /// remember a slightly different set.
+        /// </summary>
+        private void OnScrollBarScroll(object sender, ScrollEventArgs e)
+        {
+            OnListScrolled();
+        }
+
+        /// <summary>
+        /// Everything the list owes after its scroll position changed: the inline edit box
+        /// follows the row it belongs to, hover is re-derived, and the list repaints.
+        /// </summary>
+        /// <remarks>
+        /// Both this and <see cref="ScrollRows"/> call it, because the two paths cannot be
+        /// relied on to share one trigger: the <see cref="ScrollBar.Scroll"/> event is
+        /// documented for actions the user took on the control, and whether it also fires for
+        /// a programmatic assignment of <see cref="ScrollBar.Value"/> is not something this
+        /// code should stand or fall on. Calling it from both makes the work happen at least
+        /// once either way, and it is idempotent — a re-derive and a repaint that already
+        /// happened are cheap to repeat.
+        /// </remarks>
+        private void OnListScrolled()
         {
             if (_disposed) return;
 
-            _scrollOffset -= e.Delta;
-            int clamped = Math.Min(Math.Max(_scrollOffset, 0), MaxScroll);
-            if (clamped == _scrollOffset) return;
-
-            _scrollOffset = clamped;
+            // The list slides under a pointer that may not have moved at all — the wheel and
+            // the autoscroller both move it without one — so hover has to be re-derived here or
+            // it stays welded to a row index the scroll has already slid a different folder
+            // onto.
             PositionEditBox();
+            RehoverAfterScroll();
             Invalidate();
+        }
+
+        /// <summary>
+        /// Scrolls by wheel notches, where a positive delta moves toward the top of the list.
+        /// One implementation for the wheel and the autoscroller so the two cannot disagree
+        /// about what a step does. Returns whether the list actually moved.
+        /// </summary>
+        private bool ScrollRows(int delta)
+        {
+            if (_disposed || delta == 0) return false;
+
+            int before = _scrollOffset;
+            _scrollOffset = before - delta;
+            if (_scrollOffset == before) return false;
+
+            OnListScrolled();
+            return true;
+        }
+
+        /// <summary>
+        /// Takes the wheel over this list, which it would otherwise never see.
+        ///
+        /// <para>
+        /// WM_MOUSEWHEEL goes to the window with keyboard focus, not to the window under the
+        /// pointer, and the focus belongs to the WebView2 file table beside this panel — so the
+        /// wheel over the folder list scrolled the table, and the handler that exists for it was
+        /// only ever reachable by focusing the add button or the rename box. An application
+        /// message filter is the one place that sees the wheel before that routing happens, so
+        /// the list claims it and swallows it.
+        /// </para>
+        /// <para>
+        /// The filter sees the wheel for every window in the application, which is why the hit
+        /// test is a full bounds test and not just a band. The file table shares the list's
+        /// vertical band exactly, so a Y-only test would let this filter claim the wheel over
+        /// the table — and the viewer, and Excel's own grid — and scroll the folders from
+        /// underneath whatever the user was actually pointing at. Both axes have to agree the
+        /// pointer is over this list before the message is swallowed.
+        /// </para>
+        /// </summary>
+        bool IMessageFilter.PreFilterMessage(ref Message m)
+        {
+            if (_disposed || m.Msg != WM_MOUSEWHEEL) return false;
+            if (!NeedsScroll) return false;
+
+            // LParam is the cursor as a screen POINT, WParam carries the notches in its high word.
+            int packed = unchecked((int)m.LParam.ToInt64());
+            var screenPoint = new Point(packed & 0xFFFF, (packed >> 16) & 0xFFFF);
+            Point local = PointToClient(screenPoint);
+
+            if (local.X < 0 || local.X >= ClientSize.Width) return false;
+            if (local.Y < ListTop || local.Y >= ListTop + ListHeight) return false;
+
+            ScrollRows((short)((long)m.WParam >> 16));
+            return true;
+        }
+
+        /// <summary>
+        /// Scrolls the list toward a folder the pointer is holding near, then re-resolves the
+        /// drop target. A drag cannot use the wheel — the host has the mouse, so the pointer
+        /// never sends this control a wheel message — and this is what stands in for it.
+        /// Returns whether the list actually moved.
+        /// </summary>
+        private bool AutoScrollToward(Point at)
+        {
+            if (!InAutoScrollEdge(at)) return false;
+
+            // ScrollRows takes a positive delta toward the top of the list — the same
+            // convention the wheel uses — so a pointer held at the top edge feeds it positive
+            // steps and the list chases upward, and the bottom edge feeds it negative ones.
+            int step = at.Y < ListTop + AutoScrollBand ? AutoScrollStep : -AutoScrollStep;
+            if (!ScrollRows(step)) return false;
+
+            // Re-hit-test every tick: the rows under a stationary pointer have moved under it,
+            // and the highlight has to follow them onto rows the user never pointed at.
+            RefreshRowDrag(at);
+            return true;
+        }
+
+        /// <summary>
+        /// The autoscroll band at each end of the list, held to under a third of the list so a
+        /// short window cannot make the two bands meet. If they met, every point in the list
+        /// would count as near an edge, and the point would fall in the overlap where the
+        /// direction is arbitrary — the list would ratchet one way and refuse the other.
+        /// </summary>
+        private int AutoScrollBand => Math.Min(AutoScrollEdge, ListHeight / 3);
+
+        /// <summary>
+        /// True when the point is over the list and close enough to an edge for the list to
+        /// chase it. The horizontal test matters as much as the vertical one: a held drag
+        /// reports positions from over the file table as well, and a list that scrolls while
+        /// the pointer is nowhere over it is reacting to a hover that never happened.
+        /// </summary>
+        private bool InAutoScrollEdge(Point at)
+        {
+            int band = AutoScrollBand;
+            if (band <= 0) return false;
+            if (at.X < 0 || at.X >= RowsRightEdge) return false;
+
+            return at.Y < ListTop + band || at.Y > ListTop + ListHeight - band;
+        }
+
+        private void OnAutoScrollTick(object sender, EventArgs e)
+        {
+            if (_disposed || _rowDragIds == null || !NeedsScroll)
+            {
+                _autoScrollTimer.Stop();
+                return;
+            }
+
+            // Running the list out of room ends the chase. A tick that can no longer move
+            // anything still cost a full repaint of the column, sixty times a second, for as
+            // long as the pointer rested there — which reads as a stuck column rather than as
+            // "this is the end of it". A short window reaches that state in one tick instead of
+            // several, so it got stuck sooner and for longer the smaller the list was.
+            if (!AutoScrollToward(_dragPoint)) _autoScrollTimer.Stop();
         }
 
         // ── Helpers                                               ────
@@ -1577,7 +1873,7 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         private void InvalidateRow(int index)
         {
             if (index < 0 || _disposed) return;
-            Invalidate(new Rectangle(0, RowRect(index).Top, ClientSize.Width, RowHeight));
+            Invalidate(new Rectangle(0, RowRect(index).Top, RowsRightEdge, RowHeight));
         }
 
         private static int CountIn(IList<PdfMetadata> pdfs, string folderId)
