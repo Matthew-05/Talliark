@@ -354,6 +354,20 @@
       ]
     },
 
+    "OpenFileInViewerMessage": {
+      "description": "Sent by the file-manager web app when the user explicitly chooses Open in Viewer for a file. The host shows the owning workbook's task-pane viewer and switches it to this PDF, including when the viewer is still starting.",
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "open-file-in-viewer" },
+        "id":   { "type": "string", "description": "GUID of the file to show in the task-pane viewer." }
+      },
+      "examples": [
+        { "type": "open-file-in-viewer", "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" }
+      ]
+    },
+
     "MoveFileMessage": {
       "description": "Sent by the file-manager web app when the user moves a file to a different folder. Send folderId as null/omitted to move to uncategorised.",
       "type": "object",
@@ -1442,6 +1456,7 @@
     { "$ref": "#/definitions/RemoveFileMessage" },
     { "$ref": "#/definitions/ExportFileMessage" },
     { "$ref": "#/definitions/SelectFileMessage" },
+    { "$ref": "#/definitions/OpenFileInViewerMessage" },
     { "$ref": "#/definitions/MoveFileMessage" },
     { "$ref": "#/definitions/RowDragStartedMessage" },
     { "$ref": "#/definitions/RowDragEndedMessage" },

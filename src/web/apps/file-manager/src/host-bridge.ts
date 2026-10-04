@@ -160,6 +160,11 @@ export function sendSelectFile(id: string): void {
   send({ type: "select-file", id });
 }
 
+/** Opens the owning workbook's task-pane viewer and switches it to this file. */
+export function sendOpenFileInViewer(id: string): void {
+  send({ type: "open-file-in-viewer", id });
+}
+
 export function sendMoveFile(id: string, folderId: string | null): void {
   const msg: Record<string, unknown> = { type: "move-file", id };
   if (folderId) msg["folderId"] = folderId;

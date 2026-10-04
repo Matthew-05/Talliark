@@ -1,5 +1,12 @@
 import type { FileEntry, FolderEntry } from "../../types/index.js";
-import { sendExportFile, sendRenameFile, sendRemoveFile, sendSelectFile, sendRowDragStarted } from "../../host-bridge.js";
+import {
+  sendExportFile,
+  sendOpenFileInViewer,
+  sendRenameFile,
+  sendRemoveFile,
+  sendRowDragStarted,
+  sendSelectFile,
+} from "../../host-bridge.js";
 import type { OcrProgress } from "../../host-bridge.js";
 // Imported as its own entry point rather than through the package barrel:
 // the barrel re-exports the pdf.js geometry module, whose top-level worker
@@ -122,6 +129,8 @@ export class FileTable {
     this._contextMenu = document.createElement("div");
     this._contextMenu.className = "file-table__context-menu";
     this._contextMenu.innerHTML = `
+      <button class="file-table__context-item" data-action="open-in-viewer">Open in Viewer</button>
+      <span class="file-table__context-separator" aria-hidden="true"></span>
       <button class="file-table__context-item" data-action="export" title="Adds searchable text when OCR is available">Export PDF</button>
       <span class="file-table__context-separator" aria-hidden="true"></span>
       <button class="file-table__context-item" data-action="rename">Rename</button>
@@ -858,7 +867,9 @@ export class FileTable {
     if (this._locked) { this._hideContextMenu(); return; }
     if (!this._contextMenuFile || !this._contextMenuNameSpan || !this._contextMenuRow) return;
 
-    if (action === "export") {
+    if (action === "open-in-viewer") {
+      sendOpenFileInViewer(this._contextMenuFile.id);
+    } else if (action === "export") {
       sendExportFile(this._contextMenuFile.id);
     } else if (action === "rename") {
       this._startRename(this._contextMenuFile, this._contextMenuNameSpan, this._contextMenuRow);

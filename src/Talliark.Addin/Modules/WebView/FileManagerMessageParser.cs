@@ -41,6 +41,12 @@ namespace Talliark.Addin.Modules.WebView
             return new SelectFileRequest { Id = GetString(dict, "id") };
         }
 
+        public static OpenFileInViewerRequest ParseOpenFileInViewer(string json)
+        {
+            var dict = Deserialize(json);
+            return new OpenFileInViewerRequest { Id = GetString(dict, "id") };
+        }
+
         public static MoveFileRequest ParseMoveFile(string json)
         {
             var dict = Deserialize(json);
@@ -128,6 +134,11 @@ namespace Talliark.Addin.Modules.WebView
     }
 
     internal sealed class SelectFileRequest
+    {
+        public string Id { get; set; }
+    }
+
+    internal sealed class OpenFileInViewerRequest
     {
         public string Id { get; set; }
     }

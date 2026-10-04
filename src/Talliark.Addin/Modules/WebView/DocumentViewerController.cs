@@ -36,6 +36,7 @@ namespace Talliark.Addin.Modules.WebView
         private string _pendingNavigateId;
         private string _pendingNavigatePdfId;
         private int? _pendingNavigatePage;
+        private string _pendingShowPdfId;
         private string _pendingSearchQuery;
         private bool _disposed;
 
@@ -889,6 +890,7 @@ namespace Talliark.Addin.Modules.WebView
 
             _dataSentToViewer = true;
             SendLinkedRectanglesToWebView();
+            FlushPendingShowPdf();
             FlushPendingSearchQuery();
             FlushPendingNavigateToRectangle();
             TalliarkLog.Trace($"EXIT surface={_loadFailureSurfaceName}");
@@ -1110,6 +1112,37 @@ namespace Talliark.Addin.Modules.WebView
             if (!_webViewReady || string.IsNullOrWhiteSpace(pdfId))
                 return;
 
+            PostShowPdf(pdfId);
+        }
+
+        /// <summary>
+        /// Switches to a PDF after the initial catalogue has reached a newly opened viewer.
+        /// This is reserved for an explicit open command; transient file-manager selection
+        /// continues to use <see cref="SendShowPdf"/> and is deliberately not replayed.
+        /// </summary>
+        internal void SendShowPdfWhenReady(string pdfId)
+        {
+            if (_disposed || string.IsNullOrWhiteSpace(pdfId)) return;
+            if (!_webViewReady || !_dataSentToViewer)
+            {
+                _pendingShowPdfId = pdfId;
+                return;
+            }
+
+            PostShowPdf(pdfId);
+        }
+
+        private void FlushPendingShowPdf()
+        {
+            if (string.IsNullOrWhiteSpace(_pendingShowPdfId)) return;
+
+            string pdfId = _pendingShowPdfId;
+            _pendingShowPdfId = null;
+            PostShowPdf(pdfId);
+        }
+
+        private void PostShowPdf(string pdfId)
+        {
             try
             {
                 string json = HostMessageSerializer.BuildShowPdf(pdfId);

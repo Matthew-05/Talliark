@@ -587,6 +587,32 @@ namespace Talliark.Addin
 
         }
 
+        /// <summary>
+        /// Activates <paramref name="workbook"/>, opens its task-pane viewer, and switches
+        /// the viewer to <paramref name="pdfId"/> once its initial catalogue is ready.
+        /// </summary>
+        internal void OpenPdfInTaskPane(Excel.Workbook workbook, string pdfId)
+        {
+            if (workbook == null || string.IsNullOrWhiteSpace(pdfId)) return;
+
+            try
+            {
+                if (!IsSameWorkbook(workbook, Application?.ActiveWorkbook))
+                    workbook.Activate();
+
+                if (!IsSameWorkbook(workbook, Application?.ActiveWorkbook))
+                    return;
+
+                ShowTaskPane();
+                FindEntryFor(workbook)?.Host.SendShowPdfWhenReady(pdfId);
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace(
+                    $"OpenPdfInTaskPane failed: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
 
 
         internal void ShowViewerWindow()

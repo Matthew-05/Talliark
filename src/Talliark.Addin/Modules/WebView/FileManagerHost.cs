@@ -624,6 +624,10 @@ namespace Talliark.Addin.Modules.WebView
                         HandleSelectFile(FileManagerMessageParser.ParseSelectFile(raw));
                         break;
 
+                    case "open-file-in-viewer":
+                        HandleOpenFileInViewer(FileManagerMessageParser.ParseOpenFileInViewer(raw));
+                        break;
+
                     case "move-file":
                         HandleMoveFile(FileManagerMessageParser.ParseMoveFile(raw));
                         break;
@@ -900,6 +904,16 @@ namespace Talliark.Addin.Modules.WebView
         {
             if (string.IsNullOrWhiteSpace(req?.Id)) return;
             Globals.ThisAddIn.NotifyViewerShowPdf(_workbook, req.Id);
+        }
+
+        /// <summary>
+        /// Shows this manager's workbook in the task-pane viewer and selects the requested PDF.
+        /// Unlike ordinary row selection, this explicit command also survives viewer startup.
+        /// </summary>
+        private void HandleOpenFileInViewer(OpenFileInViewerRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req?.Id)) return;
+            Globals.ThisAddIn.OpenPdfInTaskPane(_workbook, req.Id);
         }
 
         private void HandleMoveFile(MoveFileRequest req)

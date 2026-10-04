@@ -63,6 +63,8 @@ namespace Talliark.Addin.Modules.WebView
 
         public void SendShowPdf(string pdfId) => _controller.SendShowPdf(pdfId);
 
+        public void SendShowPdfWhenReady(string pdfId) => _controller.SendShowPdfWhenReady(pdfId);
+
         public void SendFoldersToWebView() => _controller.SendFoldersToWebView();
 
         protected override void Dispose(bool disposing)
