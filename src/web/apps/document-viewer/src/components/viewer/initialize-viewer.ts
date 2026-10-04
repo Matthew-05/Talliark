@@ -120,7 +120,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   // Only the +/- buttons and ctrl+wheel reach this callback, so it means the user
   // has chosen an explicit zoom level and no longer wants the page kept fitted.
   zoom.onChange((scale, anchor) => {
-    fitMode.exit();
+    fitMode.exit(scale);
     zoom.setFitActive(false);
     viewer.setZoom(scale, anchor);
   });
@@ -149,7 +149,10 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
   });
 
   selector.onSelect((entry) => {
-    void viewer.loadDocument(entry.url, entry.id, entry.pageRotations).then(() => viewer.startBackgroundRender());
+    void viewer.loadDocument(entry.url, entry.id, entry.pageRotations).then(() => {
+      fitMode.restoreExplicitZoom();
+      viewer.startBackgroundRender();
+    });
   });
 
   rotate.onRotateCcw(() => {

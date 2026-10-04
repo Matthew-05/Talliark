@@ -122,3 +122,49 @@ test("fit choices are retained independently for each document", () => {
     globalThis.ResizeObserver = originalResizeObserver;
   }
 });
+
+test("an inactive document restores its explicit zoom only when requested", () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+  FakeResizeObserver.instances = [];
+
+  try {
+    const harness = createViewerHarness();
+    const applied: number[] = [];
+    const mode = createFitMode(
+      harness.viewer,
+      (scale) => {
+        applied.push(scale);
+        harness.setZoom(scale);
+      },
+      () => 1,
+    );
+
+    harness.loadDocument("pdf-a");
+    harness.setZoom(1.5);
+    mode.exit(1.5);
+
+    harness.setFitScale(2);
+    harness.loadDocument("pdf-b");
+    harness.setZoom(0.8);
+    mode.exit(0.8);
+
+    harness.setFitScale(0.5);
+    harness.loadDocument("pdf-a");
+
+    assert.deepEqual(applied, [0.75, 2]);
+    assert.equal(mode.restoreExplicitZoom(), true);
+    assert.deepEqual(applied, [0.75, 2, 1.5]);
+
+    harness.loadDocument("pdf-b");
+    assert.deepEqual(applied, [0.75, 2, 1.5]);
+    assert.equal(mode.restoreExplicitZoom(), true);
+    assert.deepEqual(applied, [0.75, 2, 1.5, 0.8]);
+
+    mode.enter();
+    assert.equal(mode.restoreExplicitZoom(), false);
+    assert.deepEqual(applied, [0.75, 2, 1.5, 0.8]);
+  } finally {
+    globalThis.ResizeObserver = originalResizeObserver;
+  }
+});

@@ -15,8 +15,10 @@ export interface FitMode {
   enter(pageNumber?: number): void;
   /** Clears any pinned page — navigation has finished and the page is current. */
   releasePin(): void;
-  /** Leaves fit mode — the user has chosen an explicit zoom level. */
-  exit(): void;
+  /** Leaves fit mode and remembers the document's explicit zoom level. */
+  exit(scale?: ZoomLevel): void;
+  /** Restores the active document's explicit zoom, if it is not in fit mode. */
+  restoreExplicitZoom(): boolean;
   isActive(): boolean;
   dispose(): void;
 }
@@ -33,8 +35,9 @@ export interface FitMode {
  *
  * Each document starts in fit mode the first time it is shown. Its choice is
  * then retained independently for the lifetime of this viewer: leaving fit on
- * one document does not turn it off for the others. Fit is also entered whenever
- * a fit scale is applied (the Fit button, rectangle navigation, search
+ * one document does not turn it off for the others, and its last explicit zoom
+ * can be restored when the user manually returns to it. Fit is also entered
+ * whenever a fit scale is applied (the Fit button, rectangle navigation, search
  * navigation), and left when the user toggles Fit off or picks an explicit zoom
  * level.
  */
@@ -44,6 +47,7 @@ export function createFitMode(
   getCurrentPage: () => number,
 ): FitMode {
   const activeByPdfId = new Map<string, boolean>();
+  const explicitZoomByPdfId = new Map<string, ZoomLevel>();
   let activeWithoutDocument = true;
   let pinnedPage: number | null = null;
 
@@ -96,9 +100,22 @@ export function createFitMode(
       pinnedPage = pageNumber ?? null;
     },
     releasePin: () => { pinnedPage = null; },
-    exit: () => {
+    exit: (scale) => {
+      const pdfId = viewer.getActivePdfId();
+      if (pdfId !== null) {
+        explicitZoomByPdfId.set(pdfId, scale ?? viewer.getCurrentZoom());
+      }
       setActive(false);
       pinnedPage = null;
+    },
+    restoreExplicitZoom: () => {
+      if (isActive()) return false;
+      const pdfId = viewer.getActivePdfId();
+      if (pdfId === null) return false;
+      const scale = explicitZoomByPdfId.get(pdfId);
+      if (scale === undefined) return false;
+      applyZoom(scale);
+      return true;
     },
     isActive,
     dispose: () => { observer.disconnect(); },
