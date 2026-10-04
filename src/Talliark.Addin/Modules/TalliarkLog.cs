@@ -33,6 +33,7 @@ namespace Talliark.Addin.Modules
         private static readonly object _lock = new object();
 
         internal static string DirectoryPath => _directory;
+        internal static string CurrentFilePath => _path;
 
         private static int GetProcessId()
         {

@@ -79,6 +79,13 @@
                   onAction="OnOpenReconcile" />
         </group>
         <group id="Talliark.Group.Help" label=" ">
+          <button id="Talliark.BtnReportBug"
+                  label="Report Bug"
+                  size="large"
+                  screentip="Report a Talliark bug"
+                  supertip="Describe a problem and open a prefilled email draft, optionally including the active workbook and current log."
+                  getImage="GetBugReportImage"
+                  onAction="OnReportBug" />
           <button id="Talliark.BtnSettings"
                   label="Settings"
                   size="large"

@@ -86,6 +86,63 @@ namespace Talliark.Addin.Ribbon
                 dialog.ShowDialog();
         }
 
+        public void OnReportBug(IRibbonControl control)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(BuildConfiguration.BugReportEmail))
+                {
+                    MessageBox.Show(
+                        "Bug reporting is not configured in this build. Set BUG_REPORT_EMAIL "
+                        + "in the repository .env file and rebuild the add-in.",
+                        "Talliark Bug Report",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
+                }
+
+                Excel.Workbook workbook = Globals.ThisAddIn?.Application?.ActiveWorkbook;
+                var draft = new BugReportDraft
+                {
+                    BugType = BugReportTypes.General,
+                    IncludeWorkbook = workbook != null,
+                    IncludeLog = true
+                };
+
+                while (true)
+                {
+                    using (var dialog = new BugReportDialog(draft, workbook != null))
+                    {
+                        if (dialog.ShowDialog() != DialogResult.OK)
+                            return;
+                    }
+
+                    PreparedBugReport report;
+                    BugReportPreparationResult preparation = BugReportService.Prepare(
+                        owner: null,
+                        draft: draft,
+                        workbook: workbook,
+                        report: out report);
+
+                    if (preparation == BugReportPreparationResult.ReturnToReport)
+                        continue;
+
+                    BugReportService.OpenEmail(owner: null, report: report);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Modules.TalliarkLog.Trace($"OnReportBug failed: {ex}");
+                MessageBox.Show(
+                    "The bug-report draft could not be prepared." + Environment.NewLine
+                    + Environment.NewLine + ex.Message,
+                    "Talliark Bug Report",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
         public void OnDeleteLinksInSelection(IRibbonControl control)
         {
             var app = Globals.ThisAddIn.Application;
@@ -571,6 +628,11 @@ namespace Talliark.Addin.Ribbon
         public System.Drawing.Bitmap GetSettingsImage(IRibbonControl control)
         {
             return LoadEmbeddedSvgAsIcon("icon-settings.svg");
+        }
+
+        public System.Drawing.Bitmap GetBugReportImage(IRibbonControl control)
+        {
+            return LoadEmbeddedSvgAsIcon("icon-bug-report.svg");
         }
 
         private static System.Drawing.Bitmap LoadEmbeddedSvgAsIcon(string iconName)
