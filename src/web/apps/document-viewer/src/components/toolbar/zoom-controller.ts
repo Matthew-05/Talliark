@@ -17,6 +17,7 @@ export class ZoomController {
 
   private _scale: ZoomLevel = 1.0;
   private _label: HTMLSpanElement;
+  private readonly _fitBtn: HTMLButtonElement;
   private readonly _callbacks: Array<(scale: ZoomLevel, anchor?: ZoomAnchor) => void> = [];
   private readonly _fitCallbacks: Array<() => void> = [];
 
@@ -39,29 +40,37 @@ export class ZoomController {
     increaseBtn.textContent = "+";
     increaseBtn.addEventListener("click", () => this.adjustBy(+STEP));
 
-    const fitBtn = document.createElement("button");
-    fitBtn.className = "zoom-controller__btn zoom-controller__fit-btn";
-    fitBtn.title = "Fit page";
-    fitBtn.textContent = "Fit";
-    fitBtn.addEventListener("click", () => {
+    this._fitBtn = document.createElement("button");
+    this._fitBtn.className = "zoom-controller__btn zoom-controller__fit-btn";
+    this._fitBtn.textContent = "Fit";
+    this._fitBtn.setAttribute("aria-pressed", "false");
+    this._fitBtn.addEventListener("click", () => {
       for (const cb of this._fitCallbacks) cb();
     });
 
-    this.element.append(decreaseBtn, this._label, increaseBtn, fitBtn);
+    this.element.append(decreaseBtn, this._label, increaseBtn, this._fitBtn);
     this._updateLabel();
+    this.setFitActive(false);
   }
 
   onChange(cb: (scale: ZoomLevel, anchor?: ZoomAnchor) => void): void {
     this._callbacks.push(cb);
   }
 
-  onFitPage(cb: () => void): void {
+  onFitToggle(cb: () => void): void {
     this._fitCallbacks.push(cb);
   }
 
   setScale(scale: ZoomLevel): void {
     this._scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
     this._updateLabel();
+  }
+
+  setFitActive(active: boolean): void {
+    this._fitBtn.classList.toggle("zoom-controller__fit-btn--active", active);
+    this._fitBtn.setAttribute("aria-pressed", String(active));
+    this._fitBtn.title = active ? "Turn off fit page" : "Fit page";
+    this._fitBtn.setAttribute("aria-label", this._fitBtn.title);
   }
 
   adjustBy(delta: number, anchor?: ZoomAnchor): void {

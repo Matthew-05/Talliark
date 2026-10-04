@@ -29,5 +29,20 @@
 .zoom-controller__fit-btn {
   width: auto;
   padding: 0 8px;
+  border: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+
+.zoom-controller__fit-btn:hover {
+  border-color: var(--color-accent-muted);
+  color: var(--color-text);
+}
+
+.zoom-controller__fit-btn--active,
+.zoom-controller__fit-btn--active:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
 }

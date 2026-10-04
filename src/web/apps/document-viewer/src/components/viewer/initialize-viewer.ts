@@ -113,12 +113,14 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     zoom.setScale(scale);
     viewer.setZoom(scale);
     fitMode.enter(pageNumber);
+    zoom.setFitActive(true);
   };
 
   // Only the +/- buttons and ctrl+wheel reach this callback, so it means the user
   // has chosen an explicit zoom level and no longer wants the page kept fitted.
   zoom.onChange((scale, anchor) => {
     fitMode.exit();
+    zoom.setFitActive(false);
     viewer.setZoom(scale, anchor);
   });
 
@@ -132,7 +134,13 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     onVisiblePageChanged();
   });
 
-  zoom.onFitPage(() => {
+  zoom.onFitToggle(() => {
+    if (fitMode.isActive()) {
+      fitMode.exit();
+      zoom.setFitActive(false);
+      return;
+    }
+
     const fitScale = viewer.getPageFitScale(currentPage);
     if (fitScale === null) return;
     applyFitZoom(fitScale);

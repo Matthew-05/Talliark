@@ -32,8 +32,8 @@ export interface FitMode {
  * also keeps the page fitted when the user drags the task-pane splitter.
  *
  * Fit mode is entered whenever a fit scale is applied (the Fit button, rectangle
- * navigation, search navigation) and left as soon as the user picks an explicit
- * zoom level.
+ * navigation, search navigation) and left when the user toggles Fit off or picks
+ * an explicit zoom level.
  */
 export function createFitMode(
   viewer: PdfViewer,
