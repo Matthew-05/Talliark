@@ -107,6 +107,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
     },
     () => currentPage,
   );
+  zoom.setFitActive(true);
 
   /** Applies a page-fit scale and keeps it fitted across later viewer resizes. */
   const applyFitZoom = (scale: ZoomLevel, pageNumber?: number): void => {
@@ -126,6 +127,7 @@ export function initializeViewer(viewer: PdfViewer): { toolbarElement: HTMLEleme
 
   viewer.onLoaded(() => {
     currentPage = 1;
+    zoom.setFitActive(fitMode.isActive());
   });
 
   page.onChange((pageNum) => {

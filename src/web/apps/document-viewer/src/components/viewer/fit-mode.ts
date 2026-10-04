@@ -31,22 +31,36 @@ export interface FitMode {
  * than trying to predict when the size has settled, fit mode reacts to it, which
  * also keeps the page fitted when the user drags the task-pane splitter.
  *
- * Fit mode is entered whenever a fit scale is applied (the Fit button, rectangle
- * navigation, search navigation) and left when the user toggles Fit off or picks
- * an explicit zoom level.
+ * Each document starts in fit mode the first time it is shown. Its choice is
+ * then retained independently for the lifetime of this viewer: leaving fit on
+ * one document does not turn it off for the others. Fit is also entered whenever
+ * a fit scale is applied (the Fit button, rectangle navigation, search
+ * navigation), and left when the user toggles Fit off or picks an explicit zoom
+ * level.
  */
 export function createFitMode(
   viewer: PdfViewer,
   applyZoom: (scale: ZoomLevel) => void,
   getCurrentPage: () => number,
 ): FitMode {
-  let active = false;
+  const activeByPdfId = new Map<string, boolean>();
+  let activeWithoutDocument = true;
   let pinnedPage: number | null = null;
 
-  const refit = (): void => {
-    if (!active) return;
+  const isActive = (): boolean => {
+    const pdfId = viewer.getActivePdfId();
+    return pdfId === null ? activeWithoutDocument : (activeByPdfId.get(pdfId) ?? true);
+  };
 
-    const pageNumber = pinnedPage ?? getCurrentPage();
+  const setActive = (active: boolean): void => {
+    const pdfId = viewer.getActivePdfId();
+    if (pdfId === null) activeWithoutDocument = active;
+    else activeByPdfId.set(pdfId, active);
+  };
+
+  const refitPage = (pageNumber: number): void => {
+    if (!isActive()) return;
+
     const scale = viewer.getPageFitScale(pageNumber);
     if (scale === null) return;
 
@@ -63,22 +77,30 @@ export function createFitMode(
     wrapper?.scrollIntoView({ behavior: "instant" as ScrollBehavior });
   };
 
+  const refit = (): void => { refitPage(pinnedPage ?? getCurrentPage()); };
+
   // Observing the border box (the default) rather than the content box keeps a
   // scrollbar appearing or disappearing from re-triggering this and oscillating.
   const observer = new ResizeObserver(refit);
   observer.observe(viewer.element);
+  // Every document opens on page one. Its dimensions may differ radically from
+  // the previous document even though the viewer element itself did not resize.
+  viewer.onLoaded(() => {
+    pinnedPage = null;
+    refitPage(1);
+  });
 
   return {
     enter: (pageNumber) => {
-      active = true;
+      setActive(true);
       pinnedPage = pageNumber ?? null;
     },
     releasePin: () => { pinnedPage = null; },
     exit: () => {
-      active = false;
+      setActive(false);
       pinnedPage = null;
     },
-    isActive: () => active,
+    isActive,
     dispose: () => { observer.disconnect(); },
   };
 }
