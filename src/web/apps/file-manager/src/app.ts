@@ -105,6 +105,8 @@ export function mountApp(root: HTMLElement): void {
 
   initHostBridge(onFilesLoaded, onFolderSelected, onOcrStatus, () => {
     fileTable.endRowDrag();
+  }, () => {
+    fileTable.dismissContextMenu();
   });
 
   wireFileManagerUiReset({

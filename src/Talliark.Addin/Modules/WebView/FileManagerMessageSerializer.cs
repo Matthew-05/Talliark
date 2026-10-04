@@ -145,6 +145,16 @@ namespace Talliark.Addin.Modules.WebView
             return "{\"type\":\"row-drag-ended\"}";
         }
 
+        /// <summary>
+        /// Builds the host→web command that dismisses transient menus after a click on the
+        /// native sidebar, which sits outside the WebView DOM and cannot raise its document
+        /// click handler.
+        /// </summary>
+        public static string BuildDismissContextMenu()
+        {
+            return "{\"type\":\"dismiss-context-menu\"}";
+        }
+
         private static void AppendString(StringBuilder sb, string value)
         {
             sb.Append('"');

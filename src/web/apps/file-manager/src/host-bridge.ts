@@ -60,12 +60,18 @@ interface RowDragEndedMessage {
   type: "row-drag-ended";
 }
 
+/** The user pressed the native sidebar, outside the WebView's DOM. */
+interface DismissContextMenuMessage {
+  type: "dismiss-context-menu";
+}
+
 type HostMessage =
   | FilesLoadedMessage
   | FolderSelectedMessage
   | OcrStatusMessage
   | ResetUiMessage
-  | RowDragEndedMessage;
+  | RowDragEndedMessage
+  | DismissContextMenuMessage;
 
 // ── Outbound (web → host) ─────────────────────────────────────────────────────
 
@@ -96,7 +102,8 @@ export function initHostBridge(
   onFilesLoaded: (folders: FolderEntry[], files: FileEntry[]) => void,
   onFolderSelected?: (folderId: string | null) => void,
   onOcrStatus?: (pdfId: string, status: string, progress: OcrProgress) => void,
-  onRowDragEnded?: () => void
+  onRowDragEnded?: () => void,
+  onDismissContextMenu?: () => void,
 ): void {
   const webview = getWebView();
   if (!webview) return;
@@ -132,6 +139,8 @@ export function initHostBridge(
       _onResetUi?.();
     } else if (msg.type === "row-drag-ended") {
       onRowDragEnded?.();
+    } else if (msg.type === "dismiss-context-menu") {
+      onDismissContextMenu?.();
     }
   });
 

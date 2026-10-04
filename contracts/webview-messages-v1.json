@@ -422,6 +422,19 @@
       ]
     },
 
+    "DismissContextMenuMessage": {
+      "description": "Sent by the C# host when the user presses the native file-manager sidebar, outside the WebView DOM. The web UI dismisses any open custom context menu just as it would for a click elsewhere in the document.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "dismiss-context-menu" }
+      },
+      "examples": [
+        { "type": "dismiss-context-menu" }
+      ]
+    },
+
     "RectPayload": {
       "description": "A normalized rectangle (0–1 coordinate space, top-left origin) on a single PDF page.",
       "type": "object",
@@ -1452,6 +1465,7 @@
     { "$ref": "#/definitions/ManagerReadyMessage" },
     { "$ref": "#/definitions/FilesLoadedMessage" },
     { "$ref": "#/definitions/FolderSelectedMessage" },
+    { "$ref": "#/definitions/DismissContextMenuMessage" },
     { "$ref": "#/definitions/RenameFileMessage" },
     { "$ref": "#/definitions/RemoveFileMessage" },
     { "$ref": "#/definitions/ExportFileMessage" },

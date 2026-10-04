@@ -158,6 +158,13 @@ namespace Talliark.Addin.Modules.WebView
             public int Count;
         }
 
+        /// <summary>
+        /// Raised when a mouse press begins anywhere on this native sidebar, including its
+        /// child controls. The web surface uses it to dismiss transient UI that would normally
+        /// close from a DOM document click.
+        /// </summary>
+        public event Action InteractionStarted;
+
         /// <summary>Raised when the user picks a row. <c>null</c> means All Files.</summary>
         public event Action<string> FolderSelected;
 
@@ -291,6 +298,7 @@ namespace Talliark.Addin.Modules.WebView
             _addButton.Cursor = Cursors.Hand;
             _addButton.FlatAppearance.BorderSize = 0;
             _addButton.FlatAppearance.MouseOverBackColor = SurfaceHover;
+            _addButton.MouseDown += OnChildControlMouseDown;
             _addButton.Click += OnAddButtonClick;
             _addButton.MouseWheel += OnSidebarMouseWheel;
             Controls.Add(_addButton);
@@ -299,6 +307,7 @@ namespace Talliark.Addin.Modules.WebView
             _editHost.Size = new Size(0, EditHeight);
             _editHost.Visible = false;
             _editHost.Paint += OnEditHostPaint;
+            _editHost.MouseDown += OnChildControlMouseDown;
             Controls.Add(_editHost);
 
             _editBox.BorderStyle = BorderStyle.None;
@@ -309,6 +318,7 @@ namespace Talliark.Addin.Modules.WebView
             _editHost.Controls.Add(_editBox);
             _editBox.LostFocus += OnEditBoxLostFocus;
             _editBox.KeyDown += OnEditBoxKeyDown;
+            _editBox.MouseDown += OnChildControlMouseDown;
             _editBox.MouseWheel += OnSidebarMouseWheel;
 
             // Sized and placed over the list band rather than docked: docking right would run it the
@@ -319,6 +329,7 @@ namespace Talliark.Addin.Modules.WebView
             // beside it, and a scrollbar in that chain would take Ctrl+A from the table.
             _scrollBar.TabStop = false;
             _scrollBar.Scroll += OnScrollBarScroll;
+            _scrollBar.MouseDown += OnChildControlMouseDown;
             _scrollBar.Width = SystemInformation.VerticalScrollBarWidth;
             Controls.Add(_scrollBar);
 
@@ -1219,7 +1230,9 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (_disposed || e.Button != MouseButtons.Left) return;
+            if (_disposed) return;
+            InteractionStarted?.Invoke();
+            if (e.Button != MouseButtons.Left) return;
 
             // A press here during a row drag is not a second gesture: the press that started
             // the drag is in the web view, and this control is only holding the mouse for it.
@@ -1395,6 +1408,12 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
         }
 
         // ── Inline edit                                           ────
+
+        private void OnChildControlMouseDown(object sender, MouseEventArgs e)
+        {
+            if (_disposed) return;
+            InteractionStarted?.Invoke();
+        }
 
         private void OnAddButtonClick(object sender, EventArgs e)
         {

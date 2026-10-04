@@ -106,6 +106,7 @@ namespace Talliark.Addin.Modules.WebView
             // first and the web view the remainder.
             _sidebar.Dock = DockStyle.Left;
             _sidebar.Width = SidebarWidth;
+            _sidebar.InteractionStarted += OnSidebarInteractionStarted;
             _sidebar.FolderSelected += OnSidebarFolderSelected;
             _sidebar.FolderCreateRequested += OnSidebarFolderCreateRequested;
             _sidebar.FolderRenameRequested += OnSidebarFolderRenameRequested;
@@ -290,6 +291,12 @@ namespace Talliark.Addin.Modules.WebView
         }
 
         // ── Native sidebar intents ────────────────────────────────────────────
+
+        private void OnSidebarInteractionStarted()
+        {
+            if (_disposed || !_webViewReady) return;
+            PostToWebView(FileManagerMessageSerializer.BuildDismissContextMenu());
+        }
 
 /// <summary>
         /// Tells the web UI which folder to filter by — it owns no folder list of its own.
@@ -1188,6 +1195,7 @@ namespace Talliark.Addin.Modules.WebView
                     DragLeave -= NativeFileDrop_DragLeave;
                     DragDrop -= NativeFileDrop_DragDrop;
 
+                    _sidebar.InteractionStarted -= OnSidebarInteractionStarted;
                     _sidebar.FolderSelected -= OnSidebarFolderSelected;
                     _sidebar.FolderCreateRequested -= OnSidebarFolderCreateRequested;
                     _sidebar.FolderRenameRequested -= OnSidebarFolderRenameRequested;

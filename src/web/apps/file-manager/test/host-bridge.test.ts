@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { sendOpenFileInViewer } from "../src/host-bridge.ts";
+import { initHostBridge, sendOpenFileInViewer } from "../src/host-bridge.ts";
 
 test("sends the explicit task-pane viewer command for a file", () => {
   const sent: string[] = [];
@@ -27,4 +27,34 @@ test("sends the explicit task-pane viewer command for a file", () => {
   assert.deepEqual(sent.map((message) => JSON.parse(message)), [
     { type: "open-file-in-viewer", id: "pdf-123" },
   ]);
+});
+
+test("dispatches native sidebar context-menu dismissal", () => {
+  const webview = new EventTarget() as EventTarget & {
+    postMessage(message: string): void;
+  };
+  webview.postMessage = () => {};
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { chrome: { webview } },
+  });
+
+  let dismissed = 0;
+  try {
+    initHostBridge(
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      () => { dismissed++; },
+    );
+    webview.dispatchEvent(new MessageEvent("message", {
+      data: JSON.stringify({ type: "dismiss-context-menu" }),
+    }));
+  } finally {
+    delete (globalThis as { window?: unknown }).window;
+  }
+
+  assert.equal(dismissed, 1);
 });

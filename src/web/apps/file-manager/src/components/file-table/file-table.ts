@@ -13,6 +13,7 @@ import type { OcrProgress } from "../../host-bridge.js";
 // setup is a side effect that keeps all of pdf.js in whatever bundles it.
 import { isTextEntryTarget } from "@talliark/shared/text-entry-target.js";
 import { fileProgressFraction, stageLabel } from "@talliark/shared";
+import { retainVisibleFileSelection } from "../../file-selection.js";
 
 export interface FileTableOptions {
   onSelectionChange(selectedIds: string[]): void;
@@ -313,11 +314,15 @@ export class FileTable {
     this._isLoading = false;
     this._files = files;
     this._selectedFolderId = selectedFolderId;
-    // Drop selections that no longer exist
-    const fileIds = new Set(files.map((f) => f.id));
-    for (const id of this._selectedIds) {
-      if (!fileIds.has(id)) this._selectedIds.delete(id);
-    }
+
+    // A folder change narrows both the rows and the selection. Keep selected
+    // documents that remain visible, but do not leave hidden documents powering
+    // toolbar actions after their rows have disappeared.
+    const selectionChanged = retainVisibleFileSelection(
+      this._selectedIds,
+      files,
+      selectedFolderId,
+    );
     for (const id of this._ocrProgress.keys()) {
       const file = files.find((entry) => entry.id === id);
       if (
@@ -331,6 +336,7 @@ export class FileTable {
       }
     }
     this._render();
+    if (selectionChanged) this._onSelectionChange(this.getSelectedIds());
   }
 
   /**
@@ -399,6 +405,11 @@ export class FileTable {
     this._lastClickedSelected = true;
     this._render();
     this._onSelectionChange([]);
+  }
+
+  /** Closes the table's custom menu after an interaction outside the WebView. */
+  dismissContextMenu(): void {
+    this._hideContextMenu();
   }
 
   /**
