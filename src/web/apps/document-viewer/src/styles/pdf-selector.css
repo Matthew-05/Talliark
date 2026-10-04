@@ -136,7 +136,7 @@
 }
 
 .pdf-selector__item--active {
-  color: var(--color-accent-hover);
+  background: rgba(var(--color-accent-rgb), 0.12);
 }
 
 .pdf-selector__empty {
