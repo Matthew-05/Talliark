@@ -205,6 +205,7 @@
   <ItemGroup>
     <Compile Include="Modules\CustomXml\TalliarkCustomXmlPartStore.cs" />
     <Compile Include="Modules\CustomXml\TalliarkXml.cs" />
+    <Compile Include="Modules\CustomXml\TalliarkXmlPartSnapshot.cs" />
     <Compile Include="Modules\CustomXml\Models\TalliarkContent.cs" />
     <Compile Include="Modules\CustomXml\Models\TalliarkStorage.cs" />
     <Compile Include="Modules\CustomXml\Models\LinkedCell.cs" />
@@ -264,6 +265,7 @@
     <Compile Include="Modules\Services\PdfTextLayerDetector.cs" />
     <Compile Include="Modules\Services\RotatePageService.cs" />
     <Compile Include="Modules\Services\SelectionTargetTracker.cs" />
+    <Compile Include="Modules\Services\StoredXmlDebugService.cs" />
     <Compile Include="Modules\Services\UpdateCheckService.cs" />
     <Compile Include="Modules\Services\UpdateInstallerService.cs" />
     <Compile Include="Modules\Services\UpdateLinkService.cs" />
@@ -289,6 +291,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Modules\UI\SettingsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Modules\UI\StoredXmlDebugDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Modules\UI\ThreadedProgressController.cs" />

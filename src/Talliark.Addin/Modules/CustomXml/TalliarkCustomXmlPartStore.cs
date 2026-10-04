@@ -368,7 +368,57 @@ namespace Talliark.Addin.Modules.CustomXml
             DeleteReconcileWorkspace();
         }
 
-        // ── Private COM helpers ───────────────────────────────────────────────
+        // ── Debug snapshots ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Takes a read-only snapshot of every Custom XML part owned by Talliark.
+        /// Namespace-prefix matching keeps the debug view useful when another
+        /// storage part is introduced without teaching the inspector its schema.
+        /// </summary>
+        public IList<TalliarkXmlPartSnapshot> LoadXmlPartSnapshots()
+        {
+            var snapshots = new List<TalliarkXmlPartSnapshot>();
+            Office.CustomXMLParts parts = null;
+
+            try
+            {
+                parts = _workbook.CustomXMLParts;
+                for (int index = 1; index <= parts.Count; index++)
+                {
+                    Office.CustomXMLPart part = null;
+                    try
+                    {
+                        part = (Office.CustomXMLPart)parts[index];
+                        string namespaceUri = part.NamespaceURI;
+                        if (!TalliarkXml.IsStorageNamespace(namespaceUri))
+                            continue;
+
+                        snapshots.Add(new TalliarkXmlPartSnapshot(namespaceUri, part.XML));
+                    }
+                    finally
+                    {
+                        if (part != null && Marshal.IsComObject(part))
+                            Marshal.ReleaseComObject(part);
+                    }
+                }
+            }
+            catch (COMException ex)
+            {
+                throw new InvalidOperationException(
+                    "Talliark could not read the stored XML data in this workbook.", ex);
+            }
+            finally
+            {
+                if (parts != null && Marshal.IsComObject(parts))
+                    Marshal.ReleaseComObject(parts);
+            }
+
+            snapshots.Sort((left, right) => string.CompareOrdinal(
+                left.NamespaceUri, right.NamespaceUri));
+            return snapshots;
+        }
+
+        // ── Private COM helpers ────────────────────────────────────────────────
 
         private Office.CustomXMLPart FindPartByNamespace(string namespaceUri)
         {

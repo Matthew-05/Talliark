@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -294,8 +295,29 @@ namespace Talliark.Addin.Modules.UI
             };
             DialogTheme.StyleSecondaryButton(openLogsBtn);
             openLogsBtn.Click += OpenLogFolder;
-            openLogsBtn.Tag = FlowedRowTag.Footer;
-            card.Controls.Add(openLogsBtn);
+
+            var inspectXmlBtn = new Button
+            {
+                Text = "Inspect Stored XML",
+                Size = new Size(150, 30)
+            };
+            DialogTheme.StyleSecondaryButton(inspectXmlBtn);
+            inspectXmlBtn.Click += OpenStoredXml;
+
+            var debugActions = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+                Tag = FlowedRowTag.Footer
+            };
+            openLogsBtn.Margin = new Padding(0, 0, 8, 0);
+            inspectXmlBtn.Margin = Padding.Empty;
+            debugActions.Controls.Add(openLogsBtn);
+            debugActions.Controls.Add(inspectXmlBtn);
+            card.Controls.Add(debugActions);
 
             LayoutFlowedRows(card, DevelopmentRowsTop);
             int laidOutAt = card.ClientSize.Width;
@@ -479,6 +501,39 @@ namespace Talliark.Addin.Modules.UI
                 MessageBox.Show(
                     this,
                     "The Talliark log folder could not be opened.",
+                    "Talliark",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void OpenStoredXml(object sender, EventArgs e)
+        {
+            try
+            {
+                var workbook = Globals.ThisAddIn?.Application?.ActiveWorkbook;
+                if (workbook == null)
+                {
+                    MessageBox.Show(
+                        this,
+                        "Open a workbook before inspecting stored XML.",
+                        "Talliark",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
+                IList<StoredXmlDebugEntry> entries =
+                    new StoredXmlDebugService().Capture(workbook);
+                using (var dialog = new StoredXmlDebugDialog(workbook.Name, entries))
+                    dialog.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                TalliarkLog.Trace($"Could not inspect stored XML: {ex}");
+                MessageBox.Show(
+                    this,
+                    "The stored Talliark XML could not be read from this workbook.",
                     "Talliark",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);

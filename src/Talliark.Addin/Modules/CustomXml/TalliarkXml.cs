@@ -4,6 +4,8 @@ namespace Talliark.Addin.Modules.CustomXml
 {
     internal static class TalliarkXml
     {
+        public const string StorageNamespacePrefix = "urn:talliark:schemas:storage:";
+
         public const string ContentNamespaceUri = "urn:talliark:schemas:storage:1:content";
 
         public static readonly XNamespace ContentNs = ContentNamespaceUri;
@@ -76,5 +78,11 @@ namespace Talliark.Addin.Modules.CustomXml
         public const string PageIndexAttribute = "index";
 
         public const string RotationAttribute = "rotation";
+
+        public static bool IsStorageNamespace(string namespaceUri)
+        {
+            return !string.IsNullOrWhiteSpace(namespaceUri)
+                && namespaceUri.StartsWith(StorageNamespacePrefix, System.StringComparison.Ordinal);
+        }
     }
 }
