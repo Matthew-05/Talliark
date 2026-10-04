@@ -78,7 +78,7 @@ export class FileTable {
    */
   private readonly _progressFloor = new Map<string, number>();
   private readonly _onSelectionChange: (ids: string[]) => void;
-  private _sortKey: SortKey | null = null;
+  private _sortKey: SortKey | null = "name";
   private _sortDirection: SortDirection = "ascending";
   /** Anchor row for shift-click range selection — the last row explicitly clicked. */
   private _lastClickedId: string | null = null;
@@ -115,6 +115,7 @@ export class FileTable {
 
     this._thead = document.createElement("thead");
     this._buildHeader();
+    this._updateSortHeaders();
 
     const selectAllCb = this._thead.querySelector<HTMLInputElement>(".select-all-cb")!;
     selectAllCb.addEventListener("change", () => this._onSelectAll(selectAllCb.checked));
