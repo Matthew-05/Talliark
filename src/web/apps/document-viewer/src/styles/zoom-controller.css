@@ -46,3 +46,17 @@
   background: var(--color-accent);
   color: #fff;
 }
+
+@media (max-width: 340px) {
+  .zoom-controller {
+    gap: 4px;
+  }
+
+  .zoom-controller__label {
+    min-width: 36px;
+  }
+
+  .zoom-controller__fit-btn {
+    padding-inline: 6px;
+  }
+}

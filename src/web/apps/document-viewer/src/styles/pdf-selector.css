@@ -9,6 +9,14 @@
   }
 }
 
+@media (max-width: 520px) {
+  .pdf-selector__dropdown {
+    right: 0;
+    left: auto;
+    width: min(240px, calc(100vw - 16px));
+  }
+}
+
 @media (min-width: 1200px) {
   .pdf-selector {
     --selector-width: 240px;

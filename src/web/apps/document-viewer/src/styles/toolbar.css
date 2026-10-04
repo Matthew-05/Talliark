@@ -6,8 +6,10 @@
 
 .toolbar {
   display: grid;
+  grid-template-areas: "left center right";
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  column-gap: var(--toolbar-gap);
   height: var(--toolbar-height);
   padding: var(--toolbar-padding);
   background: var(--color-surface);
@@ -21,6 +23,7 @@
 }
 
 .toolbar__left {
+  grid-area: left;
   display: flex;
   align-items: center;
   gap: var(--toolbar-gap);
@@ -29,20 +32,81 @@
 }
 
 .toolbar__center {
+  grid-area: center;
   display: flex;
   align-items: center;
   gap: var(--toolbar-gap);
+  min-width: 0;
 }
 
 .toolbar__right {
+  grid-area: right;
   display: flex;
   align-items: center;
   gap: var(--toolbar-gap);
   justify-self: end;
+  min-width: 0;
 }
 
 .toolbar__slot {
   display: flex;
   align-items: center;
   gap: var(--toolbar-gap);
+}
+
+/* The viewer is routinely hosted in an Excel task pane. Once all three groups
+   no longer fit comfortably on one line, keep the document tools and search on
+   the first row and give the page controls an unclipped row of their own. */
+@media (max-width: 900px) {
+  .toolbar {
+    grid-template-areas:
+      "left right"
+      "center center";
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 6px;
+    height: auto;
+    min-height: var(--toolbar-height);
+    padding: 6px 10px;
+  }
+
+  .toolbar__center {
+    justify-self: center;
+  }
+}
+
+/* At task-pane widths every group gets a row. The selectors and search control
+   can then use the available width instead of competing with page navigation. */
+@media (max-width: 520px) {
+  .toolbar {
+    grid-template-areas:
+      "left"
+      "center"
+      "right";
+    grid-template-columns: minmax(0, 1fr);
+    padding: 6px 8px;
+  }
+
+  .toolbar__left,
+  .toolbar__right {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .toolbar__left .pdf-selector,
+  .toolbar__right .search-bar {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .toolbar__left .pdf-selector__trigger,
+  .toolbar__right .search-bar__input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 340px) {
+  .toolbar {
+    --toolbar-gap: 4px;
+    padding-inline: 6px;
+  }
 }

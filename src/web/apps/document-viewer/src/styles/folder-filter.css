@@ -9,6 +9,16 @@
   }
 }
 
+@media (max-width: 520px) {
+  .folder-filter {
+    --folder-filter-width: clamp(88px, 30vw, 104px);
+  }
+
+  .folder-filter__dropdown {
+    width: min(200px, calc(100vw - 16px));
+  }
+}
+
 @media (min-width: 1200px) {
   .folder-filter {
     --folder-filter-width: 170px;

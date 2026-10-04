@@ -25,3 +25,9 @@
 .page-controller__total {
   color: var(--color-text-muted);
 }
+
+@media (max-width: 340px) {
+  .page-controller__input {
+    width: 32px;
+  }
+}
