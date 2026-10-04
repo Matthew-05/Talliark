@@ -14,6 +14,12 @@ namespace Talliark.Addin.Modules.Services
         /// <summary>The numeric value, e.g. "1.15%" resolves to 0.0115 and "(4)" resolves to -4.</summary>
         public double Value { get; set; }
         public bool HasThousandsSeparator { get; set; }
+        /// <summary>
+        /// Decimal places needed to display the resolved value at the precision
+        /// expressed by the source. A magnitude consumes decimal places as it shifts
+        /// the decimal point: "1.25 million" resolves to an integer, while
+        /// "1.2345678 million" retains one decimal place.
+        /// </summary>
         public int DecimalPlaces { get; set; }
         public bool UsesParenthesesForNegative { get; set; }
         public bool IsPercent { get; set; }
@@ -150,16 +156,41 @@ namespace Talliark.Addin.Modules.Services
             else parsed *= magnitude;
             if (isParenthetical) parsed = -parsed;
 
-            int decimalIndex = sourceNumber.IndexOf('.');
             return new ParsedNumber
             {
                 Value = parsed,
                 HasThousandsSeparator = sourceNumber.IndexOf(',') >= 0 || magnitude > 1d,
-                DecimalPlaces = decimalIndex >= 0 ? sourceNumber.Length - decimalIndex - 1 : 0,
+                DecimalPlaces = ResolveDecimalPlaces(sourceNumber, isPercent, magnitude),
                 UsesParenthesesForNegative = isParenthetical,
                 IsPercent = isPercent,
                 Magnitude = magnitude,
             };
+        }
+
+        private static int ResolveDecimalPlaces(
+            string sourceNumber,
+            bool isPercent,
+            double magnitude)
+        {
+            int decimalIndex = sourceNumber.IndexOf('.');
+            int decimalPlaces = decimalIndex >= 0
+                ? sourceNumber.Length - decimalIndex - 1
+                : 0;
+
+            // Excel stores a percentage as its decimal fraction but displays the
+            // source precision after multiplying by 100, so percent places stay as
+            // printed. A magnitude instead changes the displayed numeric value: each
+            // power of ten moves one source decimal place into the integer portion.
+            if (isPercent) return decimalPlaces;
+
+            double remainingMagnitude = magnitude;
+            while (decimalPlaces > 0 && remainingMagnitude >= 10d)
+            {
+                decimalPlaces--;
+                remainingMagnitude /= 10d;
+            }
+
+            return decimalPlaces;
         }
 
         private static double ResolveMagnitude(string text)
