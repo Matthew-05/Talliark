@@ -672,33 +672,6 @@ export class FileTable {
       this._showContextMenu(file, nameSpan, tr, e.clientX, e.clientY);
     });
 
-    // Click anywhere on the row (outside interactive controls, which handle
-    // their own clicks) toggles that row's selection — shift-click extends
-    // the range from the last-clicked row instead, standard Explorer/Finder
-    // behavior.
-    tr.addEventListener("click", (e) => {
-      if (this._locked) return;
-      // A drag the host declined leaves the release here, and it must not read as a click
-      // that reselects the row the user was trying to move somewhere else.
-      if (this._dragActive) return;
-      const target = e.target as HTMLElement;
-      if (target.closest("input, button")) return;
-      e.preventDefault();
-
-      if (e.shiftKey) {
-        this._selectRange(file.id);
-        return;
-      }
-
-      const nowSelected = !this._selectedIds.has(file.id);
-      this._onRowCheck(file.id, nowSelected);
-      cb.checked = nowSelected;
-      tr.classList.toggle("is-selected", nowSelected);
-      this._lastClickedId = file.id;
-      this._lastClickedSelected = nowSelected;
-      if (nowSelected) sendSelectFile(file.id);
-    });
-
     // Checkbox cell
     const checkTd = document.createElement("td");
     checkTd.className = "col-check";

@@ -270,7 +270,6 @@
   width: 15px;
   height: 15px;
   margin: 0 auto;
-  cursor: pointer;
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
