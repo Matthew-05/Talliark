@@ -16,7 +16,6 @@ namespace Talliark.Addin.Modules.Infrastructure
     {
         private const int MapiLogonUi = 0x00000001;
         private const int MapiDialog = 0x00000008;
-        private const int MapiTo = 1;
         private const int MapiUserAbort = 1;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
@@ -34,17 +33,6 @@ namespace Talliark.Addin.Modules.Infrastructure
             internal IntPtr Recipients;
             internal int FileCount;
             internal IntPtr Files;
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        private struct MapiRecipient
-        {
-            internal int Reserved;
-            internal int RecipientClass;
-            [MarshalAs(UnmanagedType.LPStr)] internal string Name;
-            [MarshalAs(UnmanagedType.LPStr)] internal string Address;
-            internal int EntryIdSize;
-            internal IntPtr EntryId;
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
@@ -74,7 +62,6 @@ namespace Talliark.Addin.Modules.Infrastructure
         }
 
         internal static Result ShowDraft(
-            string recipient,
             string subject,
             string body,
             IEnumerable<string> attachmentPaths)
@@ -86,7 +73,7 @@ namespace Talliark.Addin.Modules.Infrastructure
 
             try
             {
-                int code = ShowMapiDraft(recipient, subject, body, attachments);
+                int code = ShowMapiDraft(subject, body, attachments);
                 if (code == 0 || code == MapiUserAbort)
                     return new Result { Opened = true };
 
@@ -111,8 +98,7 @@ namespace Talliark.Addin.Modules.Infrastructure
 
             try
             {
-                string uri = "mailto:" + Uri.EscapeDataString(recipient)
-                    + "?subject=" + Uri.EscapeDataString(subject ?? string.Empty)
+                string uri = "mailto:?subject=" + Uri.EscapeDataString(subject ?? string.Empty)
                     + "&body=" + Uri.EscapeDataString(fallbackBody ?? string.Empty);
 
                 Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -133,27 +119,14 @@ namespace Talliark.Addin.Modules.Infrastructure
         }
 
         private static int ShowMapiDraft(
-            string recipient,
             string subject,
             string body,
             string[] attachments)
         {
-            IntPtr recipientPointer = IntPtr.Zero;
             IntPtr filePointer = IntPtr.Zero;
-            int initializedRecipients = 0;
             int initializedFiles = 0;
             try
             {
-                var recipientDescriptor = new MapiRecipient
-                {
-                    RecipientClass = MapiTo,
-                    Name = recipient,
-                    Address = "SMTP:" + recipient
-                };
-                recipientPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(MapiRecipient)));
-                Marshal.StructureToPtr(recipientDescriptor, recipientPointer, false);
-                initializedRecipients = 1;
-
                 if (attachments.Length > 0)
                 {
                     int descriptorSize = Marshal.SizeOf(typeof(MapiFile));
@@ -178,8 +151,8 @@ namespace Talliark.Addin.Modules.Infrastructure
                 {
                     Subject = subject,
                     NoteText = body,
-                    RecipientCount = 1,
-                    Recipients = recipientPointer,
+                    RecipientCount = 0,
+                    Recipients = IntPtr.Zero,
                     FileCount = attachments.Length,
                     Files = filePointer
                 };
@@ -193,7 +166,6 @@ namespace Talliark.Addin.Modules.Infrastructure
             }
             finally
             {
-                DestroyStructures<MapiRecipient>(recipientPointer, initializedRecipients);
                 DestroyStructures<MapiFile>(filePointer, initializedFiles);
             }
         }

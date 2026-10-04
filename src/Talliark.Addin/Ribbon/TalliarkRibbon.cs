@@ -90,17 +90,6 @@ namespace Talliark.Addin.Ribbon
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(BuildConfiguration.BugReportEmail))
-                {
-                    MessageBox.Show(
-                        "Bug reporting is not configured in this build. Set BUG_REPORT_EMAIL "
-                        + "in the repository .env file and rebuild the add-in.",
-                        "Talliark Bug Report",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                    return;
-                }
-
                 Excel.Workbook workbook = Globals.ThisAddIn?.Application?.ActiveWorkbook;
                 var draft = new BugReportDraft
                 {

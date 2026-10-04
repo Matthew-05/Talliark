@@ -161,7 +161,6 @@ namespace Talliark.Addin.Modules.Services
         internal static bool OpenEmail(IWin32Window owner, PreparedBugReport report)
         {
             DefaultMailComposer.Result result = DefaultMailComposer.ShowDraft(
-                BuildConfiguration.BugReportEmail,
                 report.Subject,
                 report.Body,
                 report.Attachments);
