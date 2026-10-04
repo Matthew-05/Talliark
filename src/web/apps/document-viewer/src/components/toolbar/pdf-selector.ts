@@ -1,4 +1,5 @@
 import type { PdfEntry } from "../../types/index.js";
+import { compareFileNamesAscending } from "@talliark/shared";
 
 /** True when `entry` belongs to `folderId`; a null filter accepts every entry. */
 export function matchesFolderFilter(entry: PdfEntry, folderId: string | null): boolean {
@@ -222,7 +223,7 @@ export class PdfSelector {
     const filtered = trimmed
       ? inFolder.filter((e) => e.name.toLowerCase().includes(trimmed))
       : inFolder;
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
+    filtered.sort((a, b) => compareFileNamesAscending(a.name, b.name));
 
     if (filtered.length === 0) {
       const empty = document.createElement("li");

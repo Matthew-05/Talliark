@@ -12,7 +12,7 @@ import type { OcrProgress } from "../../host-bridge.js";
 // the barrel re-exports the pdf.js geometry module, whose top-level worker
 // setup is a side effect that keeps all of pdf.js in whatever bundles it.
 import { isTextEntryTarget } from "@talliark/shared/text-entry-target.js";
-import { fileProgressFraction, stageLabel } from "@talliark/shared";
+import { compareFileNamesAscending, fileProgressFraction, stageLabel } from "@talliark/shared";
 import { retainVisibleFileSelection } from "../../file-selection.js";
 
 export interface FileTableOptions {
@@ -485,7 +485,7 @@ export class FileTable {
       case "status":
         return TEXT_COLLATOR.compare(formatStatusLabel(left.status), formatStatusLabel(right.status));
       case "name":
-        return TEXT_COLLATOR.compare(left.name, right.name);
+        return compareFileNamesAscending(left.name, right.name);
     }
   }
 

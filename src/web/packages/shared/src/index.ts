@@ -80,6 +80,7 @@ export {
 export { extractText } from "./text-extractor.js";
 export { normalizeExtractedZeroPlaceholder } from "./zero-placeholder.js";
 export { isTextEntryTarget } from "./text-entry-target.js";
+export { compareFileNamesAscending } from "./file-name-sort.js";
 export type { StageDefinition } from "./progress-stages.js";
 export { STAGES, STAGE_ORDER, fileProgressFraction, stageLabel } from "./progress-stages.js";
 export type { ModalAction, ModalActionVariant, ModalOptions } from "./modal.js";
