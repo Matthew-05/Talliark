@@ -284,7 +284,7 @@
         "status": {
           "type": "string",
           "enum": ["ocr", "text", "none"],
-          "description": "PDF content classification: ocr (processed), text (native text layer), none (scanned)."
+          "description": "PDF content classification: ocr (processed by Talliark), text (extractable text layer — native or an invisible OCR layer such as Talliark's export writes), none (scanned)."
         },
         "fileSizeBytes": { "type": "number", "description": "File size in bytes." },
         "dateAdded":     { "type": "string", "description": "ISO 8601 UTC datetime when the file was added." }
