@@ -1239,11 +1239,11 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
                 return;
             }
 
-            // A click outside the row being edited abandons it, the way clicking another
-            // folder did when this list was web-rendered.
+            // Leaving a name edit applies it before the new row handles this click. Delete
+            // confirmation is not a name edit, so clicking away still declines it.
             if (_editMode != EditMode.None && !IsInsideEditRow(index))
             {
-                CancelEdit();
+                CompleteEditOnFocusLoss();
             }
             else if (IsInsideEditRow(index))
             {
@@ -1287,6 +1287,24 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
 
             if (onDropZone) BrowseRequested?.Invoke();
             else Activate(index, zone);
+        }
+
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            base.OnMouseDoubleClick(e);
+            if (_disposed || e.Button != MouseButtons.Left || _rowDragIds != null) return;
+            if (_locked || _editMode != EditMode.None) return;
+
+            int index = HitTestRow(e.Location);
+
+            // Only the row body is a rename shortcut. All Files has no backing folder,
+            // while the action glyphs retain their own single-click behaviour.
+            if (HitTestZone(index, e.Location) != HitZone.Row) return;
+
+            FolderRow row = RowAt(index);
+            if (row == null || row.Id == null) return;
+
+            BeginRename(index);
         }
 
         private void ClearPress()
@@ -1433,7 +1451,13 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
 
         private void OnEditBoxKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.Control && !e.Alt && e.KeyCode == Keys.Back)
+            {
+                e.SuppressKeyPress = true;
+                e.Handled = true;
+                DeletePreviousToken();
+            }
+            else if (e.KeyCode == Keys.Enter)
             {
                 e.SuppressKeyPress = true;
                 e.Handled = true;
@@ -1454,9 +1478,58 @@ StrokeRounded(g, rect, borderColor, 2f, DashStyle.Dash);
             if (_holdFocus > 0) return;
             if (_editMode == EditMode.None) return;
 
-            // Focus left the sidebar entirely — abandoning the edit beats leaving a
-            // half-typed folder name behind in a row the user cannot see focus in.
-            CancelEdit();
+            CompleteEditOnFocusLoss();
+        }
+
+        /// <summary>
+        /// Applies a folder name when focus moves elsewhere. Delete confirmation remains an
+        /// explicitly confirmed action and is therefore cancelled on the same transition.
+        /// </summary>
+        private void CompleteEditOnFocusLoss()
+        {
+            if (_editMode == EditMode.Create || _editMode == EditMode.Rename) CommitEdit();
+            else CancelEdit();
+        }
+
+        /// <summary>
+        /// Gives the inline editor the Ctrl+Backspace behaviour expected of a modern text
+        /// field: remove any selection, or the whitespace and complete token before the caret.
+        /// Letters, digits and underscores form words; consecutive punctuation is one token.
+        /// </summary>
+        private void DeletePreviousToken()
+        {
+            if (_editBox.SelectionLength > 0)
+            {
+                _editBox.SelectedText = string.Empty;
+                return;
+            }
+
+            int end = _editBox.SelectionStart;
+            if (end <= 0) return;
+
+            string text = _editBox.Text;
+            int start = end;
+
+            while (start > 0 && char.IsWhiteSpace(text[start - 1])) start--;
+
+            if (start > 0)
+            {
+                bool word = IsWordCharacter(text[start - 1]);
+                while (start > 0 && !char.IsWhiteSpace(text[start - 1]) &&
+                    IsWordCharacter(text[start - 1]) == word)
+                {
+                    start--;
+                }
+            }
+
+            _editBox.SelectionStart = start;
+            _editBox.SelectionLength = end - start;
+            _editBox.SelectedText = string.Empty;
+        }
+
+        private static bool IsWordCharacter(char value)
+        {
+            return char.IsLetterOrDigit(value) || value == '_';
         }
 
         private void CommitEdit()
