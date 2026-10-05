@@ -1536,6 +1536,8 @@
     { "$ref": "#/definitions/ReconcileScanStatusMessage" },
     { "$ref": "#/definitions/RequestReconcileResultMessage" },
     { "$ref": "#/definitions/ReconcileResultLoadedMessage" },
+    { "$ref": "reconcile-review-v1.json#/definitions/ReviewRequest" },
+    { "$ref": "reconcile-review-v1.json#/definitions/ReviewResponse" },
 
     { "$ref": "#/definitions/LinkerAppReadyMessage" },
     { "$ref": "#/definitions/LinkerReadyMessage" },

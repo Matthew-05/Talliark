@@ -10,6 +10,7 @@ import {
 } from "@talliark/shared";
 import type { CharacterEntry, SearchMatch, SearchPageIndex } from "@talliark/shared";
 import type { Bounds, ReconcileOutcome } from "../../types/index.js";
+import type { ReviewBounds, ReviewCell, ReviewEvaluation } from "../../types/reconcile-review.generated.js";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const MIN_ZOOM = 0.25;
@@ -54,6 +55,9 @@ export class ReconcileViewer {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private searchMatches: SearchMatch[] = [];
   private activeSearchIndex = -1;
+  private reviewFocusGeneration = 0;
+  private evidencePicker: { cells: ReviewCell[]; select: (cell: ReviewCell) => void } | null = null;
+  private drawCallback: ((pageIndex: number, bounds: ReviewBounds) => void) | null = null;
   private readonly characters = new Map<number, CharacterEntry[]>();
   private readonly searchIndices = new Map<number, SearchPageIndex>();
   private categoryOverview: {
@@ -130,6 +134,7 @@ export class ReconcileViewer {
       this.pageInput.value = "1";
       this.pageInput.max = String(total);
       this.pageTotal.textContent = String(total);
+      this.renderReviewControls();
     });
     this.viewer.element.addEventListener("scroll", () => this.updatePageFromScroll(), { passive: true });
     this.viewer.element.addEventListener("wheel", (event) => {
@@ -158,7 +163,7 @@ export class ReconcileViewer {
     this.clearSearch();
     this.searchInput.disabled = true;
     this.searchInput.placeholder = "Indexing document…";
-    this.objectUrl = URL.createObjectURL(new Blob([decodeBase64(pdfBase64)], { type: "application/pdf" }));
+    this.objectUrl = URL.createObjectURL(new Blob([decodeBase64(pdfBase64).buffer as ArrayBuffer], { type: "application/pdf" }));
     await this.viewer.loadDocument(this.objectUrl, pdfId, pageRotations);
     this.viewer.startBackgroundRender();
     this.renderCategoryOverview();
@@ -184,6 +189,93 @@ export class ReconcileViewer {
     state.className = "viewer__placeholder reconcile-viewer__state--error";
     state.textContent = "The source document is unavailable.";
     this.viewer.showEmptyState(state);
+  }
+
+  dispose(): void {
+    this.reviewFocusGeneration++;
+    if (this.searchTimer !== null) clearTimeout(this.searchTimer);
+    this.revokeObjectUrl();
+    this.viewer.showEmptyState(document.createElement("div"));
+  }
+
+  async focusReview(cells: ReviewCell[], targetId: string, state: ReviewEvaluation["state"], navigate = true): Promise<void> {
+    const generation = ++this.reviewFocusGeneration;
+    await this.viewer.waitForLoad();
+    if (generation !== this.reviewFocusGeneration) return;
+    this.clearFocus();
+    const outcome = state === "exact-match" ? "confirmed" : state === "difference" ? "break" : "unresolved";
+    for (const cell of cells) {
+      const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${cell.pageIndex + 1}"]`);
+      if (!page) continue;
+      const highlight = document.createElement("div");
+      highlight.className = `reconcile-viewer__footing-highlight reconcile-viewer__footing-highlight--${cell.id === targetId ? "total" : "addend"} reconcile-viewer__footing-highlight--${outcome}`;
+      applyNormalizedRectToElement(highlight, cell.bounds); ensureOverlayLayer(page).append(highlight);
+    }
+    const target = cells.find(cell => cell.id === targetId) ?? cells[0];
+    if (target && navigate) {
+      await this.viewer.renderPageNow(target.pageIndex + 1);
+      if (generation === this.reviewFocusGeneration) this.viewer.scrollToPage(target.pageIndex + 1);
+    }
+  }
+
+  pickEvidence(cells: ReviewCell[], select: ((cell: ReviewCell) => void) | null): void {
+    this.evidencePicker = select ? { cells, select } : null;
+    this.renderReviewControls();
+  }
+
+  drawValue(complete: ((pageIndex: number, bounds: ReviewBounds) => void) | null): void {
+    this.drawCallback = complete;
+    this.renderReviewControls();
+  }
+
+  async showReviewPage(pageIndex: number): Promise<void> {
+    await this.viewer.waitForLoad();
+    await this.viewer.renderPageNow(pageIndex + 1);
+    this.viewer.scrollToPage(pageIndex + 1);
+  }
+
+  private renderReviewControls(): void {
+    this.viewer.element.querySelectorAll(".reconcile-viewer__evidence-pick, .reconcile-viewer__draw-surface")
+      .forEach(element => element.remove());
+    if (this.drawCallback) {
+      for (const { pageNumber, wrapper } of this.viewer.getPageLayout()) {
+        const surface = document.createElement("div"); surface.className = "reconcile-viewer__draw-surface";
+        surface.setAttribute("aria-label", "Drag a rectangle around the missing printed figure");
+        let start: { x: number; y: number } | null = null;
+        let box: HTMLElement | null = null;
+        const point = (event: PointerEvent): { x: number; y: number } => {
+          const rect = surface.getBoundingClientRect();
+          return { x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) };
+        };
+        const bounds = (end: { x: number; y: number }): ReviewBounds => ({
+          x: Math.min(start!.x, end.x), y: Math.min(start!.y, end.y), width: Math.abs(start!.x - end.x), height: Math.abs(start!.y - end.y),
+        });
+        surface.addEventListener("pointerdown", event => {
+          if (event.button !== 0) return; event.preventDefault(); start = point(event);
+          surface.setPointerCapture(event.pointerId); box = document.createElement("div");
+          box.className = "reconcile-viewer__draw-box"; surface.append(box);
+        });
+        surface.addEventListener("pointermove", event => { if (start && box) applyNormalizedRectToElement(box, bounds(point(event))); });
+        surface.addEventListener("pointerup", event => {
+          if (!start) return;
+          const rect = bounds(point(event)); start = null; box?.remove(); box = null;
+          if (rect.width > 0 && rect.height > 0) this.drawCallback?.(pageNumber - 1, rect);
+        });
+        surface.addEventListener("pointercancel", () => { start = null; box?.remove(); box = null; });
+        ensureOverlayLayer(wrapper).append(surface);
+      }
+    } else if (this.evidencePicker) {
+      const picker = this.evidencePicker;
+      for (const cell of picker.cells) {
+        const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${cell.pageIndex + 1}"]`);
+        if (!page) continue;
+        const button = document.createElement("button"); button.type = "button";
+        button.className = "reconcile-viewer__evidence-pick";
+        button.title = `${cell.label || cell.text} · ${cell.text}`; button.setAttribute("aria-label", `Select printed figure ${cell.text}`);
+        applyNormalizedRectToElement(button, cell.bounds);
+        button.addEventListener("click", () => picker.select(cell)); ensureOverlayLayer(page).append(button);
+      }
+    }
   }
 
   focus(focus: ViewerFocus): void {

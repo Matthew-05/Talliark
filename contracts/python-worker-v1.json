@@ -383,6 +383,8 @@
     { "$ref": "#/definitions/OcrSuccessMessage" },
     { "$ref": "#/definitions/ConvertSuccessMessage" },
     { "$ref": "#/definitions/ExportPdfSuccessMessage" },
-    { "$ref": "#/definitions/OcrErrorMessage" }
+    { "$ref": "#/definitions/OcrErrorMessage" },
+    { "$ref": "reconcile-review-v1.json#/definitions/ReviewWorkerJob" },
+    { "$ref": "reconcile-review-v1.json#/definitions/ReviewWorkerResult" }
   ]
 }

@@ -1,0 +1,9 @@
+.equation-editor { border: 1px solid var(--color-border); padding: 10px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 7px; }
+.equation-editor h3, .equation-editor p, .equation-editor__result { width: 100%; margin: 0; }
+.equation-editor__operand { display: flex; gap: 5px; margin: 5px 0; align-items: center; }
+.equation-editor__operand button:nth-child(2) { flex: 1; }
+.equation-editor__picker { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; }
+.equation-editor__picker input, .equation-editor__picker select { max-width: 100%; width: 100%; }
+.equation-editor details { width: 100%; }
+.equation-editor details input { max-width: 100%; width: 100%; margin: 5px 0; }
+.equation-editor__calculation { font-variant-numeric: tabular-nums; padding: 8px 0; }

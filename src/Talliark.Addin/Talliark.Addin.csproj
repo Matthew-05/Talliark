@@ -260,6 +260,9 @@
     <Compile Include="Modules\Services\OcrService.cs" />
     <Compile Include="Modules\Services\OcrStatusDetail.cs" />
     <Compile Include="Modules\Services\ReconcileResultService.cs" />
+    <Compile Include="Modules\Services\ReconcileReviewService.cs" />
+    <Compile Include="Modules\CustomXml\Models\ReconcileReview.generated.cs" />
+    <Compile Include="Modules\CustomXml\Serialization\TalliarkReconcileReviewSerializer.cs" />
     <Compile Include="Modules\Services\ReconcileWorkspaceService.cs" />
     <Compile Include="Modules\Services\PdfImportService.cs" />
     <Compile Include="Modules\Services\PdfExportService.cs" />

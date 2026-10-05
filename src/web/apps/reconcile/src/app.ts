@@ -14,6 +14,7 @@ import {
   sendImportDocument,
   sendCopyDocument,
   sendCompleteSetup,
+  sendReviewRequest,
 } from "./host-bridge.js";
 import { ScanProgressPanel } from "./components/scan-progress/scan-progress.js";
 import { completedPrimary, SetupWizard } from "./components/setup-wizard/setup-wizard.js";
@@ -29,6 +30,7 @@ export function mountApp(root: HTMLElement): void {
   let scanPresentation: "inline" | "floating" | null = null;
   let selectedId: string | null = null;
   let projectName = "";
+  let resultGeneration = 0;
 
   const intake = {
     onImport: (role: ReconcileDocumentRole) => sendImportDocument(role),
@@ -46,6 +48,7 @@ export function mountApp(root: HTMLElement): void {
   });
 
   const resultView = new ResultView(root, {
+    onReviewRequest: sendReviewRequest,
     onRescan(pdfId: string) {
       scanningId = pdfId;
       presentScan(pdfId);
@@ -83,6 +86,7 @@ export function mountApp(root: HTMLElement): void {
   }
 
   initHostBridge({
+    onReviewResponse: response => resultView.receiveReview(response),
     onDataLoaded(loaded, sources: ReconcileImportSource[], scanning, loadedProjectName) {
       documents = loaded;
       projectName = loadedProjectName;
@@ -145,6 +149,7 @@ export function mountApp(root: HTMLElement): void {
     },
 
     async onResultLoaded(pdfId, pdfBase64, pageRotations, reconcileBase64, staleness) {
+      const generation = ++resultGeneration;
       if (selectedId !== pdfId) return;
       const existing = documents.find((entry) => entry.id === pdfId);
       if (!existing) return;
@@ -154,9 +159,11 @@ export function mountApp(root: HTMLElement): void {
         return;
       }
       try {
+        const model = await decodeReconcileResult(reconcileBase64);
+        if (generation !== resultGeneration || selectedId !== pdfId) return;
         resultView.showResult(
           entry,
-          await decodeReconcileResult(reconcileBase64),
+          model,
           pdfBase64,
           pageRotations,
         );

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Source** | `src/python/engines/reconcile/` |
-| **Contract** | `contracts/reconcile-v1.json` |
+| **Contracts** | `contracts/reconcile-v1.json`; `contracts/reconcile-review-v1.json` |
 | **Entry point** | `engines/reconcile/detector.py` |
 | **Consumes** | The Reconcile-owned PDF version, its freshly produced artifacts, and private `FinancialTableScan` blocks |
 | **Tests** | `src/python/tests/test_reconcile.py`; fixtures in `src/python/tests/fixtures/reconcile/` |
@@ -11,7 +11,7 @@
 **Modules**
 
 `detector.py`, `findings.py`, `nominate.py`, `propagate.py`, `structures.py`,
-`sums.py`
+`sums.py`, `evaluate.py`, `review.py`
 
 Reconcile and its financial-table input engine are on-demand; neither runs in
 the cache build.
@@ -21,7 +21,13 @@ the cache build.
 Reconcile proves arithmetically whether totals printed in financial-statement
 blocks equal the addends the document presents. It owns nomination, run search,
 proof, findings, and the durable `reconcile-v1` envelope; it no longer owns table
-recognition or value-to-cell membership.
+recognition or value-to-cell membership. The mathematical review pane treats
+every detected equation as an unreviewed suggestion. The review list spans the
+whole active document and groups matching foots, crossfoots and manual sums by
+page and table. Reviewers approve the displayed relationships in a table,
+correct individual equations, or create
+manual equations from anchored PDF figures. Human acceptance and numerical
+agreement are independent facts; an exact match does not earn review credit.
 
 ## 2. Inputs and outputs
 
@@ -64,6 +70,24 @@ result. Failure or cancellation performs no storage write, so an earlier
 successful result remains intact. Version-history UI is intentionally not
 implemented.
 
+Review edits use a separate `reconcile-review` worker command over the existing
+NDJSON transport. Its inputs are the immutable scan, document values and an
+optional saved review. It performs no OCR or detection. Preview responses never
+write storage. A commit evaluates explicit operands, appends the previous review
+revision, and returns the new compressed review. The C# service rechecks the
+source and saved review after background work before replacing the workbook part.
+The pane updates persisted state only after that write is acknowledged.
+
+`talliark-storage-reconcile-review-v1.xsd` owns an independent Custom XML part,
+keyed by document identity. This additive store leaves earlier workbook workspace
+XML and `reconcile-v1` results readable without migration. A workbook without the
+part initializes review on first load; the initial state is recorded when workbook
+structure is writable. A protected workbook permits inspection, but commits fail
+without replacing saved state. Excel must be saved to persist workbook changes
+on disk. Unsupported review versions fail without replacing their payload.
+Reviews belonging to replaced document identities remain in the XML store;
+the current pane exposes only the active document's review and scan archives.
+
 ## 3. Types
 
 - **Internal candidate** - a cell proposed by structural recognition for
@@ -88,8 +112,73 @@ implemented.
   reassembled privately; only exact, independently parallel-supported results
   are eligible, so the broader view contributes neither breaks nor unresolved
   totals.
+- **Review equation** - an explicit printed target and signed anchored operands,
+  with human decision, numeric evaluation and issue disposition kept separately.
+- **Review revision** - a recoverable snapshot of equations, evidence, local
+  corrections and page-review declarations before a commit.
+- **Scan archive** - the prior review and evidence retained when the source scan
+  changes; approvals transfer only under the exact identity rules in section 4.
 
 ## 4. Algorithm
+
+### Assisted review
+
+`review.from_scan` adapts the existing detector's published resolutions into
+explicit target/operand equations; old `confirmed` outcomes are not acceptance.
+Figures inside detected blocks carry row and column labels. Recognized numbers
+outside those blocks remain selectable when their catalogue marks them clickable,
+and every page has a manual-review
+region even when detection produces no totals. The reviewer can add a missing
+figure by drawing a normalized source rectangle and entering its printed text
+and exact signed decimal. Corrections retain the original recognized value.
+
+`evaluate.py` evaluates only the selected signed operands, with decimal
+precision derived from their digits and count. The result is `exact-match`,
+`difference`, or `not-evaluable`. Delta is the printed target minus the selected
+sum. Neither detector admission policy nor plausibility thresholds suppress a
+reviewed difference. Approving the relationship leaves a difference open;
+explaining or resolving its issue requires a note and leaves its numerical result
+unchanged. Decisions are `unreviewed`, `accepted`, `rejected`, and `deferred`.
+
+Before a manual equation or acceptance, the engine rejects unknown anchors,
+duplicate operands, self-reference, circular accepted relationships, and a
+reviewed subtotal counted with its component operands. It checks existing
+parents when accepting a child, so approval order cannot bypass that guard.
+Shared operands across separate equations are permitted. Only one accepted
+relationship per target and axis is permitted; independent footing and
+cross-foot relationships remain possible.
+
+Each decision attaches to a signature of the equation, anchored evidence and
+effective values. A changed signature resets acceptance and issue disposition.
+Operations run against a copy and commit atomically. Scan identity and expected
+revision prevent a stale client from overwriting newer state. Undo/history
+restore creates a new revision rather than rewinding the revision counter.
+
+Loading a changed scan archives the old equations and evidence. On the same
+geometry fingerprint, exactly unchanged anchors and signatures retain review
+decisions; a retained edited equation replaces its old detector suggestion.
+Re-OCR with a different fingerprint requires review again. Manual figures whose
+anchors cannot be reproduced remain in the archive. Page-review markers are
+explicit reviewer declarations, never inferred from suggestion counts; equation
+or value changes clear them. Independent arithmetic-result, sum-type and
+review-status filters intersect across all pages; choosing a page for manual
+review does not restrict the suggestion list. Rows carry table context, row and
+column labels, arithmetic results and human decisions. Selecting a row navigates
+to its printed target and highlights the selected operands.
+
+Each table's bulk action captures only matching, readable, pending equation ids
+and presents an explicit confirmation list. It excludes approved, rejected and
+unreadable relationships. A changed filter or loaded/saved revision discards the
+confirmation. Details and keyboard decisions operate only on visible equations;
+an empty filter clears selection and source highlights. After an acknowledged
+decision, selection advances to another pending match in source order, including
+later pages, excluding ids just decided while other pending matches remain.
+Alt+A/R/D approve, reject or defer outside editor inputs. Navigation is disabled
+while a request, equation edit, missing-figure selection or unsaved difference
+explanation is unfinished. Manual sums, source figures, explicit page coverage,
+undo and history live in the separate review-tools section.
+
+### Legacy detection
 
 1. The financial-table sister engine builds ordinary lattice blocks, composed
    lattice fallbacks, and grid fallbacks.
@@ -172,6 +261,14 @@ from becoming a second table detector.
 
 ## 5. Tuning and thresholds
 
+**Assisted review inputs.** Manual and effective canonical decimals are limited
+to 256 characters to bound pathological input; arithmetic precision is derived
+from the actual digits, not truncated to the default Decimal context. A sum
+requires at least two distinct operands because this workflow records additive
+relationships. At most 1,000 operations may appear in a request to bound one
+atomic edit. These are input/operation guards, not detection confidence or
+rounding tolerances. Any nonzero reviewed delta remains a difference.
+
 Financial-table geometry thresholds, including the measured `0.005` right-edge
 plateau, now live in the [sister engine record](../financial-table/README.md) §5.
 
@@ -197,6 +294,18 @@ whole financial block, not from an issuer, form, page number, or fixture. The
 diagnostics report both the total withheld count and counts by reason.
 
 ## 6. Failure modes
+
+**Review remains a human judgment.** The existing candidate detector is
+unchanged; misses are recoverable with manual equations and false suggestions
+with rejection. Approval establishes the selected relationship, not exhaustive
+document coverage. Pages without suggestions still require inspection.
+
+**Review persistence is separate from document persistence.** A failed or
+conflicting write leaves saved review unchanged and preserves the pane's draft.
+Closing the window discards an unsaved editor draft. Closing Excel without
+saving loses workbook changes as usual. Re-scan is disabled while a draft or
+request is unfinished. Stale scans permit inspection but block review commits.
+Revision snapshots retain full equation evidence; storage grows with edits.
 
 **Two structural models must stay coherent.** The lattice and the cached grid are
 reconciled at scan time by code with no prior art in the repo. The
@@ -239,6 +348,32 @@ the user review the recognizer rather than the statement. They remain counted
 by diagnostics so loss of recognition is still visible to development tooling.
 
 ## 7. Tests and corpus
+
+`test_reconcile_review.py` covers exact precision, signed subtraction, initial
+unreviewed state, approval/difference separation, dependency invalidation,
+atomic bulk failure, conflicting revisions, manual source anchors, cycles and
+subtotal overlap in both approval orders, undo, scan archives, upgrade retention,
+and real worker NDJSON dispatch. Its statement is synthetic, not a blessed
+detector golden. The legacy detector fixtures and scorer remain unchanged.
+
+The web `review-controller.test.ts` tests acknowledgement ownership, preview
+isolation, failure preservation, request identity, undo and explicit bulk scope.
+`review-queue.test.ts` tests document-wide source ordering, both detected axes,
+intersecting filters, visible selection, cross-page advancement, deferred/bulk
+advancement and table approval restricted to filtered readable pending ids.
+`scripts/generate_reconcile_review.mjs --check` verifies generated Python,
+TypeScript and C# bindings against the contract. The contract carries synthetic
+JSON and XML samples. `scripts/test_reconcile_review_storage.ps1` checks the C#
+serializer, multi-document preservation, unsupported versions, duplicate
+identities, schema validation and the generated C# reader.
+Its optional `-ExcelRoundtrip` check uses the built add-in's actual store in a
+separate hidden Excel instance and a fresh synthetic workbook under `output/`.
+It verifies both document reviews and the existing workspace survive save/reopen.
+
+`scripts/preview_reconcile_review.py` serves the built pane with a synthetic
+PDF and real Python review operations on localhost. Its state lives in `output/`
+and does not modify Excel. It exercises browser interactions; it is not a
+substitute for an Excel workbook save/reopen test.
 
 `test_reconcile.py` has 112 tests pinning nomination independence, relative
 column independence, zero-insensitive signed patterns, subtotal block

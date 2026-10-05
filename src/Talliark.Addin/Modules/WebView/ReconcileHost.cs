@@ -22,6 +22,7 @@ namespace Talliark.Addin.Modules.WebView
         private readonly WebView2 _webView = new WebView2();
         private readonly ReconcileResultService _results = new ReconcileResultService();
         private readonly ReconcileWorkspaceService _workspaceService = new ReconcileWorkspaceService();
+        private readonly ReconcileReviewService _reviewService = new ReconcileReviewService();
         private readonly OcrService _ocrService;
         private WebViewStartupSurface _startup;
         private string _scanningPdfId;
@@ -94,6 +95,9 @@ namespace Talliark.Addin.Modules.WebView
                     case "request-reconcile-result":
                         SendResult(ReconcileMessageParser.ParsePdfId(raw));
                         break;
+                    case "reconcile-review-request":
+                        _ = ReviewAsync(raw);
+                        break;
                     case "import-reconcile-document":
                         _ = ImportDocumentAsync(ReconcileMessageParser.ParseRole(raw));
                         break;
@@ -141,6 +145,12 @@ namespace Talliark.Addin.Modules.WebView
                 _scanningPdfId = null;
                 SendData();
             }
+        }
+
+        private async Task ReviewAsync(string raw)
+        {
+            string response = await _reviewService.ProcessAsync(_workbook, raw, _ocrService.IsRunning);
+            Post(response);
         }
 
         public void RefreshDataIfReady()
@@ -292,6 +302,7 @@ namespace Talliark.Addin.Modules.WebView
             if (!_disposed)
             {
                 _disposed = true;
+                _reviewService.Dispose();
                 try { _ocrService?.Cancel(); } catch { }
                 try
                 {

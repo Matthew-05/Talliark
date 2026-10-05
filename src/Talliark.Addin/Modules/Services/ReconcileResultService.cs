@@ -47,6 +47,7 @@ public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
                     PdfBase64 = document.Version.Base64,
                     PageRotations = document.Version.PageRotations,
                     ReconcileBase64 = document.Version.ReconcileBase64,
+                    DocumentValuesBase64 = document.Version.DocumentValuesBase64,
                     Staleness = info.Staleness,
                 };
             }
@@ -62,6 +63,7 @@ public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
                 PdfBase64 = comparison.PdfBase64,
                 PageRotations = comparison.PageRotations,
                 ReconcileBase64 = comparison.ReconcileBase64,
+                DocumentValuesBase64 = comparison.DocumentValuesBase64,
                 Staleness = comparisonInfo.Staleness,
             };
         }
@@ -375,6 +377,7 @@ public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
         public string PdfBase64 { get; set; }
         public Dictionary<int, int> PageRotations { get; set; }
         public string ReconcileBase64 { get; set; }
+        public string DocumentValuesBase64 { get; set; }
         public string Staleness { get; set; }
     }
 }

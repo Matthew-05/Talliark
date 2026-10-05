@@ -176,6 +176,23 @@ namespace Talliark.Addin.Modules.CustomXml
 
         public void DeleteReconcileWorkspace() => DeletePart(TalliarkXml.ReconcileNamespaceUri);
 
+        public string LoadReconcileReview(string documentId)
+        {
+            Office.CustomXMLPart part = FindPartByNamespace(TalliarkReconcileReviewSerializer.NamespaceUri);
+            var reviews = TalliarkReconcileReviewSerializer.FromXml(part?.XML);
+            return reviews.TryGetValue(documentId, out string value) ? value : null;
+        }
+
+        public void SaveReconcileReview(string documentId, string base64)
+        {
+            if (string.IsNullOrWhiteSpace(documentId) || string.IsNullOrEmpty(base64))
+                throw new ArgumentException("Document identity and review data are required.");
+            Office.CustomXMLPart part = FindPartByNamespace(TalliarkReconcileReviewSerializer.NamespaceUri);
+            var reviews = TalliarkReconcileReviewSerializer.FromXml(part?.XML);
+            reviews[documentId] = base64;
+            ReplacePart(TalliarkReconcileReviewSerializer.NamespaceUri, TalliarkReconcileReviewSerializer.ToXml(reviews));
+        }
+
         // ── Metadata-only helpers ─────────────────────────────────────────────
 
         public bool TryGetMetadata(string id, out PdfMetadata metadata)
@@ -366,6 +383,7 @@ namespace Talliark.Addin.Modules.CustomXml
             DeletePart(TalliarkXml.ContentNamespaceUri);
             DeletePart(TalliarkXml.LinksNamespaceUri);
             DeleteReconcileWorkspace();
+            DeletePart(TalliarkReconcileReviewSerializer.NamespaceUri);
         }
 
         // ── Debug snapshots ───────────────────────────────────────────────────

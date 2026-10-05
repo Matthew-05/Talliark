@@ -15,6 +15,7 @@ import type {
   ReconcileImportSource,
   ReconcileDocumentRole,
 } from "./types/index.js";
+import type { ReviewRequest, ReviewResponse } from "./types/reconcile-review.generated.js";
 
 // ── Inbound (host → web) ─────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function send(msg: object): void {
 }
 
 export interface HostHandlers {
+  onReviewResponse?(response: ReviewResponse): void;
   onDataLoaded(
     documents: ReconcileDocument[],
     sources: ReconcileImportSource[],
@@ -92,17 +94,19 @@ export function initHostBridge(handlers: HostHandlers): void {
 
   webview.addEventListener("message", (event: Event) => {
     const raw = (event as MessageEvent<unknown>).data;
-    let msg: HostMessage;
+    let msg: HostMessage | ReviewResponse;
     try {
       const parsed: unknown =
         typeof raw === "string" ? (JSON.parse(raw) as unknown) : raw;
       if (typeof parsed !== "object" || parsed === null) return;
-      msg = parsed as HostMessage;
+      msg = parsed as HostMessage | ReviewResponse;
     } catch {
       return;
     }
 
-    if (msg.type === "reconcile-data-loaded") {
+    if (msg.type === "reconcile-review-response") {
+      handlers.onReviewResponse?.(msg);
+    } else if (msg.type === "reconcile-data-loaded") {
       handlers.onDataLoaded(
         msg.documents ?? [],
         msg.sources ?? [],
@@ -139,6 +143,10 @@ export function initHostBridge(handlers: HostHandlers): void {
  */
 export function sendRunScan(pdfId: string): void {
   send({ type: "run-reconcile-scan", pdfId });
+}
+
+export function sendReviewRequest(request: ReviewRequest): void {
+  send(request);
 }
 
 /** Cancels the running scan. A cancelled scan leaves a stored result untouched. */

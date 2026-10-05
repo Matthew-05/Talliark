@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "documentId": "doc",
+  "scanId": "91150a2b938dfef2d94f6aaa1de45987",
+  "geometryFingerprint": "geometry-1",
+  "pageCount": 2,
+  "revision": 0,
+  "evidence": [
+    {
+      "id": "cell-6642e9eb3c2b2915e1250f0f646a9146",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.1,
+        "width": 0.1,
+        "height": 0.02
+      },
+      "text": "10",
+      "label": "Sales",
+      "column": "",
+      "value": "10",
+      "dash": false,
+      "origin": "scan"
+    },
+    {
+      "id": "cell-e5b4c8a8ca6cea381d3e9c66ab00a84e",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.2,
+        "width": 0.1,
+        "height": 0.02
+      },
+      "text": "-2",
+      "label": "Returns",
+      "column": "",
+      "value": "-2",
+      "dash": false,
+      "origin": "scan"
+    },
+    {
+      "id": "cell-b1ace0a5dc49452d34fd67ac3b2229c8",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.30000000000000004,
+        "width": 0.1,
+        "height": 0.02
+      },
+      "text": "8",
+      "label": "Net sales",
+      "column": "",
+      "value": "8",
+      "dash": false,
+      "origin": "scan"
+    },
+    {
+      "id": "cell-1e0bdd973c7c0fe517ca12afa87f9941",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.4,
+        "width": 0.1,
+        "height": 0.02
+      },
+      "text": "1",
+      "label": "Other",
+      "column": "",
+      "value": "1",
+      "dash": false,
+      "origin": "scan"
+    },
+    {
+      "id": "cell-45e38508f8f5590f8c6e88ecb9684f69",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.5,
+        "width": 0.1,
+        "height": 0.02
+      },
+      "text": "9",
+      "label": "Total",
+      "column": "",
+      "value": "9",
+      "dash": false,
+      "origin": "scan"
+    }
+  ],
+  "regions": [
+    {
+      "id": "page-0",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "label": "Page 1 \u00b7 manual review"
+    },
+    {
+      "id": "page-1",
+      "pageIndex": 1,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "label": "Page 2 \u00b7 manual review"
+    },
+    {
+      "id": "region-73bfea04ffb572499443cd263eafd07d",
+      "pageIndex": 0,
+      "bounds": {
+        "x": 0.1,
+        "y": 0.1,
+        "width": 0.6,
+        "height": 0.6
+      },
+      "label": "Page 1 \u00b7 5 rows"
+    }
+  ],
+  "equations": [
+    {
+      "id": "eq-f79477ceaea7bfb746dc151da639ca37",
+      "regionId": "region-73bfea04ffb572499443cd263eafd07d",
+      "targetId": "cell-b1ace0a5dc49452d34fd67ac3b2229c8",
+      "axis": "vertical",
+      "terms": [
+        {
+          "cellId": "cell-6642e9eb3c2b2915e1250f0f646a9146",
+          "coefficient": 1
+        },
+        {
+          "cellId": "cell-e5b4c8a8ca6cea381d3e9c66ab00a84e",
+          "coefficient": 1
+        }
+      ],
+      "origin": "detected",
+      "decision": "unreviewed",
+      "evaluation": {
+        "state": "exact-match",
+        "sum": "8",
+        "delta": "0",
+        "reason": ""
+      },
+      "issue": "open",
+      "note": "",
+      "signature": "55652a939ba4f900cd3f5d066f838f72"
+    },
+    {
+      "id": "eq-f14295adff607551c534dec4c39bdf75",
+      "regionId": "region-73bfea04ffb572499443cd263eafd07d",
+      "targetId": "cell-45e38508f8f5590f8c6e88ecb9684f69",
+      "axis": "vertical",
+      "terms": [
+        {
+          "cellId": "cell-b1ace0a5dc49452d34fd67ac3b2229c8",
+          "coefficient": 1
+        },
+        {
+          "cellId": "cell-1e0bdd973c7c0fe517ca12afa87f9941",
+          "coefficient": 1
+        }
+      ],
+      "origin": "detected",
+      "decision": "unreviewed",
+      "evaluation": {
+        "state": "exact-match",
+        "sum": "9",
+        "delta": "0",
+        "reason": ""
+      },
+      "issue": "open",
+      "note": "",
+      "signature": "1478f7b9fb24de3ae6f7fce21362382f"
+    }
+  ],
+  "corrections": [],
+  "history": [],
+  "archives": [],
+  "reviewedPages": []
+}

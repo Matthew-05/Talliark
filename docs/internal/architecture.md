@@ -146,7 +146,10 @@ is close to free now and expensive once Reconcile has users.
 | `financial-structure-v1` | documentClass, notes, noteReferences, items, itemReferences, and what was looked for but absent | cache build |
 | `reconcile-v1` | statements, tagged facts, periods, exceptions, dispositions | Reconcile runtime |
 
-The Reconcile webview consumes `reconcile-v1` and nothing else.
+The Reconcile webview consumes immutable `reconcile-v1` scans and versioned
+`reconcile-review-v1` acknowledgements. The C# host supplies stored evidence to
+the Python review engine and owns workbook writes; the web pane sends review
+intent and renders returned state. Preview/edit operations do not rerun OCR.
 `engines/financial_table/` deliberately has no contract: its statement blocks
 exist only between Python packages during one scan, so no second public table
 model can disagree with `table-structure-v1`.

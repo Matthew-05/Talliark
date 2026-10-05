@@ -43,6 +43,7 @@ from engines.pdf_export_engine import add_searchable_text_layer
 from engines.financial.detector import detect_financial_structure, structure_to_base64 as financial_structure_to_base64
 from engines.values.detector import detect_values, values_to_base64
 from engines.reconcile.detector import detect_reconcile, reconcile_to_base64
+from engines.reconcile.review import handle_job as handle_review_job
 from engines.values.lines import prepare as prepare_lines
 from engines.table.detector import detect_tables, structure_to_base64
 from engines.table_cell_engine import recover_table_geometry
@@ -709,6 +710,12 @@ def main() -> None:
         try:
             data = json.loads(line)
             command = data.get("command", "ocr")
+            if command == "reconcile-review":
+                try:
+                    _write(handle_review_job(data))
+                except (ValueError, KeyError, TypeError) as exc:
+                    _write({"job_id": data.get("job_id", ""), "status": "error", "error": str(exc)})
+                continue
             if command == "convert":
                 convert_job = ConvertJob.from_dict(data)
             elif command == "export-pdf":
