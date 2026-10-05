@@ -58,3 +58,34 @@ test("dispatches native sidebar context-menu dismissal", () => {
 
   assert.equal(dismissed, 1);
 });
+
+test("dispatches the imported file selection", () => {
+  const webview = new EventTarget() as EventTarget & {
+    postMessage(message: string): void;
+  };
+  webview.postMessage = () => {};
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { chrome: { webview } },
+  });
+
+  let selectedIds: string[] = [];
+  try {
+    initHostBridge(
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (ids) => { selectedIds = ids; },
+    );
+    webview.dispatchEvent(new MessageEvent("message", {
+      data: JSON.stringify({ type: "select-files", ids: ["pdf-1", "pdf-2"] }),
+    }));
+  } finally {
+    delete (globalThis as { window?: unknown }).window;
+  }
+
+  assert.deepEqual(selectedIds, ["pdf-1", "pdf-2"]);
+});

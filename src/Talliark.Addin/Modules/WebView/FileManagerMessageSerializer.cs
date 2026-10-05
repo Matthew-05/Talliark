@@ -135,6 +135,24 @@ namespace Talliark.Addin.Modules.WebView
             return sb.ToString();
         }
 
+        /// <summary>Builds the host→web selection applied after an import refresh.</summary>
+        public static string BuildSelectFiles(IList<string> ids)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"type\":\"select-files\",\"ids\":[");
+            if (ids != null)
+            {
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    if (i > 0)
+                        sb.Append(',');
+                    AppendString(sb, ids[i] ?? string.Empty);
+                }
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
         /// <summary>
         /// Builds the host→web <c>row-drag-ended</c> message. It carries no outcome because
         /// the web UI has no use for one: it only needs to know its drag highlight is stale

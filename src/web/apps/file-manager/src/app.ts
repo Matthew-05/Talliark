@@ -107,6 +107,8 @@ export function mountApp(root: HTMLElement): void {
     fileTable.endRowDrag();
   }, () => {
     fileTable.dismissContextMenu();
+  }, (ids) => {
+    fileTable.selectFiles(ids);
   });
 
   wireFileManagerUiReset({

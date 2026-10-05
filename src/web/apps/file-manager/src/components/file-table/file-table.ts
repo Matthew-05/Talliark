@@ -407,6 +407,16 @@ export class FileTable {
     this._onSelectionChange([]);
   }
 
+  /** Replaces the selection with requested files that are visible in the table. */
+  selectFiles(ids: string[]): void {
+    const visibleIds = new Set(this._visibleFiles().map((file) => file.id));
+    this._selectedIds = new Set(ids.filter((id) => visibleIds.has(id)));
+    this._lastClickedId = null;
+    this._lastClickedSelected = true;
+    this._render();
+    this._onSelectionChange(this.getSelectedIds());
+  }
+
   /** Closes the table's custom menu after an interaction outside the WebView. */
   dismissContextMenu(): void {
     this._hideContextMenu();

@@ -303,6 +303,27 @@
       }
     },
 
+    "SelectFilesMessage": {
+      "description": "Sent by the C# file-manager host immediately after refreshing the file list following an import. The web table replaces its current selection with the newly imported file IDs that are visible under its active filters.",
+      "type": "object",
+      "required": ["type", "ids"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "select-files" },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "GUIDs of successfully imported files."
+        }
+      },
+      "examples": [
+        {
+          "type": "select-files",
+          "ids": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+        }
+      ]
+    },
+
     "RenameFileMessage": {
       "description": "Sent by the file-manager web app when the user renames a file.",
       "type": "object",
@@ -1464,6 +1485,7 @@
     { "$ref": "#/definitions/ViewerFoldersUpdatedMessage" },
     { "$ref": "#/definitions/ManagerReadyMessage" },
     { "$ref": "#/definitions/FilesLoadedMessage" },
+    { "$ref": "#/definitions/SelectFilesMessage" },
     { "$ref": "#/definitions/FolderSelectedMessage" },
     { "$ref": "#/definitions/DismissContextMenuMessage" },
     { "$ref": "#/definitions/RenameFileMessage" },

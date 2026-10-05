@@ -535,6 +535,9 @@ namespace Talliark.Addin.Modules.WebView
                         addedCount);
 
                     SendFilesToWebView();
+                    // WebView postMessage preserves order, so selection is applied only
+                    // after the table has received rows for the newly imported IDs.
+                    PostToWebView(FileManagerMessageSerializer.BuildSelectFiles(addedIds));
                     foreach (string id in addedIds)
                         Globals.ThisAddIn.NotifyViewerPdfAdded(_workbook, id);
 

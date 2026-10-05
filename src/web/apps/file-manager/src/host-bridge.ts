@@ -8,6 +8,11 @@ interface FilesLoadedMessage {
   files: FileEntry[];
 }
 
+interface SelectFilesMessage {
+  type: "select-files";
+  ids: string[];
+}
+
 interface OcrStatusMessage {
   type: "ocr-status";
   pdfId: string;
@@ -67,6 +72,7 @@ interface DismissContextMenuMessage {
 
 type HostMessage =
   | FilesLoadedMessage
+  | SelectFilesMessage
   | FolderSelectedMessage
   | OcrStatusMessage
   | ResetUiMessage
@@ -104,6 +110,7 @@ export function initHostBridge(
   onOcrStatus?: (pdfId: string, status: string, progress: OcrProgress) => void,
   onRowDragEnded?: () => void,
   onDismissContextMenu?: () => void,
+  onFilesSelected?: (ids: string[]) => void,
 ): void {
   const webview = getWebView();
   if (!webview) return;
@@ -123,6 +130,8 @@ export function initHostBridge(
     if (msg.type === "files-loaded") {
       console.log(`[Talliark] files-loaded received: ${msg.files.length} files`);
       onFilesLoaded(msg.folders, msg.files);
+    } else if (msg.type === "select-files" && onFilesSelected && Array.isArray(msg.ids)) {
+      onFilesSelected(msg.ids.filter((id): id is string => typeof id === "string"));
     } else if (msg.type === "folder-selected" && onFolderSelected) {
       onFolderSelected(msg.folderId ?? null);
     } else if (msg.type === "ocr-status" && onOcrStatus) {
