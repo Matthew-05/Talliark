@@ -1,0 +1,7 @@
+{
+  "type": "reconcile-review-response",
+  "version": 1,
+  "requestId": "save-workbook-example",
+  "pdfId": "doc",
+  "status": "workbook-saved"
+}

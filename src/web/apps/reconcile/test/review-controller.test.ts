@@ -44,21 +44,23 @@ test("preview does not change saved state or undo history", () => {
   assert.equal(controller.workspace, saved); assert.equal(controller.preview, preview); assert.equal(controller.undoRevision, null);
 });
 
-test("save updates only after acknowledgement and captures undo revision", () => {
+test("direct XML update captures undo revision without a save notice", () => {
   const { controller, sent, reply } = harness(); controller.request("load"); reply("loaded", workspace(4));
   controller.request("commit", [{ kind: "decision", equationIds: ["a"], decision: "accepted" }]);
   assert.equal(controller.workspace?.revision, 4); assert.equal(sent.at(-1)!.expectedRevision, 4);
-  reply("saved", workspace(5)); assert.equal(controller.workspace?.revision, 5); assert.equal(controller.undoRevision, 4);
-  assert.equal(controller.lastSavedOperations[0]?.kind, "decision");
+  assert.equal(controller.notice, "");
+  reply("updated", workspace(5)); assert.equal(controller.workspace?.revision, 5); assert.equal(controller.undoRevision, 4);
+  assert.equal(controller.lastAppliedOperations[0]?.kind, "decision");
+  assert.equal(controller.notice, "");
 });
 
-test("failed save preserves state and pending operations are not marked saved", () => {
+test("failed XML update preserves state and does not apply pending operations", () => {
   const { controller, sent, reply } = harness(); controller.request("load"); reply("loaded");
   const saved = controller.workspace;
   controller.request("commit", [{ kind: "restore", revision: 0 }]);
   controller.receive({ type: "reconcile-review-response", version: 1, requestId: sent.at(-1)!.requestId, pdfId: "doc", status: "error", error: "Workbook protected" });
   assert.equal(controller.workspace, saved); assert.equal(controller.pending, null);
-  assert.equal(controller.error, "Workbook protected"); assert.deepEqual(controller.lastSavedOperations, []);
+  assert.equal(controller.error, "Workbook protected"); assert.deepEqual(controller.lastAppliedOperations, []);
 });
 
 test("unrelated or late acknowledgement cannot replace state", () => {
@@ -89,13 +91,31 @@ test("arithmetic ties are separate from approval and open issues", () => {
 
 test("reloading after a scan change resets undo", () => {
   const { controller, reply } = harness(); controller.request("load"); reply("loaded");
-  controller.request("commit", [{ kind: "page", pageIndex: 0, reviewed: true }]); reply("saved", workspace(1));
+  controller.request("commit", [{ kind: "page", pageIndex: 0, reviewed: true }]); reply("updated", workspace(1));
   assert.equal(controller.undoRevision, 0);
   const state = workspace(2); state.scanId = "new-scan"; controller.request("load"); reply("loaded", state);
   assert.equal(controller.undoRevision, null);
 });
 
 test("unexpected acknowledgement does not apply data", () => {
-  const { controller, reply } = harness(); controller.request("load"); reply("saved", workspace(8));
+  const { controller, reply } = harness(); controller.request("load"); reply("updated", workspace(8));
   assert.equal(controller.workspace, null); assert.match(controller.error, /Unexpected/);
+});
+
+test("Excel save is a separate host action and preserves review state and undo", () => {
+  const { controller, sent, reply } = harness(); controller.request("load"); reply("loaded", workspace(4));
+  controller.request("commit", [{ kind: "page", pageIndex: 0, reviewed: true }]); reply("updated", workspace(5));
+  const state = controller.workspace;
+  controller.request("save-workbook");
+  assert.equal(sent.at(-1)!.mode, "save-workbook"); assert.deepEqual(sent.at(-1)!.operations, []);
+  controller.receive({ type: "reconcile-review-response", version: 1, requestId: sent.at(-1)!.requestId, pdfId: "doc", status: "workbook-saved" });
+  assert.equal(controller.workspace, state); assert.equal(controller.undoRevision, 4);
+  assert.deepEqual(controller.lastAppliedOperations, []); assert.equal(controller.notice, "Workbook saved");
+});
+
+test("cancelled Excel save leaves the automatically recorded XML state available", () => {
+  const { controller, sent, reply } = harness(); controller.request("load"); reply("loaded");
+  const state = controller.workspace; controller.request("save-workbook");
+  controller.receive({ type: "reconcile-review-response", version: 1, requestId: sent.at(-1)!.requestId, pdfId: "doc", status: "error", error: "Save cancelled" });
+  assert.equal(controller.workspace, state); assert.match(controller.notice, /open workbook/); assert.equal(controller.error, "Save cancelled");
 });

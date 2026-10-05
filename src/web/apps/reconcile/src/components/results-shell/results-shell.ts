@@ -5,6 +5,7 @@ export type ReviewMode = "mathematical" | "intra-document" | "inter-document";
 export interface ResultsShellCallbacks {
   onRescan(pdfId: string): void;
   onModeChanged(mode: ReviewMode): void;
+  onSaveWorkbook?(): void;
 }
 
 export interface ResultsShellOptions {
@@ -55,9 +56,16 @@ export class ResultsShell {
     const rescan = document.createElement("button");
     rescan.type = "button";
     rescan.className = "button button--secondary";
+    rescan.dataset.action = "rescan";
     rescan.textContent = "Re-scan";
     rescan.addEventListener("click", () => callbacks.onRescan(entry.id));
     if (options.showRescan ?? layout === "review") actions.appendChild(rescan);
+    if (layout === "review" && callbacks.onSaveWorkbook) {
+      const save = document.createElement("button"); save.type = "button";
+      save.className = "button button--primary"; save.dataset.action = "save-workbook";
+      save.textContent = "Save workbook"; save.title = "Save the entire Excel workbook, including its review XML and other pending edits";
+      save.addEventListener("click", () => callbacks.onSaveWorkbook?.()); actions.append(save);
+    }
     topbar.append(identity, actions);
 
     this.sidebarSlot = document.createElement("div");

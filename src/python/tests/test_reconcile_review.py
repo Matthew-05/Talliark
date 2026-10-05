@@ -71,6 +71,26 @@ class ReviewTests(unittest.TestCase):
         loaded = handle_job(self.job(previous=saved))
         self.assertEqual(loaded["review_base64"], json_to_base64(saved))
 
+    def test_worker_reuse_never_leaks_decisions_into_a_fresh_review(self):
+        accepted = handle_job(self.job("commit", [self.decision(self.net["id"])], self.workspace))
+        self.assertEqual(accepted["response"]["workspace"]["equations"][0]["decision"], "accepted")
+        fresh = handle_job(self.job())
+        self.assertEqual(fresh["response"]["workspace"], self.workspace)
+
+    def test_reused_worker_rebuilds_evidence_when_the_scan_payload_changes(self):
+        handle_job(self.job())
+        self.model["tables"][0]["cells"][2]["normalizedValue"] = "7"
+        fresh = handle_job(self.job())
+        self.assertEqual(fresh["response"]["status"], "loaded")
+        self.assertNotEqual(fresh["response"]["workspace"]["scanId"], self.workspace["scanId"])
+        self.assertEqual(fresh["response"]["workspace"]["equations"][0]["evaluation"]["state"], "difference")
+
+    def test_workbook_save_cannot_run_in_the_arithmetic_worker(self):
+        result = handle_job(self.job("save-workbook"))
+        self.assertEqual(result["response"]["status"], "error")
+        self.assertIn("Excel host", result["response"]["error"])
+        self.assertEqual(result["review_base64"], "")
+
     def test_undo_is_a_new_revision(self):
         saved = handle_job(self.job("commit", [self.decision(self.net["id"])], self.workspace))["response"]["workspace"]
         restored = handle_job(self.job("commit", [{"kind": "restore", "revision": 0}], saved, expectedRevision=1))["response"]["workspace"]
@@ -233,6 +253,10 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(SCHEMA, json.loads((root / "contracts/reconcile-review-v1.json").read_text()))
         sample = json.loads((root / "contracts/reconcile-review-v1.sample.json").read_text())
         validate(sample, "ReviewWorkspace")
+        for suffix, shape in (("request", "ReviewRequest"), ("response", "ReviewResponse")):
+            transport = json.loads((root / f"contracts/reconcile-review-v1.save-workbook.{suffix}.sample.json").read_text())
+            validate(transport, shape)
+        validate(json.loads((root / "contracts/reconcile-review-v1.commit.response.sample.json").read_text()), "ReviewResponse")
         import xml.etree.ElementTree as ET
         stored = ET.parse(root / "contracts/talliark-storage-reconcile-review-v1.sample.xml")
         encoded = stored.find(".//{urn:talliark:schemas:storage:1:reconcile-review}ReviewBase64").text
@@ -249,7 +273,7 @@ class ReviewTests(unittest.TestCase):
         result = subprocess.run([sys.executable, "-c", bootstrap], input="".join(json.dumps(job) + "\n" for job in jobs), text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         replies = [json.loads(line) for line in result.stdout.splitlines()]
-        self.assertEqual([reply["response"]["status"] for reply in replies], ["loaded", "saved"])
+        self.assertEqual([reply["response"]["status"] for reply in replies], ["loaded", "updated"])
 
 
 class ReviewArithmeticTests(unittest.TestCase):

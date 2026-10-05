@@ -42,8 +42,13 @@ export class ResultView {
     for (const button of this.element.querySelectorAll<HTMLButtonElement>(
       ".result-state__action, .results-shell__actions .button",
     )) {
-      button.disabled = this.scanning || this.reviewBusy;
-      button.title = this.reviewBusy ? "Finish or cancel your edit before re-scanning" : "";
+      const save = button.dataset.action === "save-workbook";
+      button.disabled = this.scanning || this.reviewBusy || (save && !this.review?.ready);
+      if (save) {
+        button.textContent = this.review?.controller.pending?.mode === "save-workbook" ? "Saving workbook…" : "Save workbook";
+        button.title = this.reviewBusy ? "Finish or cancel the current review action first"
+          : "Save the entire Excel workbook, including its review XML and other pending edits";
+      } else button.title = this.reviewBusy ? "Finish or cancel your edit before re-scanning" : "";
     }
   }
 
@@ -93,7 +98,8 @@ export class ResultView {
     const viewer = this.viewer!;
     this.review = new EquationReview(entry.id, {
       onRequest: request => this.callbacks.onReviewRequest(request),
-      onFocus: (cells, target, state, navigate) => { void viewer.focusReview(cells, target, state, navigate); },
+      onFocus: (cells, target, state, navigate, equationId) => { void viewer.focusReview(cells, target, state, navigate, equationId); },
+      onOverview: (equations, evidence, select, clear) => viewer.showReviewEquations(equations, evidence, select, clear),
       onPick: (cells, select) => viewer.pickEvidence(cells, select),
       onDraw: complete => viewer.drawValue(complete),
       onPage: pageIndex => { void viewer.showReviewPage(pageIndex); },
@@ -113,6 +119,7 @@ export class ResultView {
     const shell = new ResultsShell(entry, {
       onRescan: (pdfId) => this.callbacks.onRescan(pdfId),
       onModeChanged: (mode) => this.showMode(mode),
+      onSaveWorkbook: () => this.review?.saveWorkbook(),
     });
     this.viewer = new ReconcileViewer();
     shell.viewerSlot.appendChild(this.viewer.element);

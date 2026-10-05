@@ -34,7 +34,11 @@ public IList<ReconcileDocumentInfo> LoadDocuments(Excel.Workbook workbook)
         public ReconcileStoredResult LoadResult(Excel.Workbook workbook, string pdfId)
         {
             var store = new TalliarkCustomXmlPartStore(workbook);
-            ReconcileWorkspace workspace = store.LoadReconcileWorkspace();
+            return LoadResult(store.LoadReconcileWorkspace(), pdfId);
+        }
+
+        internal ReconcileStoredResult LoadResult(ReconcileWorkspace workspace, string pdfId)
+        {
             ReconcileDocument document = workspace.Primary != null
                 && string.Equals(workspace.Primary.Id, pdfId, StringComparison.Ordinal)
                 ? workspace.Primary : null;

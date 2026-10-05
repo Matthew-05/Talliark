@@ -121,7 +121,7 @@ export interface ReviewRequest {
   version: 1;
   requestId: string;
   pdfId: string;
-  mode: "load" | "preview" | "commit";
+  mode: "load" | "preview" | "commit" | "save-workbook";
   scanId: string;
   expectedRevision: number;
   operations: Array<ReviewOperation>;
@@ -132,7 +132,7 @@ export interface ReviewResponse {
   version: 1;
   requestId: string;
   pdfId: string;
-  status: "loaded" | "preview" | "saved" | "error";
+  status: "loaded" | "preview" | "updated" | "workbook-saved" | "error";
   workspace?: ReviewWorkspace;
   evaluation?: ReviewEvaluation;
   error?: string;

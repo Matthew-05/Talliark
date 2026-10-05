@@ -158,13 +158,20 @@ namespace Talliark.Addin.Modules.CustomXml
 
         public ReconcileWorkspace LoadReconcileWorkspace()
         {
-            Office.CustomXMLPart part = FindPartByNamespace(TalliarkXml.ReconcileNamespaceUri);
-            if (part == null || string.IsNullOrWhiteSpace(part.XML)) return new ReconcileWorkspace();
-            try { return TalliarkReconcileSerializer.FromXml(part.XML); }
+            string xml = LoadReconcileWorkspaceXml();
+            if (string.IsNullOrWhiteSpace(xml)) return new ReconcileWorkspace();
+            try { return TalliarkReconcileSerializer.FromXml(xml); }
             catch (System.Xml.XmlException ex)
             {
                 throw new InvalidOperationException("Talliark Reconcile custom XML part contains invalid XML.", ex);
             }
+        }
+
+        // Exact source snapshot for review currentness checks. Reading it does
+        // not deserialize PDFs or recompute geometry fingerprints.
+        internal string LoadReconcileWorkspaceXml()
+        {
+            return FindPartByNamespace(TalliarkXml.ReconcileNamespaceUri)?.XML ?? string.Empty;
         }
 
         public void SaveReconcileWorkspace(ReconcileWorkspace workspace)

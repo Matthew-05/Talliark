@@ -1,6 +1,6 @@
 import type { ReviewOperation, ReviewRequest, ReviewResponse, ReviewWorkspace } from "../types/reconcile-review.generated.js";
 
-/** Authoritative host acknowledgements own all persisted state. A preview is never a save. */
+/** Host updates own committed state; only Excel Save reports a saved workbook. */
 export class ReviewController {
   workspace: ReviewWorkspace | null = null;
   preview: ReviewWorkspace | null = null;
@@ -8,7 +8,7 @@ export class ReviewController {
   notice = "Loading relationship review…";
   pending: ReviewRequest | null = null;
   undoRevision: number | null = null;
-  lastSavedOperations: ReviewOperation[] = [];
+  lastAppliedOperations: ReviewOperation[] = [];
   readonly pdfId: string;
   private readonly send: (request: ReviewRequest) => void;
   private readonly changed: () => void;
@@ -28,7 +28,8 @@ export class ReviewController {
     this.pending = request;
     this.error = "";
     this.preview = null;
-    this.notice = mode === "load" ? "Loading relationship review…" : mode === "preview" ? "Calculating…" : "Saving review to workbook…";
+    this.notice = mode === "load" ? "Loading relationship review…" : mode === "preview" ? "Calculating…"
+      : mode === "save-workbook" ? "Saving Excel workbook…" : "";
     this.changed();
     this.send(request);
   }
@@ -37,20 +38,23 @@ export class ReviewController {
     if (response.version !== 1 || response.pdfId !== this.pdfId || response.requestId !== this.pending?.requestId) return false;
     const request = this.pending;
     this.pending = null;
-    this.lastSavedOperations = [];
-    if (response.status === "error" || !response.workspace) {
+    this.lastAppliedOperations = [];
+    if (response.status === "workbook-saved" && request.mode === "save-workbook") {
+      this.notice = "Workbook saved";
+    } else if (response.status === "error" || !response.workspace) {
       this.error = response.error ?? "The host did not return review state.";
-      this.notice = "Review was not saved. Your draft is still available.";
+      this.notice = request.mode === "save-workbook" ? "Workbook was not saved. Review remains in the open workbook."
+        : "Review was not updated. Your draft is still available.";
     } else if (response.status === "preview" && request.mode === "preview") {
       this.preview = response.workspace;
-      this.notice = "Calculation preview · not saved";
-    } else if ((response.status === "saved" && request.mode === "commit") || (response.status === "loaded" && request.mode === "load")) {
-      if (response.status === "saved") {
+      this.notice = "Calculation preview";
+    } else if ((response.status === "updated" && request.mode === "commit") || (response.status === "loaded" && request.mode === "load")) {
+      if (response.status === "updated") {
         this.undoRevision = this.workspace?.revision ?? null;
-        this.lastSavedOperations = request.operations;
+        this.lastAppliedOperations = request.operations;
       } else if (response.workspace.scanId !== this.workspace?.scanId) this.undoRevision = null;
       this.workspace = response.workspace;
-      this.notice = response.status === "saved" ? "Review recorded in workbook · save Excel to keep it on disk" : "Review loaded";
+      this.notice = "";
     } else {
       this.error = "Unexpected review acknowledgement. Reload the review.";
     }

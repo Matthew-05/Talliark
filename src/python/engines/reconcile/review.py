@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from functools import lru_cache
 import hashlib
 import json
 
@@ -109,14 +110,18 @@ def from_scan(model, values=None):
 
 
 def align(model, values, previous):
-    current = from_scan(model, values)
+    return _align_workspace(from_scan(model, values), previous)
+
+
+def _align_workspace(current, previous):
     if not previous:
-        return current
+        return deepcopy(current)
     validate(previous, "ReviewWorkspace")
     if previous["documentId"] != current["documentId"]:
         raise ValueError("Review belongs to another document snapshot.")
     if previous["scanId"] == current["scanId"]:
         return deepcopy(previous)
+    current = deepcopy(current)
     current["revision"] = previous["revision"] + 1
     current["archives"] = deepcopy(previous["archives"]) + [
         {key: deepcopy(previous[key]) for key in ("scanId", "geometryFingerprint", "revision", "evidence", "regions", "equations", "corrections", "history", "reviewedPages")}
@@ -146,6 +151,18 @@ def align(model, values, previous):
         refresh(current)
     validate(current, "ReviewWorkspace")
     return current
+
+
+@lru_cache(maxsize=1)
+def _scan_workspace(model_base64, values_base64):
+    """Keep one immutable scan substrate per worker; source changes miss the cache.
+
+    Review alignment always copies before edits. The cache holds no decisions
+    and is keyed by the complete scan and selectable-value payloads.
+    """
+    model = json_from_base64(model_base64)
+    values = json_from_base64(values_base64) if values_base64 else None
+    return from_scan(model, values)
 
 
 def _snapshot(workspace):
@@ -269,16 +286,16 @@ def handle_job(job):
     request = job["request"]
     response = {"type": "reconcile-review-response", "version": 1, "requestId": request["requestId"], "pdfId": request["pdfId"], "status": "error"}
     try:
-        model = json_from_base64(job["model_base64"])
-        values = json_from_base64(job["values_base64"]) if job["values_base64"] else None
+        if request["mode"] == "save-workbook":
+            raise ValueError("Workbook Save is handled only by the Excel host.")
         previous = json_from_base64(job["review_base64"]) if job["review_base64"] else None
-        workspace = align(model, values, previous)
+        workspace = _align_workspace(_scan_workspace(job["model_base64"], job["values_base64"]), previous)
         if workspace["documentId"] != request["pdfId"]:
             raise ValueError("The source document was replaced.")
         mode = request["mode"]
         if mode != "load":
             if request["scanId"] != workspace["scanId"] or request["expectedRevision"] != workspace["revision"]:
-                raise ValueError("This review changed. Reload it before saving your draft.")
+                raise ValueError("This review changed. Reload it before applying your draft.")
             if not request["operations"]:
                 raise ValueError("No review operation was provided.")
             working = apply_operations(workspace, request["operations"])
@@ -288,7 +305,7 @@ def handle_job(job):
             workspace = working
         elif request["operations"]:
             raise ValueError("Loading review cannot apply changes.")
-        response.update(status={"load": "loaded", "preview": "preview", "commit": "saved"}[mode], workspace=workspace)
+        response.update(status={"load": "loaded", "preview": "preview", "commit": "updated"}[mode], workspace=workspace)
         encoded = (job["review_base64"] if mode == "load" and workspace == previous else json_to_base64(workspace)) if mode != "preview" else ""
     except (ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
         response["error"] = str(exc)

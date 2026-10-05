@@ -118,6 +118,10 @@
   border-width: 2px;
   border-style: solid;
 }
+.reconcile-viewer__review-overview { padding: 0; }
+.reconcile-viewer--review-focused .reconcile-viewer__review-overview { display: none; }
+.reconcile-viewer__review-focus-target { pointer-events: auto; cursor: pointer; }
+.reconcile-viewer__review-focus-target:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .reconcile-viewer__footing-highlight--total.reconcile-viewer__footing-highlight--confirmed {
   border-color: #178447;
   background: rgba(23, 132, 71, .18);

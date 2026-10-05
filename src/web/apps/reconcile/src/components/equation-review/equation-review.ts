@@ -1,24 +1,27 @@
 import type { ReviewBounds, ReviewCell, ReviewDraft, ReviewEquation, ReviewOperation, ReviewRequest, ReviewResponse } from "../../types/reconcile-review.generated.js";
 import { acceptDisplayed, reviewCounts, ReviewController } from "../../services/review-controller.js";
-import { nextReviewSelection, reviewQueue, visibleSelection, type ReviewFilters } from "../../services/review-queue.js";
+import { reviewPageGroups, reviewQueue, visibleSelection, type ReviewFilters } from "../../services/review-queue.js";
 import { EquationEditor, type EquationEditorState } from "../equation-editor/equation-editor.js";
 
 export interface EquationReviewCallbacks {
   onRequest(request: ReviewRequest): void;
-  onFocus(cells: ReviewCell[], targetId: string, state: ReviewEquation["evaluation"]["state"], navigate?: boolean): void;
+  onFocus(cells: ReviewCell[], targetId: string, state: ReviewEquation["evaluation"]["state"], navigate?: boolean, equationId?: string): void;
+  onOverview(equations: ReviewEquation[], evidence: ReviewCell[], select: ((id: string) => void) | null, clear: (() => void) | null): void;
   onPick(cells: ReviewCell[], select: ((cell: ReviewCell) => void) | null): void;
   onDraw(complete: ((pageIndex: number, bounds: ReviewBounds) => void) | null): void;
   onPage(pageIndex: number): void;
   onEditingChanged(busy: boolean): void;
 }
 
-/** Document-wide review queue; table actions capture explicit filtered equation ids. */
+/** Page-grouped review; all decisions automatically update the open workbook. */
 export class EquationReview {
   readonly element = document.createElement("aside");
   readonly controller: ReviewController;
   private regionId = "";
-  private filters: ReviewFilters = { result: "all", type: "all", status: "all" };
+  private filters: ReviewFilters = { result: "all", type: "all", statuses: ["unreviewed", "deferred", "accepted"] };
   private selectedId = "";
+  private hoveredId = "";
+  private hoverNeedsMove = false;
   private draft: ReviewDraft | null = null;
   private editingId = "";
   private pickRole: "target" | "operand" = "operand";
@@ -35,10 +38,19 @@ export class EquationReview {
   private drawing = false;
   private editorState: EquationEditorState = { page: 0, search: "", selectedId: "", correctedValue: "", correctionReason: "", correctionOpen: false };
   private readonly issueDrafts = new Map<string, { note: string; issue: "open" | "explained" | "resolved" }>();
+  private readonly openIssues = new Set<string>();
 
   constructor(pdfId: string, private readonly callbacks: EquationReviewCallbacks) {
     this.element.className = "equation-review";
     this.controller = new ReviewController(pdfId, callbacks.onRequest, () => this.render());
+    this.element.addEventListener("pointermove", event => {
+      if (!this.hoverNeedsMove) return;
+      this.hoverNeedsMove = false;
+      if (event.target instanceof Element) this.preview(event.target.closest<HTMLElement>(".equation-review__row")?.dataset.equationId ?? "");
+    });
+    this.element.addEventListener("click", event => {
+      if (event.target instanceof Element && !event.target.closest(".equation-review__row, .equation-editor, .equation-review__missing, .equation-review__bulk, button, input, select, textarea, summary")) this.unselect();
+    });
     this.element.addEventListener("keydown", event => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || this.locked) return;
       const decisions = { a: "accepted", r: "rejected", d: "deferred" } as const;
@@ -50,37 +62,43 @@ export class EquationReview {
   }
   load(): void { this.controller.request("load"); }
   setBlocked(blocked: boolean): void { this.blocked = blocked; this.render(); }
-  clear(): void { this.callbacks.onPick([], null); this.callbacks.onDraw(null); this.drawing = false; }
-  activate(): void { if (this.draft) this.pick(this.pickRole); }
+  clear(): void {
+    this.callbacks.onPick([], null); this.callbacks.onDraw(null); this.drawing = false;
+    this.callbacks.onOverview([], [], null, null); this.callbacks.onFocus([], "", "not-evaluable", false);
+  }
+  activate(): void { if (this.draft) this.pick(this.pickRole); else this.syncOverlay(); }
+  saveWorkbook(): void { if (!this.editing) this.controller.request("save-workbook"); }
+  get ready(): boolean { return this.controller.workspace !== null; }
+  unselect(): void {
+    if (this.locked || (!this.selectedId && !this.hoveredId)) return;
+    this.selectedId = ""; this.hoveredId = ""; this.hoverNeedsMove = true; this.bulk = null; this.render();
+  }
   receive(response: ReviewResponse): void {
-    const before = this.queue.map(eq => eq.id);
-    const previousId = this.selectedId;
     if (!this.controller.receive(response)) return;
-    const saved = this.controller.lastSavedOperations;
-    if (saved.some(op => op.kind === "equation")) {
+    const applied = this.controller.lastAppliedOperations;
+    if (applied.some(op => op.kind === "equation")) {
       const draft = this.draft;
       this.selectedId = this.controller.workspace?.equations.find(eq => draft && eq.targetId === draft.targetId
         && eq.axis === draft.axis && JSON.stringify(eq.terms) === JSON.stringify(draft.terms))?.id ?? "";
       this.draft = null; this.editingId = ""; this.clear();
       if (this.selectedId && !this.queue.some(eq => eq.id === this.selectedId)) {
-        this.controller.notice = "Equation saved outside the current filters. Clear filters to review and approve it.";
+        this.controller.notice = "Equation applied outside the current filters. Clear filters to review and approve it.";
       }
     }
-    if (saved.some(op => op.kind === "value")) { this.missing = null; if (this.draft) this.pick(this.pickRole); }
-    for (const op of saved) if (op.kind === "issue" && op.equationId) this.issueDrafts.delete(op.equationId);
-    if (saved.some(op => op.kind === "decision")) {
-      this.selectedId = nextReviewSelection(before, this.queue, previousId,
-        saved.filter(op => op.kind === "decision").flatMap(op => op.equationIds ?? []));
+    if (applied.some(op => op.kind === "value")) { this.missing = null; if (this.draft) this.pick(this.pickRole); }
+    for (const op of applied) if (op.kind === "issue" && op.equationId) this.issueDrafts.delete(op.equationId);
+    if (applied.some(op => op.kind === "decision")) {
+      this.selectedId = ""; this.hoveredId = "";
     }
-    if (response.status === "saved" || response.status === "loaded") this.bulk = null;
-    if (saved.some(op => op.kind === "decision" || op.kind === "equation")) {
+    if (response.status === "updated" || response.status === "loaded") this.bulk = null;
+    if (applied.some(op => op.kind === "decision" || op.kind === "equation")) {
       const next = this.queue.find(eq => eq.id === this.selectedId); if (next) this.regionId = next.regionId;
     }
     this.render();
-    if (response.status === "loaded" || saved.some(op => op.kind === "decision" || op.kind === "equation")) {
+    if (applied.some(op => op.kind === "equation")) {
       const next = this.controller.workspace?.equations.find(eq => eq.id === this.selectedId);
       if (next) this.focus(next);
-      if (response.status !== "loaded") this.focusRow();
+      this.focusRow();
     }
     if (response.status === "preview") this.focusDraft();
   }
@@ -91,8 +109,13 @@ export class EquationReview {
       const draft = this.issueDrafts.get(eq.id); return draft && (draft.note !== eq.note || draft.issue !== eq.issue);
     }) ?? false;
   }
-  private get locked(): boolean { return this.busy || !!this.draft || !!this.missing || this.drawing || this.unsavedIssue; }
-  private commit(operations: ReviewOperation[]): void { if (!this.blocked) this.controller.request("commit", operations); }
+  private get editing(): boolean { return this.controller.pending !== null || !!this.draft || !!this.missing || this.drawing || this.unsavedIssue; }
+  private get locked(): boolean { return this.blocked || this.editing; }
+  private commit(operations: ReviewOperation[]): void {
+    if (this.blocked) return;
+    if (operations.some(op => op.kind === "decision")) { this.hoverNeedsMove = true; this.hoveredId = ""; }
+    this.controller.request("commit", operations);
+  }
   private decide(id: string, decision: "accepted" | "rejected" | "deferred"): void {
     const selected = this.queue.find(eq => eq.id === id);
     if (this.locked || !selected || (decision === "accepted" && selected.evaluation.state === "not-evaluable")) return;
@@ -130,7 +153,7 @@ export class EquationReview {
     const workspace = this.controller.workspace;
     const scroll = this.element.scrollTop;
     const queueScroll = this.element.querySelector(".equation-review__rows")?.scrollTop ?? 0;
-    this.callbacks.onEditingChanged(this.controller.pending !== null || !!this.draft || !!this.missing || this.drawing || this.unsavedIssue);
+    this.callbacks.onEditingChanged(this.editing);
     const header = document.createElement("header");
     const title = document.createElement("h2"); title.textContent = "Review sums";
     const status = document.createElement("p"); status.setAttribute("role", "status");
@@ -148,103 +171,50 @@ export class EquationReview {
     if (!workspace.regions.some(region => region.id === this.regionId)) this.regionId = workspace.regions.find(item => item.id === "page-0")?.id ?? workspace.regions[0]?.id ?? "";
     const navigation = document.createElement("div"); navigation.className = "equation-review__navigation";
     navigation.append(this.filterControl("result", "Arithmetic result", [["all", "All results"], ["exact-match", "Figures tie"], ["difference", "Figures differ"], ["not-evaluable", "Cannot calculate"]]),
-      this.filterControl("type", "Sum type", [["all", "All sum types"], ["vertical", "Foots (columns)"], ["cross", "Crossfoots (rows)"], ["manual", "Manual sums"]]),
-      this.filterControl("status", "Review status", [["all", "All statuses"], ["pending", "Awaiting review"], ["unreviewed", "Not yet reviewed"], ["deferred", "Review later"], ["accepted", "Approved"], ["rejected", "Rejected"]]));
-    this.element.append(navigation);
+      this.filterControl("type", "Sum type", [["all", "All sum types"], ["vertical", "Foots (columns)"], ["cross", "Crossfoots (rows)"], ["manual", "Manual sums"]]));
+    this.element.append(navigation, this.statusControls());
     const shown = this.queue;
     this.selectedId = visibleSelection(shown, this.selectedId);
+    this.hoveredId = "";
+    const groups = reviewPageGroups(workspace, shown);
     const summary = document.createElement("p"); summary.className = "equation-review__scope";
-    const pages = new Set(shown.map(eq => workspace.evidence.find(cell => cell.id === eq.targetId)?.pageIndex ?? workspace.regions.find(region => region.id === eq.regionId)?.pageIndex));
-    summary.textContent = `${shown.length} of ${workspace.equations.length} sums · ${pages.size} ${pages.size === 1 ? "page" : "pages"} · whole document`;
+    summary.textContent = `${shown.length} matching sums · ${groups.size} ${groups.size === 1 ? "page" : "pages"} · whole document`;
     this.element.append(summary);
-    if (this.filters.result !== "all" || this.filters.type !== "all" || this.filters.status !== "all") {
-      summary.append(" · ", this.lockButton("Clear filters", () => { this.filters = { result: "all", type: "all", status: "all" }; this.changeFilters(); }));
+    if (this.filters.result !== "all" || this.filters.type !== "all" || this.filters.statuses.length !== 3) {
+      summary.append(" · ", this.lockButton("Clear filters", () => {
+        this.filters = { result: "all", type: "all", statuses: ["unreviewed", "deferred", "accepted"] }; this.changeFilters();
+      }));
     }
+    if (this.selectedId) summary.append(" · ", this.lockButton("Show all matching sums", () => this.unselect()));
     if (this.bulk) {
       const box = document.createElement("div"); box.className = "equation-review__bulk";
       const ids = new Set(this.bulk.equationIds);
-      const selected = workspace.equations.filter(eq => ids.has(eq.id));
+      const selected = shown.filter(eq => ids.has(eq.id));
       const copy = document.createElement("p");
-      copy.textContent = `Approve these ${selected.length} matching sums in ${this.location(selected[0]!)}? ${selected.filter(eq => eq.evaluation.state === "difference").length} have differences that will remain open. Already reviewed and unreadable sums are excluded.`;
+      copy.textContent = `Approve these ${selected.length} matching sums on ${this.location(selected[0]!)}? ${selected.filter(eq => eq.evaluation.state === "difference").length} have differences that will remain open. Already reviewed and unreadable sums are excluded.`;
       const list = document.createElement("ul");
-      for (const eq of selected) { const li = document.createElement("li"); li.textContent = this.location(eq) + " · " + this.label(eq); list.append(li); }
+      for (const eq of selected) { const li = document.createElement("li"); li.textContent = this.label(eq); list.append(li); }
       box.append(copy, list, this.button("Confirm approval", () => { if (this.bulk && !this.locked) this.commit([this.bulk]); }, this.locked),
         this.button("Cancel", () => { this.bulk = null; this.render(); }, this.busy)); this.element.append(box);
     }
     const rows = document.createElement("div"); rows.className = "equation-review__rows";
-    const groups = new Map<string, ReviewEquation[]>();
-    for (const eq of shown) groups.set(eq.regionId, [...(groups.get(eq.regionId) ?? []), eq]);
-    for (const [regionId, equations] of groups) {
-      const group = document.createElement("section"); group.className = "equation-review__group";
+    for (const [pageIndex, equations] of groups) {
+      const group = document.createElement("section"); group.className = "equation-review__group"; group.dataset.pageIndex = String(pageIndex);
       const heading = document.createElement("div"); heading.className = "equation-review__group-heading";
-      const label = document.createElement("h3"); label.textContent = `${this.location(equations[0]!)} · ${equations.length} ${equations.length === 1 ? "sum" : "sums"}`;
+      const label = document.createElement("h3"); label.textContent = `Page ${pageIndex + 1} · ${equations.length} ${equations.length === 1 ? "sum" : "sums"}`;
       const approval = acceptDisplayed(workspace, equations.map(eq => eq.id));
       heading.append(label, this.lockButton("Approve matching sums…", () => {
         this.bulk = approval; this.bulkRevision = workspace.revision; this.bulkScanId = workspace.scanId;
         this.render(); this.element.querySelector(".equation-review__bulk")?.scrollIntoView({ block: "nearest" });
       }, !approval));
-      group.dataset.regionId = regionId; group.append(heading);
-      for (const eq of equations) {
-        const row = this.lockButton("", () => { this.select(eq); this.focusRow(); });
-        row.className = `equation-review__row${eq.id === this.selectedId ? " equation-review__row--selected" : ""}`;
-        row.setAttribute("aria-pressed", String(eq.id === this.selectedId)); row.dataset.equationId = eq.id;
-        const title = document.createElement("span"); title.className = "equation-review__row-title"; title.textContent = this.label(eq);
-        const result = document.createElement("span"); result.className = `equation-review__result equation-review__result--${eq.evaluation.state}`;
-        result.textContent = eq.evaluation.state === "exact-match" ? "Figures tie" : eq.evaluation.state === "difference" ? `Difference ${eq.evaluation.delta}` : "Cannot calculate";
-        const decision = document.createElement("span"); decision.className = "equation-review__decision";
-        decision.textContent = ({ unreviewed: "Awaiting review", accepted: "Approved", rejected: "Rejected", deferred: "Review later" })[eq.decision];
-        if (eq.decision === "accepted" && eq.evaluation.state === "difference") decision.textContent += ` · issue ${eq.issue}`;
-        row.append(title, result, decision); group.append(row);
-      }
+      group.append(heading);
+      for (const eq of equations) group.append(this.equationRow(eq));
       rows.append(group);
     }
     if (!shown.length) {
-      const empty = document.createElement("p"); empty.textContent = "No sums match these filters anywhere in the document.";
-      rows.append(empty);
-      if (!this.draft) this.callbacks.onFocus([], "", "not-evaluable", false);
+      const empty = document.createElement("p"); empty.textContent = "No sums match these filters anywhere in the document."; rows.append(empty);
     }
     this.element.append(rows);
-    const selected = shown.find(eq => eq.id === this.selectedId);
-    if (selected && !this.draft) {
-      const details = document.createElement("section"); details.className = "equation-review__details";
-      const heading = document.createElement("h3"); heading.textContent = this.label(selected);
-      const context = document.createElement("p"); context.className = "equation-review__scope";
-      context.textContent = `${this.location(selected)} · result ${workspace.evidence.find(cell => cell.id === selected.targetId)?.text ?? "?"}`;
-      const source = document.createElement("div"); source.className = "equation-review__source";
-      source.append(context, this.lockButton("Show on PDF", () => this.focus(selected))); details.append(heading, source);
-      const working = document.createElement("p");
-      const corrections = new Map(workspace.corrections.map(item => [item.cellId, item.value]));
-      working.textContent = selected.terms.map(term => `${term.coefficient === 1 ? "+" : "−"} (${corrections.get(term.cellId) ?? workspace.evidence.find(cell => cell.id === term.cellId)?.text ?? "?"})`).join(" ")
-        + (selected.evaluation.state === "not-evaluable" ? ` · ${selected.evaluation.reason}` : ` = ${selected.evaluation.sum}; target − sum = ${selected.evaluation.delta}`);
-      const actions = document.createElement("div"); actions.className = "equation-review__actions";
-      const approve = this.lockButton("Approve", () => this.decide(selected.id, "accepted"), selected.evaluation.state === "not-evaluable" || selected.decision === "accepted");
-      approve.setAttribute("aria-label", "Approve sum");
-      approve.classList.add("equation-review__primary");
-      approve.title = "Confirm the chosen operands. Any numerical difference stays open.";
-      const reject = this.lockButton("Reject", () => this.decide(selected.id, "rejected"), selected.decision === "rejected"); reject.setAttribute("aria-label", "Reject suggestion");
-      const later = this.lockButton("Later", () => this.decide(selected.id, "deferred")); later.setAttribute("aria-label", "Review later");
-      const edit = this.lockButton("Edit", () => this.edit(selected)); edit.setAttribute("aria-label", "Edit equation");
-      actions.append(approve, reject, later, edit);
-      const help = document.createElement("p"); help.className = "equation-review__scope";
-      help.textContent = selected.evaluation.state === "not-evaluable" ? "Check the result and operands before approval." : selected.evaluation.state === "difference" ? "Approval confirms operands; this difference stays open." : "Shortcuts: Alt+A approve · Alt+R reject · Alt+D later";
-      details.append(working, actions, help);
-      if (selected.decision === "accepted" && selected.evaluation.state === "difference") {
-        const issueDraft = this.issueDrafts.get(selected.id) ?? { note: selected.note, issue: selected.issue };
-        this.issueDrafts.set(selected.id, issueDraft);
-        const note = document.createElement("textarea"); note.value = issueDraft.note; note.placeholder = "Explain this difference"; note.setAttribute("aria-label", "Difference explanation");
-        const disposition = document.createElement("select"); disposition.setAttribute("aria-label", "Issue disposition");
-        for (const state of ["open", "explained", "resolved"]) disposition.add(new Option(state, state)); disposition.value = issueDraft.issue;
-        note.disabled = this.busy; disposition.disabled = this.busy;
-        note.addEventListener("input", () => { issueDraft.note = note.value; this.updateLocks(); });
-        disposition.addEventListener("change", () => { issueDraft.issue = disposition.value as typeof issueDraft.issue; this.updateLocks(); });
-        details.append(note, disposition, this.button("Save issue disposition", () => this.commit([{ kind: "issue", equationId: selected.id, issue: disposition.value as "open" | "explained" | "resolved", note: note.value }]), this.busy));
-        details.append(this.button("Cancel issue edit", () => { this.issueDrafts.delete(selected.id); this.render(); }, this.busy));
-        const reminder = document.createElement("p"); reminder.className = "equation-review__scope equation-review__issue-reminder";
-        reminder.textContent = this.unsavedIssue ? "Save or cancel the difference explanation before reviewing another sum." : "";
-        details.append(reminder);
-      }
-      this.element.append(details);
-    }
     if (this.draft) {
       const draft = this.draft;
       const preview = this.controller.preview?.equations.find(eq => eq.targetId === draft.targetId && eq.axis === draft.axis
@@ -277,7 +247,7 @@ export class EquationReview {
     const pageLabel = document.createElement("label"); pageLabel.textContent = "Manual review page (does not filter sums)"; pageLabel.append(pageSelect); tools.append(pageLabel);
     tools.append(this.lockButton("Add sum on this page", () => { this.regionId = pageSelect.value; this.edit(); }),
       this.lockButton("Reload review", () => { this.clear(); this.controller.request("load"); }),
-      this.lockButton("Undo last save", () => { if (this.controller.undoRevision !== null) this.commit([{ kind: "restore", revision: this.controller.undoRevision }]); }, this.controller.undoRevision === null));
+      this.lockButton("Undo last change", () => { if (this.controller.undoRevision !== null) this.commit([{ kind: "restore", revision: this.controller.undoRevision }]); }, this.controller.undoRevision === null));
     if (region) tools.append(this.lockButton(workspace.reviewedPages.includes(region.pageIndex) ? "Reopen page review" : "Mark this page reviewed", () => this.commit([{ kind: "page", pageIndex: region.pageIndex, reviewed: !workspace.reviewedPages.includes(region.pageIndex) }])));
     tools.append(this.button("Locate missing figure on PDF", () => {
       this.bulk = null; this.drawing = true; this.callbacks.onPick([], null);
@@ -301,18 +271,18 @@ export class EquationReview {
       text.addEventListener("input", () => { this.missingText = text.value; });
       value.addEventListener("input", () => { this.missingValue = value.value; });
       reason.addEventListener("input", () => { this.missingReason = reason.value; });
-      const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "Save anchored figure"; submit.disabled = this.busy;
+      const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "Add anchored figure"; submit.disabled = this.busy;
       form.addEventListener("submit", event => { event.preventDefault(); this.commit([{ kind: "value", cell: { id: "", ...missing, text: text.value, value: value.value.trim(), label: reason.value, column: "", dash: false, origin: "manual" } }]); });
       form.append(title, text, value, reason, submit, this.button("Cancel figure", () => { this.missing = null; if (this.draft) this.pick(this.pickRole); this.render(); }, this.busy)); tools.append(form);
     }
-    tools.append(this.button(this.showHistory ? "Hide review history" : "Show review history", () => { this.showHistory = !this.showHistory; this.render(); }, false));
+    tools.append(this.lockButton(this.showHistory ? "Hide review history" : "Show review history", () => { this.showHistory = !this.showHistory; this.render(); }));
     if (this.showHistory) {
       const history = document.createElement("section"); history.className = "equation-review__history";
       for (const revision of [...workspace.history].reverse()) history.append(this.lockButton(`Restore review revision ${revision.revision} · ${revision.at}`, () => this.commit([{ kind: "restore", revision: revision.revision }])));
       for (const archive of workspace.archives) {
         const details = document.createElement("details");
         const summary = document.createElement("summary"); summary.textContent = `Previous scan · ${archive.equations.filter(eq => eq.decision === "accepted").length} approved relationships · retained evidence`; details.append(summary);
-        for (const eq of archive.equations.filter(item => item.decision !== "unreviewed")) {
+        for (const eq of archive.equations.filter(item => item.decision === "accepted" || item.decision === "deferred")) {
           const entry = document.createElement("p"); const cell = archive.evidence.find(item => item.id === eq.targetId);
           const corrected = new Map(archive.corrections.map(item => [item.cellId, item.value]));
           const working = eq.terms.map(term => `${term.coefficient === 1 ? "+" : "−"} (${corrected.get(term.cellId) ?? archive.evidence.find(item => item.id === term.cellId)?.text ?? "?"})`).join(" ");
@@ -324,10 +294,89 @@ export class EquationReview {
     }
     this.element.append(tools);
     rows.scrollTop = queueScroll; this.element.scrollTop = scroll;
+    this.syncOverlay();
   }
-  private focus(eq: ReviewEquation): void {
+  private equationRow(eq: ReviewEquation): HTMLElement {
+    const workspace = this.controller.workspace!;
+    const row = document.createElement("section"); row.dataset.equationId = eq.id;
+    row.className = `equation-review__row${eq.id === this.selectedId ? " equation-review__row--selected" : ""}`;
+    row.setAttribute("aria-label", this.label(eq));
+    const select = this.lockButton("", () => this.select(eq)); select.className = "equation-review__row-select";
+    select.setAttribute("aria-pressed", String(eq.id === this.selectedId));
+    const title = document.createElement("span"); title.className = "equation-review__row-title"; title.textContent = this.label(eq);
+    const result = document.createElement("span"); result.className = `equation-review__result equation-review__result--${eq.evaluation.state}`;
+    result.textContent = eq.evaluation.state === "exact-match" ? "Figures tie" : eq.evaluation.state === "difference" ? `Difference ${eq.evaluation.delta}` : "Cannot calculate";
+    const decision = document.createElement("span"); decision.className = "equation-review__decision";
+    decision.textContent = eq.decision === "accepted" ? "Approved" : eq.decision === "deferred" ? "Review later" : "Awaiting review";
+    if (eq.decision === "accepted" && eq.evaluation.state === "difference") decision.textContent += ` · issue ${eq.issue}`;
+    select.append(title, result, decision); row.append(select);
+    const working = document.createElement("p"); working.className = "equation-review__working";
+    const cells = new Map(workspace.evidence.map(cell => [cell.id, cell]));
+    const corrections = new Map(workspace.corrections.map(item => [item.cellId, item.value]));
+    const target = cells.get(eq.targetId);
+    working.textContent = eq.terms.map(term => `${term.coefficient === 1 ? "+" : "−"} (${corrections.get(term.cellId) ?? cells.get(term.cellId)?.text ?? "?"})`).join(" ")
+      + (eq.evaluation.state === "not-evaluable" ? ` · ${eq.evaluation.reason}` : ` = ${eq.evaluation.sum}; printed result ${target?.text ?? "?"}${corrections.has(eq.targetId) ? ` → ${corrections.get(eq.targetId)}` : ""}; difference ${eq.evaluation.delta}`);
+    const actions = document.createElement("div"); actions.className = "equation-review__actions";
+    const approve = this.lockButton("Approve", () => this.decide(eq.id, "accepted"), eq.evaluation.state === "not-evaluable" || eq.decision === "accepted");
+    approve.classList.add("equation-review__primary"); approve.title = "Confirm the chosen operands. Any numerical difference stays open.";
+    actions.append(approve, this.lockButton("Reject", () => this.decide(eq.id, "rejected")),
+      this.lockButton("Later", () => this.decide(eq.id, "deferred")), this.lockButton("Edit", () => this.edit(eq)));
+    row.append(working, actions);
+    if (eq.decision === "accepted" && eq.evaluation.state === "difference") {
+      const issue = document.createElement("details"); issue.className = "equation-review__issue"; issue.open = this.openIssues.has(eq.id);
+      issue.addEventListener("toggle", () => { if (issue.isConnected) { if (issue.open) this.openIssues.add(eq.id); else this.openIssues.delete(eq.id); } });
+      const summary = document.createElement("summary"); summary.textContent = "Explain difference";
+      const draft = this.issueDrafts.get(eq.id) ?? { note: eq.note, issue: eq.issue };
+      const note = document.createElement("textarea"); note.value = draft.note; note.placeholder = "Explain this difference"; note.setAttribute("aria-label", "Difference explanation");
+      const disposition = document.createElement("select"); disposition.setAttribute("aria-label", "Issue disposition");
+      for (const state of ["open", "explained", "resolved"]) disposition.add(new Option(state, state)); disposition.value = draft.issue;
+      note.disabled = this.busy || !!this.draft; disposition.disabled = this.busy || !!this.draft;
+      note.addEventListener("input", () => { draft.note = note.value; this.issueDrafts.set(eq.id, draft); this.updateLocks(); });
+      disposition.addEventListener("change", () => { draft.issue = disposition.value as typeof draft.issue; this.issueDrafts.set(eq.id, draft); this.updateLocks(); });
+      issue.append(summary, note, disposition, this.button("Record explanation", () => this.commit([{ kind: "issue", equationId: eq.id, issue: draft.issue, note: draft.note }]), this.busy || !!this.draft),
+        this.button("Cancel explanation", () => { this.issueDrafts.delete(eq.id); this.render(); }, this.busy));
+      const reminder = document.createElement("p"); reminder.className = "equation-review__scope equation-review__issue-reminder";
+      reminder.textContent = this.unsavedIssue ? "Record or cancel the explanation before reviewing another sum." : ""; issue.append(reminder); row.append(issue);
+    }
+    row.addEventListener("pointerenter", () => this.preview(eq.id));
+    row.addEventListener("pointerleave", () => this.preview(""));
+    return row;
+  }
+  private statusControls(): HTMLElement {
+    const fieldset = document.createElement("fieldset"); fieldset.className = "equation-review__statuses";
+    const legend = document.createElement("legend"); legend.textContent = "Review status"; fieldset.append(legend);
+    const statuses = [["unreviewed", "Awaiting review"], ["deferred", "Review later"], ["accepted", "Approved"]] as const;
+    for (const [status, text] of statuses) {
+      const label = document.createElement("label"); const checkbox = document.createElement("input"); checkbox.type = "checkbox";
+      checkbox.checked = this.filters.statuses.includes(status); checkbox.disabled = this.locked; checkbox.dataset.reviewLock = "false";
+      const count = reviewQueue(this.controller.workspace!, { ...this.filters, statuses: [status] }).length;
+      checkbox.setAttribute("aria-label", text);
+      checkbox.addEventListener("change", () => {
+        this.filters = { ...this.filters, statuses: statuses.map(([id]) => id).filter(id => id === status ? checkbox.checked : this.filters.statuses.includes(id)) };
+        this.changeFilters();
+      }); label.append(checkbox, ` ${text} (${count})`); fieldset.append(label);
+    }
+    return fieldset;
+  }
+  private syncOverlay(): void {
+    const workspace = this.controller.workspace;
+    if (!workspace) return;
+    const editing = !!this.draft || !!this.missing || this.drawing;
+    this.callbacks.onOverview(editing ? [] : this.queue, workspace.evidence,
+      id => { const eq = this.queue.find(eq => eq.id === id); if (eq) this.select(eq); }, () => this.unselect());
+    if (this.draft) this.focusDraft(); else if (!editing) this.syncFocus();
+  }
+  private syncFocus(): void {
+    const eq = this.queue.find(eq => eq.id === (this.hoveredId || this.selectedId));
+    if (eq) this.focus(eq, false); else this.callbacks.onFocus([], "", "not-evaluable", false);
+  }
+  private preview(id: string): void {
+    if (this.locked || this.hoveredId === id || (id && this.hoverNeedsMove)) return;
+    this.hoveredId = id; this.syncFocus();
+  }
+  private focus(eq: ReviewEquation, navigate = true): void {
     const ids = new Set([eq.targetId, ...eq.terms.map(term => term.cellId)]);
-    this.callbacks.onFocus(this.controller.workspace?.evidence.filter(cell => ids.has(cell.id)) ?? [], eq.targetId, eq.evaluation.state);
+    this.callbacks.onFocus(this.controller.workspace?.evidence.filter(cell => ids.has(cell.id)) ?? [], eq.targetId, eq.evaluation.state, navigate, eq.id);
   }
   private focusDraft(): void {
     if (!this.draft) return;
@@ -345,12 +394,9 @@ export class EquationReview {
     const workspace = this.controller.workspace!;
     const region = workspace.regions.find(item => item.id === eq.regionId);
     const page = workspace.evidence.find(cell => cell.id === eq.targetId)?.pageIndex ?? region?.pageIndex ?? 0;
-    const tables = workspace.regions.filter(item => item.pageIndex === page && item.id !== `page-${page}`)
-      .sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x || a.id.localeCompare(b.id));
-    const table = tables.findIndex(item => item.id === eq.regionId);
-    return `Page ${page + 1} · ${table < 0 ? "Manual sums" : `Table ${table + 1}`}`;
+    return `Page ${page + 1}`;
   }
-  private filterControl(key: keyof ReviewFilters, label: string, options: string[][]): HTMLLabelElement {
+  private filterControl(key: "result" | "type", label: string, options: string[][]): HTMLLabelElement {
     const wrapper = document.createElement("label"); wrapper.textContent = label;
     const select = document.createElement("select"); select.setAttribute("aria-label", label);
     for (const [id, text] of options) {
@@ -364,30 +410,30 @@ export class EquationReview {
   }
   private changeFilters(): void {
     this.bulk = null;
-    if (this.controller.notice.startsWith("Equation saved outside")) this.controller.notice = "Equation saved · save Excel to keep it on disk";
-    const first = this.queue[0]; this.selectedId = first?.id ?? ""; if (first) this.regionId = first.regionId;
-    this.render(); if (first) this.focus(first);
+    if (this.controller.notice.startsWith("Equation applied outside")) this.controller.notice = "";
+    this.selectedId = ""; this.hoveredId = ""; this.render();
   }
   private pickInstruction(): string {
-    return `PDF selection: ${this.pickRole === "target" ? "click the printed result" : "click operands to add or remove them"}. Save the equation, then approve it separately.`;
+    return `PDF selection: ${this.pickRole === "target" ? "click the printed result" : "click operands to add or remove them"}. Apply the equation, then approve it separately.`;
   }
   private select(eq: ReviewEquation): void {
     if (this.locked) return;
-    this.selectedId = eq.id; this.regionId = eq.regionId; this.bulk = null; this.render(); this.focus(eq);
+    this.selectedId = this.selectedId === eq.id ? "" : eq.id; this.hoveredId = ""; this.hoverNeedsMove = !this.selectedId;
+    this.regionId = eq.regionId; this.bulk = null; this.render();
+    if (this.selectedId) this.focus(eq); this.focusRow();
   }
   private focusRow(): void {
-    const row = this.element.querySelector<HTMLButtonElement>(".equation-review__row--selected");
+    const row = this.element.querySelector<HTMLButtonElement>(".equation-review__row--selected .equation-review__row-select");
     row?.focus({ preventScroll: true });
     row?.scrollIntoView({ block: "nearest" });
   }
   /** Lock navigation without rebuilding a textarea while the reviewer is typing. */
   private updateLocks(): void {
-    this.callbacks.onEditingChanged(this.controller.pending !== null || !!this.draft || !!this.missing || this.drawing || this.unsavedIssue);
-    for (const control of this.element.querySelectorAll<HTMLButtonElement | HTMLSelectElement>("[data-review-lock]")) {
+    this.callbacks.onEditingChanged(this.editing);
+    for (const control of this.element.querySelectorAll<HTMLButtonElement | HTMLSelectElement | HTMLInputElement>("[data-review-lock]")) {
       control.disabled = this.locked || control.dataset.reviewLock === "true";
     }
-    const reminder = this.element.querySelector(".equation-review__issue-reminder");
-    if (reminder) reminder.textContent = this.unsavedIssue ? "Save or cancel the difference explanation before reviewing another sum." : "";
+    for (const reminder of this.element.querySelectorAll(".equation-review__issue-reminder")) reminder.textContent = this.unsavedIssue ? "Record or cancel the explanation before reviewing another sum." : "";
   }
   private lockButton(label: string, action: () => void, disabled = false): HTMLButtonElement {
     const button = this.button(label, () => { if (!this.locked) action(); }, this.locked || disabled);

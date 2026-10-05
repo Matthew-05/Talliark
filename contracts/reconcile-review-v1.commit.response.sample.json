@@ -1,0 +1,22 @@
+{
+  "type": "reconcile-review-response",
+  "version": 1,
+  "requestId": "mark-page-reviewed-example",
+  "pdfId": "doc",
+  "status": "updated",
+  "workspace": {
+    "version": 1,
+    "documentId": "doc",
+    "scanId": "scan-example",
+    "geometryFingerprint": "geometry-example",
+    "pageCount": 1,
+    "revision": 1,
+    "evidence": [],
+    "regions": [],
+    "equations": [],
+    "corrections": [],
+    "history": [],
+    "archives": [],
+    "reviewedPages": [0]
+  }
+}

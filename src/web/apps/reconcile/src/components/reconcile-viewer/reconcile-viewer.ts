@@ -10,7 +10,7 @@ import {
 } from "@talliark/shared";
 import type { CharacterEntry, SearchMatch, SearchPageIndex } from "@talliark/shared";
 import type { Bounds, ReconcileOutcome } from "../../types/index.js";
-import type { ReviewBounds, ReviewCell, ReviewEvaluation } from "../../types/reconcile-review.generated.js";
+import type { ReviewBounds, ReviewCell, ReviewEquation, ReviewEvaluation } from "../../types/reconcile-review.generated.js";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const MIN_ZOOM = 0.25;
@@ -63,6 +63,12 @@ export class ReconcileViewer {
   private categoryOverview: {
     items: readonly CategoryOverviewItem[];
     onSelect: (id: string) => void;
+  } | null = null;
+  private reviewOverview: {
+    equations: readonly ReviewEquation[];
+    evidence: readonly ReviewCell[];
+    select: ((id: string) => void) | null;
+    clear: (() => void) | null;
   } | null = null;
 
   constructor() {
@@ -135,8 +141,13 @@ export class ReconcileViewer {
       this.pageInput.max = String(total);
       this.pageTotal.textContent = String(total);
       this.renderReviewControls();
+      this.renderReviewOverview();
     });
     this.viewer.element.addEventListener("scroll", () => this.updatePageFromScroll(), { passive: true });
+    this.viewer.element.addEventListener("click", event => {
+      if (this.evidencePicker || this.drawCallback || !(event.target instanceof Element)) return;
+      if (!event.target.closest(".reconcile-viewer__review-overview, .reconcile-viewer__footing-highlight")) this.reviewOverview?.clear?.();
+    });
     this.viewer.element.addEventListener("wheel", (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
@@ -167,6 +178,7 @@ export class ReconcileViewer {
     await this.viewer.loadDocument(this.objectUrl, pdfId, pageRotations);
     this.viewer.startBackgroundRender();
     this.renderCategoryOverview();
+    this.renderReviewOverview();
     const document_ = this.viewer.getDocument();
     if (!document_) return;
     try {
@@ -193,22 +205,34 @@ export class ReconcileViewer {
 
   dispose(): void {
     this.reviewFocusGeneration++;
+    this.reviewOverview = null;
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     this.revokeObjectUrl();
     this.viewer.showEmptyState(document.createElement("div"));
   }
 
-  async focusReview(cells: ReviewCell[], targetId: string, state: ReviewEvaluation["state"], navigate = true): Promise<void> {
+  async focusReview(cells: ReviewCell[], targetId: string, state: ReviewEvaluation["state"], navigate = true, equationId = ""): Promise<void> {
     const generation = ++this.reviewFocusGeneration;
     await this.viewer.waitForLoad();
     if (generation !== this.reviewFocusGeneration) return;
     this.clearFocus();
+    this.element.classList.toggle("reconcile-viewer--review-focused", cells.length > 0);
     const outcome = state === "exact-match" ? "confirmed" : state === "difference" ? "break" : "unresolved";
     for (const cell of cells) {
       const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${cell.pageIndex + 1}"]`);
       if (!page) continue;
       const highlight = document.createElement("div");
+      highlight.dataset.cellId = cell.id;
       highlight.className = `reconcile-viewer__footing-highlight reconcile-viewer__footing-highlight--${cell.id === targetId ? "total" : "addend"} reconcile-viewer__footing-highlight--${outcome}`;
+      if (cell.id === targetId && equationId) {
+        highlight.classList.add("reconcile-viewer__review-focus-target");
+        highlight.dataset.equationId = equationId;
+        highlight.setAttribute("role", "button"); highlight.tabIndex = 0;
+        highlight.setAttribute("aria-label", "Toggle focus for this sum");
+        const select = (): void => this.reviewOverview?.select?.(equationId);
+        highlight.addEventListener("click", event => { event.stopPropagation(); select(); });
+        highlight.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
+      }
       applyNormalizedRectToElement(highlight, cell.bounds); ensureOverlayLayer(page).append(highlight);
     }
     const target = cells.find(cell => cell.id === targetId) ?? cells[0];
@@ -301,8 +325,36 @@ export class ReconcileViewer {
   }
 
   clearFocus(): void {
+    this.element.classList.remove("reconcile-viewer--review-focused");
     this.viewer.element.querySelectorAll(".reconcile-viewer__footing-highlight")
       .forEach((element) => element.remove());
+  }
+
+  showReviewEquations(equations: readonly ReviewEquation[], evidence: readonly ReviewCell[],
+    select: ((id: string) => void) | null, clear: (() => void) | null): void {
+    this.reviewOverview = { equations, evidence, select, clear };
+    this.renderReviewOverview();
+  }
+
+  private renderReviewOverview(): void {
+    this.viewer.element.querySelectorAll(".reconcile-viewer__review-overview").forEach(element => element.remove());
+    const overview = this.reviewOverview;
+    if (!overview) return;
+    const cells = new Map(overview.evidence.map(cell => [cell.id, cell]));
+    for (const eq of overview.equations) {
+      const target = cells.get(eq.targetId); if (!target) continue;
+      const page = this.viewer.element.querySelector<HTMLElement>(`[data-page="${target.pageIndex + 1}"]`);
+      if (!page) continue;
+      const outcome = eq.evaluation.state === "exact-match" ? "confirmed" : eq.evaluation.state === "difference" ? "break" : "unresolved";
+      const button = document.createElement("button"); button.type = "button";
+      button.className = `reconcile-viewer__category-highlight reconcile-viewer__category-highlight--${outcome} reconcile-viewer__review-overview`;
+      button.dataset.equationId = eq.id; button.dataset.pageIndex = String(target.pageIndex);
+      button.title = `${target.label || target.text}${target.column ? ` · ${target.column}` : ""} · ${eq.axis === "vertical" ? "Foot" : eq.axis === "cross" ? "Crossfoot" : "Manual sum"}`;
+      button.setAttribute("aria-label", `Focus ${button.title}`);
+      applyNormalizedRectToElement(button, target.bounds);
+      button.addEventListener("click", event => { event.stopPropagation(); overview.select?.(eq.id); });
+      ensureOverlayLayer(page).append(button);
+    }
   }
 
   showCategory(

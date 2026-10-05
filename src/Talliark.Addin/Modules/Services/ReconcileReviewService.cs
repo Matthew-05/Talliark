@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using Talliark.Addin.Modules.CustomXml;
 using Talliark.Addin.Modules.CustomXml.Models;
+using Talliark.Addin.Modules.CustomXml.Serialization;
 using Talliark.Addin.Modules.Infrastructure;
 using Excel = Microsoft.Office.Interop.Excel;
 
@@ -19,6 +20,8 @@ namespace Talliark.Addin.Modules.Services
     {
         private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
         private PythonWorkerSession _session;
+        private string _sourceXml;
+        private readonly Dictionary<string, ReconcileStoredResult> _sources = new Dictionary<string, ReconcileStoredResult>(StringComparer.Ordinal);
         private bool _disposed;
         private static JavaScriptSerializer Serializer() => new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 256 };
 
@@ -40,13 +43,37 @@ namespace Talliark.Addin.Modules.Services
                     if (request == null || request.version != 1 || request.type != "reconcile-review-request")
                         throw new InvalidOperationException("Unsupported review request.");
                     if (scanning) throw new InvalidOperationException("Wait for the scan to finish before reviewing this document.");
+                    if (request.mode == "save-workbook")
+                    {
+                        if (request.operations == null || request.operations.Count != 0)
+                            throw new InvalidOperationException("Saving the workbook cannot apply review operations.");
+                        // The gate has drained pending XML writes. Excel owns
+                        // Save As, BeforeSave handlers and cancellation.
+                        workbook.Save();
+                        if (!workbook.Saved)
+                            throw new InvalidOperationException("Workbook save did not complete. Your review remains in the open workbook.");
+                        return Serializer().Serialize(new Dictionary<string, object>
+                        {
+                            ["type"] = "reconcile-review-response", ["version"] = 1,
+                            ["requestId"] = requestId, ["pdfId"] = pdfId, ["status"] = "workbook-saved",
+                        });
+                    }
                     if (request.mode == "commit") WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
-                    var results = new ReconcileResultService();
-                    ReconcileStoredResult source = results.LoadResult(workbook, pdfId);
+                    var store = new TalliarkCustomXmlPartStore(workbook);
+                    string sourceXml = store.LoadReconcileWorkspaceXml();
+                    if (!string.Equals(sourceXml, _sourceXml, StringComparison.Ordinal))
+                    {
+                        _sources.Clear();
+                        _sourceXml = sourceXml;
+                    }
+                    if (!_sources.TryGetValue(pdfId, out ReconcileStoredResult source))
+                    {
+                        source = new ReconcileResultService().LoadResult(TalliarkReconcileSerializer.FromXml(sourceXml), pdfId);
+                        _sources[pdfId] = source;
+                    }
                     if (string.IsNullOrEmpty(source.ReconcileBase64)) throw new InvalidOperationException("Scan this document before reviewing its relationships.");
                     if (source.Staleness != "current" && request.mode != "load")
                         throw new InvalidOperationException("Re-scan stale evidence before applying review decisions.");
-                    var store = new TalliarkCustomXmlPartStore(workbook);
                     string prior = store.LoadReconcileReview(pdfId);
                     string jobId = Guid.NewGuid().ToString();
                     var job = new Dictionary<string, object>
@@ -68,13 +95,9 @@ namespace Talliark.Addin.Modules.Services
                     {
                         // Re-read after background work: a scan, second window,
                         // document replacement or save must not be overwritten.
-                        ReconcileStoredResult latest = results.LoadResult(workbook, pdfId);
-                        if (!string.Equals(latest.ReconcileBase64, source.ReconcileBase64, StringComparison.Ordinal)
-                            || !string.Equals(latest.DocumentValuesBase64, source.DocumentValuesBase64, StringComparison.Ordinal)
-                            || !string.Equals(latest.PdfBase64, source.PdfBase64, StringComparison.Ordinal)
-                            || !string.Equals(latest.Staleness, source.Staleness, StringComparison.Ordinal)
+                        if (!string.Equals(store.LoadReconcileWorkspaceXml(), sourceXml, StringComparison.Ordinal)
                             || !string.Equals(store.LoadReconcileReview(pdfId), prior, StringComparison.Ordinal))
-                            throw new InvalidOperationException("The document or review changed. Reload before saving.");
+                            throw new InvalidOperationException("The document or review changed. Reload before applying changes.");
                         if (request.mode != "load" || !workbook.ProtectStructure)
                         {
                             WorkbookProtectionGuard.ThrowIfStructureProtected(workbook);
@@ -123,6 +146,8 @@ namespace Talliark.Addin.Modules.Services
         public void Dispose()
         {
             _disposed = true;
+            _sources.Clear();
+            _sourceXml = null;
             // Kill is safe from the UI thread and wakes a blocked result read.
             _session?.Kill();
             if (_gate.CurrentCount == 1)

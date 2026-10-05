@@ -24,7 +24,7 @@ proof, findings, and the durable `reconcile-v1` envelope; it no longer owns tabl
 recognition or value-to-cell membership. The mathematical review pane treats
 every detected equation as an unreviewed suggestion. The review list spans the
 whole active document and groups matching foots, crossfoots and manual sums by
-page and table. Reviewers approve the displayed relationships in a table,
+page. Reviewers approve the displayed relationships on a page,
 correct individual equations, or create
 manual equations from anchored PDF figures. Human acceptance and numerical
 agreement are independent facts; an exact match does not earn review credit.
@@ -76,15 +76,21 @@ optional saved review. It performs no OCR or detection. Preview responses never
 write storage. A commit evaluates explicit operands, appends the previous review
 revision, and returns the new compressed review. The C# service rechecks the
 source and saved review after background work before replacing the workbook part.
-The pane updates persisted state only after that write is acknowledged.
+The pane applies the authoritative `updated` response after the direct XML write.
+Routine XML updates have no save banner or separate saved state; only the explicit
+Excel workbook save reports **Workbook saved**. Undo is presented as **Undo last
+change**.
 
 `talliark-storage-reconcile-review-v1.xsd` owns an independent Custom XML part,
 keyed by document identity. This additive store leaves earlier workbook workspace
 XML and `reconcile-v1` results readable without migration. A workbook without the
 part initializes review on first load; the initial state is recorded when workbook
 structure is writable. A protected workbook permits inspection, but commits fail
-without replacing saved state. Excel must be saved to persist workbook changes
-on disk. Unsupported review versions fail without replacing their payload.
+without replacing saved state. Review actions automatically update the XML in the
+open workbook. The results topbar's **Save workbook** button invokes Excel Save
+for the entire workbook, including review XML and unrelated workbook edits;
+Excel must be saved to persist those changes on disk. Unsupported review versions
+fail without replacing their payload.
 Reviews belonging to replaced document identities remain in the XML store;
 the current pane exposes only the active document's review and scan archives.
 
@@ -161,22 +167,41 @@ Re-OCR with a different fingerprint requires review again. Manual figures whose
 anchors cannot be reproduced remain in the archive. Page-review markers are
 explicit reviewer declarations, never inferred from suggestion counts; equation
 or value changes clear them. Independent arithmetic-result, sum-type and
-review-status filters intersect across all pages; choosing a page for manual
-review does not restrict the suggestion list. Rows carry table context, row and
-column labels, arithmetic results and human decisions. Selecting a row navigates
-to its printed target and highlights the selected operands.
+review-status filters intersect across all pages; review statuses are checkboxes
+whose selected values form a union. Rejected equations remain stored but are
+excluded from the current list, highlights, counts and visible scan archives.
+Choosing a page for manual review does not restrict the suggestion list. Rows
+group solely by page, ordered by target position, and carry row and column
+labels, arithmetic results and human decisions. Each row owns its approve,
+reject, defer, edit and difference-explanation controls.
 
-Each table's bulk action captures only matching, readable, pending equation ids
+The PDF initially highlights all targets matching the filters. Selecting a row
+or target navigates to that sum and replaces the overview with its target and
+operands. Clicking away, toggling the selection, or completing a decision restores
+the overview. Hovering a row temporarily shows that sum's components without
+changing the selection or scrolling; leaving restores the selection or overview.
+The hover preview does not expand row content or move action buttons.
+
+Each page's bulk action captures only matching, readable, pending equation ids
 and presents an explicit confirmation list. It excludes approved, rejected and
-unreadable relationships. A changed filter or loaded/saved revision discards the
-confirmation. Details and keyboard decisions operate only on visible equations;
-an empty filter clears selection and source highlights. After an acknowledged
-decision, selection advances to another pending match in source order, including
-later pages, excluding ids just decided while other pending matches remain.
+unreadable relationships. A changed filter or loaded/updated revision discards the
+confirmation. Row and keyboard decisions operate only on visible equations;
+an empty filter clears selection and source highlights. Decisions clear focus;
+no next sum is selected automatically.
 Alt+A/R/D approve, reject or defer outside editor inputs. Navigation is disabled
 while a request, equation edit, missing-figure selection or unsaved difference
 explanation is unfinished. Manual sums, source figures, explicit page coverage,
 undo and history live in the separate review-tools section.
+
+Repeated review actions reuse the host's decoded scan and staleness result only
+while the complete source workspace XML is unchanged. After worker evaluation,
+the host rechecks that XML and the saved review before replacing review state.
+The worker caches one immutable scan-derived workspace keyed by the complete scan
+and value payloads; alignment copies it before edits, so cached data never contains
+reviewer decisions. Source changes invalidate reuse. Workbook Save runs inside
+the same host gate after pending XML writes, without dispatching to Python or
+creating a review revision. Cancelled or failed Excel saves preserve open-workbook
+review state and report failure.
 
 ### Legacy detection
 
@@ -353,22 +378,29 @@ by diagnostics so loss of recognition is still visible to development tooling.
 unreviewed state, approval/difference separation, dependency invalidation,
 atomic bulk failure, conflicting revisions, manual source anchors, cycles and
 subtotal overlap in both approval orders, undo, scan archives, upgrade retention,
-and real worker NDJSON dispatch. Its statement is synthetic, not a blessed
+immutable scan-cache reuse/invalidation, and real worker NDJSON dispatch. Its statement is synthetic, not a blessed
 detector golden. The legacy detector fixtures and scorer remain unchanged.
 
 The web `review-controller.test.ts` tests acknowledgement ownership, preview
-isolation, failure preservation, request identity, undo and explicit bulk scope.
+isolation, failure preservation, request identity, undo, explicit bulk scope,
+silent direct XML updates, and independent workbook-save acknowledgements and failures.
 `review-queue.test.ts` tests document-wide source ordering, both detected axes,
-intersecting filters, visible selection, cross-page advancement, deferred/bulk
-advancement and table approval restricted to filtered readable pending ids.
+checkbox status unions, rejection exclusion, intersecting filters, visible
+selection, page grouping across tables/manual regions and page approval restricted
+to filtered readable pending ids.
 `scripts/generate_reconcile_review.mjs --check` verifies generated Python,
 TypeScript and C# bindings against the contract. The contract carries synthetic
-JSON and XML samples. `scripts/test_reconcile_review_storage.ps1` checks the C#
+JSON and XML samples, including a direct XML update response and the workbook-save
+request and acknowledgement.
+`scripts/test_reconcile_review_storage.ps1` checks the C#
 serializer, multi-document preservation, unsupported versions, duplicate
 identities, schema validation and the generated C# reader.
 Its optional `-ExcelRoundtrip` check uses the built add-in's actual store in a
 separate hidden Excel instance and a fresh synthetic workbook under `output/`.
-It verifies both document reviews and the existing workspace survive save/reopen.
+It verifies automatic XML commits through the actual service and packaged worker,
+source-cache invalidation, invalid/scan-time saves, and the workbook-save proxy.
+Both document reviews, the existing workspace and unrelated sheet edits survive
+save/reopen.
 
 `scripts/preview_reconcile_review.py` serves the built pane with a synthetic
 PDF and real Python review operations on localhost. Its state lives in `output/`

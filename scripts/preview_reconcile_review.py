@@ -35,13 +35,19 @@ cells.append({"id": "unresolved", "bounds": {"x": .75, "y": .44, "width": .08, "
 totals.append({"id": "unresolved", "cellId": "unresolved", "axis": "vertical", "resolution": {"addendCellIds": []}})
 MODEL["tables"].append({"id": "page-two", "pageIndex": 1, "bounds": {"x": .1, "y": .1, "width": .75, "height": .4},
     "rowCount": 4, "cells": cells, "headerLabels": MODEL["tables"][0]["headerLabels"], "totals": totals})
-MODEL.update(summary={"tablesExamined": 2, "totalsNominated": 8, "confirmed": 5, "breaks": 2, "unresolved": 1}, findings=[])
+MODEL["tables"].append({"id": "another-table-on-page-one", "pageIndex": 0, "bounds": {"x": .1, "y": .75, "width": .75, "height": .2},
+    "rowCount": 3, "cells": [{"id": f"other-{row}", "bounds": {"x": .6, "y": .78 + row * .05, "width": .08, "height": .025},
+        "text": value, "normalizedValue": value, "rowLabel": label, "columnIndex": 0}
+        for row, (label, value) in enumerate([("Cash", "5"), ("Investments", "6"), ("Total assets", "11")])],
+    "headerLabels": [{"columnIndex": 0, "text": "2025"}],
+    "totals": [{"id": "other-total", "cellId": "other-2", "axis": "vertical", "resolution": {"addendCellIds": ["other-0", "other-1"]}}]})
+MODEL.update(summary={"tablesExamined": 3, "totalsNominated": 9, "confirmed": 6, "breaks": 2, "unresolved": 1}, findings=[])
 PDF = fitz.open()
 for page_index in range(3):
     page = PDF.new_page(width=600, height=800)
     page.insert_text((60, 50), "Synthetic statement - review workflow preview", fontsize=14)
     if page_index < 2:
-        for cell in MODEL["tables"][page_index]["cells"]:
+        for cell in [cell for table in MODEL["tables"] if table["pageIndex"] == page_index for cell in table["cells"]]:
             bounds = cell["bounds"]
             page.insert_text((60, bounds["y"] * 800 + 13), cell["rowLabel"], fontsize=11)
             page.insert_text((bounds["x"] * 600, bounds["y"] * 800 + 13), cell["text"], fontsize=11)
@@ -97,6 +103,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/review": return self.send_error(404)
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if request["mode"] == "save-workbook":
+            # UI acknowledgement only: this harness has no Excel workbook.
+            return self.reply({"type": "reconcile-review-response", "version": 1, "requestId": request["requestId"],
+                               "pdfId": request["pdfId"], "status": "workbook-saved"})
         result = handle_job({"job_id": "preview", "command": "reconcile-review", "request": request,
                              "model_base64": MODEL_BASE64, "values_base64": "", "review_base64": STATE.read_text() if STATE.exists() else ""})
         if result["review_base64"]: STATE.write_text(result["review_base64"])

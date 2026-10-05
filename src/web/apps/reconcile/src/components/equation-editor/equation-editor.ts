@@ -77,7 +77,7 @@ export class EquationEditor {
     value.addEventListener("input", () => { state.correctedValue = value.value; });
     reason.addEventListener("input", () => { state.correctionReason = reason.value; });
     const copy = document.createElement("p"); copy.textContent = "Select a value above. Corrections apply to this review and reset affected approvals. Leave the decimal empty to restore the recognized value.";
-    correction.append(summary, copy, value, reason, button("Save value correction", () => {
+    correction.append(summary, copy, value, reason, button("Apply value correction", () => {
       if (selected() && reason.value.trim()) callbacks.onCorrection({ cellId: select.value, value: value.value.trim(), reason: reason.value.trim() });
     }, disabled));
     this.element.append(correction);
@@ -85,7 +85,7 @@ export class EquationEditor {
     preview.textContent = evaluation ? evaluation.state === "not-evaluable" ? evaluation.reason
       : `Selected operands = ${evaluation.sum}; difference = ${evaluation.delta}${evaluation.state === "exact-match" ? " · figures tie" : ""}` : "Calculate to preview the selected equation.";
     this.element.append(preview, button("Calculate", callbacks.onCalculate, disabled),
-      button("Save equation", callbacks.onSave, disabled), button("Cancel edit", callbacks.onCancel, disabled));
+      button("Apply equation", callbacks.onSave, disabled), button("Cancel edit", callbacks.onCancel, disabled));
   }
 }
 
